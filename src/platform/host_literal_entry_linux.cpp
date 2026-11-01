@@ -4,7 +4,6 @@
 
 #include <fcntl.h>
 #include <linux/fs.h>
-#include <linux/magic.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/vfs.h>
@@ -16,6 +15,8 @@ namespace host_platform {
 
 namespace {
 
+constexpr decltype(statfs::f_type) kFuseSuperMagic = 0x65735546;
+
 bool DirectoryFoldsNames(const std::string& dir) {
     const int fd = open(dir.c_str(), O_RDONLY | O_DIRECTORY | O_NONBLOCK | O_CLOEXEC);
     if (fd < 0) return false;
@@ -23,7 +24,7 @@ bool DirectoryFoldsNames(const std::string& dir) {
     struct statfs fs {};
     struct stat   marker {};
     const bool    folds = (ioctl(fd, FS_IOC_GETFLAGS, &flags) == 0 && (flags & FS_CASEFOLD_FL) != 0) ||
-                       (fstatfs(fd, &fs) == 0 && fs.f_type == FUSE_SUPER_MAGIC &&
+                       (fstatfs(fd, &fs) == 0 && fs.f_type == kFuseSuperMagic &&
                         fstatat(fd, ".ciopfs", &marker, AT_NO_AUTOMOUNT) == 0);
     close(fd);
     return folds;

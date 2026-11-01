@@ -56,6 +56,17 @@ elseif(ANDROID)
     cerfcore_find_library(CERFCORE_PCRE2_LIBRARY pcre2-8)
     list(APPEND cerfcore_slirp_libraries "${CERFCORE_GLIB_LIBRARY}" "${CERFCORE_INTL_LIBRARY}"
                                          "${CERFCORE_PCRE2_LIBRARY}" atomic m)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CERFCORE_SLIRP_LIBRARY MATCHES "\\.a$")
+    cerfcore_find_library(CERFCORE_GLIB_LIBRARY glib-2.0)
+    cerfcore_find_library(CERFCORE_PCRE2_LIBRARY pcre2-8)
+    list(APPEND cerfcore_slirp_libraries "${CERFCORE_GLIB_LIBRARY}" "${CERFCORE_PCRE2_LIBRARY}" m)
+    set(cerfcore_hidden_archives "")
+    foreach(cerfcore_archive IN ITEMS "${CERFCORE_SLIRP_LIBRARY}" "${CERFCORE_GLIB_LIBRARY}"
+                                      "${CERFCORE_PCRE2_LIBRARY}")
+        get_filename_component(cerfcore_archive_name "${cerfcore_archive}" NAME)
+        list(APPEND cerfcore_hidden_archives "${cerfcore_archive_name}")
+    endforeach()
+    list(JOIN cerfcore_hidden_archives ":" cerfcore_hidden_archives)
 endif()
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/cerfcore_host_sources.cmake")
@@ -78,6 +89,9 @@ endif()
 target_link_libraries(cerfcore PUBLIC "$<LINK_LIBRARY:WHOLE_ARCHIVE,cerfengine::cerfengine>"
                                       nlohmann_json::nlohmann_json
                                PRIVATE ${cerfcore_slirp_libraries})
+if(cerfcore_hidden_archives)
+    target_link_options(cerfcore INTERFACE "LINKER:--exclude-libs,${cerfcore_hidden_archives}")
+endif()
 
 if(WIN32)
     target_compile_definitions(cerfcore PUBLIC UNICODE _UNICODE)
