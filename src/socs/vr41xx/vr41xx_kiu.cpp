@@ -155,7 +155,7 @@ void Vr41xxKiu::ClearScanStpLocked() {
    p520). Scan end reaches interval, "waiting for the start of the next key scan" (VR4102 UM
    21.2.3 p428; VR4111 UM Fig 22-3 p473, VR4121 UM Fig 22-5 p525). */
 void Vr41xxKiu::CompleteScanLocked() {
-    emu_.Get<Vr41xxCmu>().RequireTclock(kCmuMskKiu, "KIU key scan completion");
+    emu_.Get<Vr41xxCmu>().RequireClock(kCmuMskKiu, "KIU key scan completion");
     LatchScanLocked();
     data_unread_ = true;
     causes_ |= kKDatRdy;
@@ -254,7 +254,7 @@ void Vr41xxKiu::PublishCausesLocked() { emu_.Get<Vr41xxIcu>().SetKiuSource(cause
 
 void Vr41xxKiu::RequireTclockIfTimedLocked(const char* operation) {
     if (sstat_ == kSStatScanning || sstat_ == kSStatInterval)
-        emu_.Get<Vr41xxCmu>().RequireTclock(kCmuMskKiu, operation);
+        emu_.Get<Vr41xxCmu>().RequireClock(kCmuMskKiu, operation);
 }
 
 uint16_t Vr41xxKiu::ReadHalf(uint32_t addr) {
@@ -426,7 +426,7 @@ void Vr41xxKiu::PostRestore() {
    key scan and when the next scan operation starts" (VR4111 UM 22.2.6 p468 D[2] cell, VR4121 UM
    22.2.6 p520 prose; VR4102 UM 21.2.6 p431 carries the bit with no such prose). */
 void Vr41xxKiu::ArmScanLocked(uint64_t start) {
-    emu_.Get<Vr41xxCmu>().RequireTclock(kCmuMskKiu, "KIU key scan");
+    emu_.Get<Vr41xxCmu>().RequireClock(kCmuMskKiu, "KIU key scan");
     if (data_unread_) causes_ |= kKDatLost;
     PublishCausesLocked();
     scan_in_flight_ = true;

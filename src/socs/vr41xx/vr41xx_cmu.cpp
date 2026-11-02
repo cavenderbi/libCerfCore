@@ -5,11 +5,11 @@
 
 namespace cerfcore {
 
-void Vr41xxCmu::RequireTclock(uint16_t mask_bit, const char* operation) const {
+void Vr41xxCmu::RequireClock(uint16_t mask_bit, const char* operation) const {
     const uint16_t mask = ClockMask();
     if ((mask & mask_bit) == 0u) {
-        emu_.Get<Fatal>().Die("Vr41xxCmu: %s with CMUCLKMSK 0x%04X masking its TClock; the unit "
-                              "without TClock is not modeled", operation, mask);
+        emu_.Get<Fatal>().Die("Vr41xxCmu: %s with CMUCLKMSK 0x%04X masking the unit's clock; the unit "
+                              "without its clock is not modeled", operation, mask);
     }
 }
 

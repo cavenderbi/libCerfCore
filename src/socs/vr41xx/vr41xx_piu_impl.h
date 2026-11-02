@@ -310,7 +310,7 @@ private:
     }
 
     void BeginScanLocked(uint16_t kind, uint64_t start_tick, uint64_t start_cycle) {
-        cmu_->RequireTclock(kCmuMskPiu, "PIU scan start");
+        cmu_->RequireClock(kCmuMskPiu, "PIU scan start");
         scan_.Begin(kind, stbl_, start_tick, start_cycle);
     }
 

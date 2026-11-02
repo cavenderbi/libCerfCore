@@ -47,7 +47,7 @@ uint32_t Vr41xxPiuConverter::MmioBase() const { return emu_.Get<Vr41xxPiu>().Piu
 uint32_t Vr41xxPiuConverter::MmioSize() const { return emu_.Get<Vr41xxPiu>().Piu2Size(); }
 
 int Vr41xxPiuConverter::ConvertCoordinates(uint16_t pos_x, uint16_t pos_y) {
-    emu_.Get<Vr41xxCmu>().RequireTclock(kCmuMskPiu, "PIU coordinate sample");
+    emu_.Get<Vr41xxCmu>().RequireClock(kCmuMskPiu, "PIU coordinate sample");
     std::lock_guard<std::mutex> lk(mtx_);
     const int page = next_page_;
     uint16_t (&buf)[5] = page_buf_[page];
@@ -66,7 +66,7 @@ int Vr41xxPiuConverter::ConvertCoordinates(uint16_t pos_x, uint16_t pos_y) {
 }
 
 bool Vr41xxPiuConverter::ConvertCommand(uint16_t cmd, uint16_t pos_x, uint16_t pos_y) {
-    emu_.Get<Vr41xxCmu>().RequireTclock(kCmuMskPiu, "PIU command scan");
+    emu_.Get<Vr41xxCmu>().RequireClock(kCmuMskPiu, "PIU command scan");
     std::lock_guard<std::mutex> lk(mtx_);
     const std::optional<uint16_t> val = emu_.Get<Vr41xxPiuPanel>().ConvertCommandPort(
         static_cast<uint16_t>(cmd & 0x000Fu), pos_x, pos_y);
@@ -77,7 +77,7 @@ bool Vr41xxPiuConverter::ConvertCommand(uint16_t cmd, uint16_t pos_x, uint16_t p
 /* Buffer slot n's port = (TPPSCAN?0:4)+n; PIUAMSKREG bit index = that port (VR4121 UM
    Table 20-5 + 20.3.7, VR4102 UM Table 19-5 + 19.3.7). */
 bool Vr41xxPiuConverter::ScanAdPorts(uint16_t ascn, uint16_t amsk) {
-    emu_.Get<Vr41xxCmu>().RequireTclock(kCmuMskPiu, "PIU A/D port scan");
+    emu_.Get<Vr41xxCmu>().RequireClock(kCmuMskPiu, "PIU A/D port scan");
     std::lock_guard<std::mutex> lk(mtx_);
     const uint16_t port_base = (ascn & kTppScan) ? 0u : 4u;
     bool any_valid = false;
