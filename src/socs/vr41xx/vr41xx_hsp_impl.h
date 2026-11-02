@@ -1,10 +1,11 @@
 #pragma once
 
-#include <cerfcore/peripherals/peripheral_base.h>
+#include "vr41xx_hsp.h"
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
+#include <cerfcore/host/guest_deep_sleep.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
@@ -32,15 +33,17 @@ inline constexpr uint32_t kOffIndex         = 0x04u;
 inline constexpr uint32_t kOffSignature     = 0x09u;
 inline constexpr uint16_t kInitWritable     = 0x001Fu;
 inline constexpr uint16_t kInitHsprst       = 0x0001u;
+inline constexpr uint16_t kInitBsc          = 0x0002u;
+inline constexpr uint16_t kExtOutAferst     = 0x0004u;
 inline constexpr uint16_t kIndexExtOut      = 2u;
 inline constexpr uint16_t kExtOutWritable   = 0x006Du;
 inline constexpr uint16_t kExtOutAfterReset = 0x0004u;
 inline constexpr std::array<uint8_t, 6> kSignature = { 'P', 'C', 't', 'e', 'l', 0xAAu };
 
 template <const std::string_view& Soc, const Vr41xxHspChip& Chip>
-class Vr41xxHspBase : public Peripheral {
+class Vr41xxHspBase : public Vr41xxHsp {
 public:
-    using Peripheral::Peripheral;
+    using Vr41xxHsp::Vr41xxHsp;
 
     bool ShouldRegister() override {
         return emu_.Get<BoardContext>().GetSocId() == Soc;
@@ -50,7 +53,13 @@ public:
         emu_.Get<PeripheralDispatcher>().Register(this);
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
             init_ = 0u;
+            hibernating_ = false;
             ResetCore();
+            DriveAferstPin();
+        });
+        emu_.Get<GuestDeepSleep>().RegisterSleepEntryListener([this] {
+            hibernating_ = true;
+            DriveAferstPin();
         });
     }
 
@@ -112,6 +121,7 @@ public:
         w.Write<uint8_t>("unlocked", unlocked_ ? 1u : 0u);
         w.Write("signature_pos", signature_pos_);
         w.Write<uint8_t>("signature_broken", signature_broken_ ? 1u : 0u);
+        w.Write<uint8_t>("hibernating", hibernating_ ? 1u : 0u);
     }
 
     void RestoreState(StateReader& r) override {
@@ -131,7 +141,12 @@ public:
         uint8_t broken = 0u;
         r.Read("signature_broken", broken);
         signature_broken_ = broken != 0u;
+        uint8_t hibernating = 0u;
+        r.Read("hibernating", hibernating);
+        hibernating_ = hibernating != 0u;
     }
+
+    void PostRestore() override { DriveAferstPin(); }
 
 private:
     void RequireClock(const char* operation) const {
@@ -146,6 +161,10 @@ private:
         unlocked_ = false;
         signature_pos_ = 0u;
         signature_broken_ = false;
+    }
+
+    void DriveAferstPin() {
+        DriveAferst(!hibernating_ && (init_ & kInitBsc) != 0u && (extout_ & kExtOutAferst) != 0u);
     }
 
     [[noreturn]] void DieCore(const char* access, std::optional<uint16_t> value, const char* reason) const {
@@ -185,9 +204,10 @@ private:
         if ((value & kInitHsprst) != 0u) {
             ResetCore();
             init_ = Chip.hsprst_resets_init ? 0u : value;
-            return;
+        } else {
+            init_ = value;
         }
-        init_ = value;
+        DriveAferstPin();
     }
 
     void WriteData(uint16_t value) {
@@ -199,6 +219,7 @@ private:
         if ((value & ~kExtOutWritable) != 0u)
             emu_.Get<Fatal>().Die("[HSP] HSPEXTOUT write 0x%04X sets reserved bits", value);
         extout_ = value;
+        DriveAferstPin();
     }
 
     void WriteSignature(uint8_t value) {
@@ -226,6 +247,7 @@ private:
     bool     unlocked_      = false;
     uint8_t  signature_pos_ = 0u;
     bool     signature_broken_ = false;
+    bool     hibernating_   = false;
 };
 
 }

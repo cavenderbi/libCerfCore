@@ -59,10 +59,6 @@ inline constexpr uint8_t kRsrDis = 0x40;
    p. 1-159: "The maximum count reached by any counter is 192 (C0H)". */
 inline constexpr uint8_t kTallyMax = 0xC0;
 
-/* DP8390D datasheet, 1992 National LAN databook, AUTODIN II generator
-   p. 1-133. */
-inline constexpr uint32_t kAutodinIIPoly = 0x04C11DB7u;
-
 }
 
 class Dp8390 {

@@ -1,6 +1,7 @@
 #include "dp8390_receiver.h"
 
 #include <cerfcore/core/byte_order.h>
+#include <cerfcore/core/crc32.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
 #include "../../net/ipv4_packet.h"
@@ -13,19 +14,14 @@ using namespace dp8390;
 
 namespace {
 
-/* DP8390D datasheet, 1992 National LAN databook, MAR0-MAR7 p. 1-158. */
+constexpr uint32_t kMulticastIndexBits = 6u;
+
 uint32_t MulticastFilterBit(const uint8_t* dest) {
-    uint32_t crc = 0xFFFFFFFFu;
-    for (std::size_t i = 0; i < cerf::inet::kEthMacSize; ++i) {
-        uint8_t octet = dest[i];
-        for (int bit = 0; bit < 8; ++bit) {
-            const uint32_t feed = ((crc >> 31) ^ octet) & 0x1u;
-            crc <<= 1;
-            octet >>= 1;
-            if (feed != 0u) crc ^= kAutodinIIPoly;
-        }
-    }
-    return crc >> 26;
+    const uint32_t reflected = ~Crc32::Update(0u, dest, cerf::inet::kEthMacSize);
+    uint32_t index = 0u;
+    for (uint32_t i = 0; i < kMulticastIndexBits; ++i)
+        index |= ((reflected >> i) & 1u) << (kMulticastIndexBits - 1u - i);
+    return index;
 }
 
 }

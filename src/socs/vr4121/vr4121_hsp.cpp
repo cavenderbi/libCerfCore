@@ -14,6 +14,6 @@ public:
 
 }
 
-REGISTER_SERVICE(Vr4121Hsp);
+REGISTER_SERVICE_AS(Vr4121Hsp, Vr41xxHsp);
 
 }

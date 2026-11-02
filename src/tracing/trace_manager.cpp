@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/crc32.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/boot/rom_parser_service.h>
@@ -12,25 +13,6 @@
 namespace cerfcore {
 
 REGISTER_SERVICE(TraceManager);
-
-namespace {
-
-/* CRC-32 / zlib (polynomial 0xEDB88320, init 0xFFFFFFFF, final XOR
-   0xFFFFFFFF). Compatible with `python -c "import zlib;
-   print(hex(zlib.crc32(open('x','rb').read())))"` so callers can
-   pre-compute the bundle CRC offline and embed it in hook files. */
-uint32_t Crc32Update(uint32_t crc, const uint8_t* data, size_t n) {
-    crc = ~crc;
-    for (size_t i = 0; i < n; ++i) {
-        crc ^= data[i];
-        for (int j = 0; j < 8; ++j) {
-            crc = (crc >> 1) ^ ((crc & 1u) ? 0xEDB88320u : 0u);
-        }
-    }
-    return ~crc;
-}
-
-}  /* namespace */
 
 std::optional<uint8_t> TraceContext::ReadVa8(uint32_t va) const {
     auto host = emu.Get<EngineBridge>().Guest().PeekGuestVa(va);
@@ -62,7 +44,7 @@ uint32_t TraceManager::ComputeBundleCrc32() const {
     uint32_t crc = 0;
     if (auto* rom = emu_.TryGet<RomParserService>()) {
         for (const auto& r : rom->Loaded())
-            crc = Crc32Update(crc, r.raw.data(), r.raw.size());
+            crc = Crc32::Update(crc, r.raw.data(), r.raw.size());
     }
     return crc;
 }

@@ -1,0 +1,104 @@
+#pragma once
+
+#include <cstdint>
+
+namespace cerfcore::rcvdl56dpfl_reg {
+
+inline constexpr uint32_t kRbuffer    = 0x00u;
+inline constexpr uint32_t kStatus01   = 0x01u;
+inline constexpr uint32_t kControl02  = 0x02u;
+inline constexpr uint32_t kControl03  = 0x03u;
+inline constexpr uint32_t kControl04  = 0x04u;
+inline constexpr uint32_t kControl05  = 0x05u;
+inline constexpr uint32_t kFormat     = 0x06u;
+inline constexpr uint32_t kLoopback   = 0x07u;
+inline constexpr uint32_t kTransmit   = 0x08u;
+inline constexpr uint32_t kMode       = 0x09u;
+inline constexpr uint32_t kStatus0A   = 0x0Au;
+inline constexpr uint32_t kStatus0C   = 0x0Cu;
+inline constexpr uint32_t kStatus0D   = 0x0Du;
+inline constexpr uint32_t kStatus0E   = 0x0Eu;
+inline constexpr uint32_t kStatus0F   = 0x0Fu;
+inline constexpr uint32_t kTbuffer    = 0x10u;
+inline constexpr uint32_t kControl11  = 0x11u;
+inline constexpr uint32_t kConf       = 0x12u;
+inline constexpr uint32_t kControl13  = 0x13u;
+inline constexpr uint32_t kDownload   = 0x14u;
+inline constexpr uint32_t kPower      = 0x15u;
+inline constexpr uint32_t kSecrxb     = 0x16u;
+inline constexpr uint32_t kSectxb     = 0x17u;
+inline constexpr uint32_t kMedal      = 0x18u;
+inline constexpr uint32_t kSecondary  = 0x1Au;
+inline constexpr uint32_t kDtmfStatus = 0x1Bu;
+inline constexpr uint32_t kMeaddl     = 0x1Cu;
+inline constexpr uint32_t kMemAccess  = 0x1Du;
+inline constexpr uint32_t kBuffer     = 0x1Eu;
+inline constexpr uint32_t kNewStatus  = 0x1Fu;
+
+inline constexpr uint8_t kTxhf        = 0x04u;
+inline constexpr uint8_t kRxhf        = 0x02u;
+inline constexpr uint8_t kRxp         = 0x01u;
+inline constexpr uint8_t kS511        = 0x20u;
+inline constexpr uint8_t kV54Enables  = 0x07u;
+inline constexpr uint8_t kRlsde       = 0x10u;
+inline constexpr uint8_t kGts         = 0x01u;
+inline constexpr uint8_t kFifoen      = 0x10u;
+inline constexpr uint8_t kTxsq        = 0x10u;
+inline constexpr uint8_t kCeq         = 0x08u;
+inline constexpr uint8_t kHdlc        = 0x10u;
+inline constexpr uint8_t kPen         = 0x08u;
+inline constexpr uint8_t kStb         = 0x04u;
+inline constexpr uint8_t kWdszMask    = 0x03u;
+inline constexpr uint8_t kRdl         = 0x40u;
+inline constexpr uint8_t kL2act       = 0x20u;
+inline constexpr uint8_t kL3act       = 0x08u;
+inline constexpr uint8_t kMhld        = 0x01u;
+inline constexpr uint8_t kAsyn        = 0x80u;
+inline constexpr uint8_t kTpdm        = 0x40u;
+inline constexpr uint8_t kV21s        = 0x20u;
+inline constexpr uint8_t kV54Sends    = 0x1Cu;
+inline constexpr uint8_t kRtrn        = 0x02u;
+inline constexpr uint8_t kRts         = 0x01u;
+inline constexpr uint8_t kLeasedLine  = 0x08u;
+inline constexpr uint8_t kData        = 0x04u;
+inline constexpr uint8_t kDtr         = 0x01u;
+inline constexpr uint8_t kOe          = 0x08u;
+inline constexpr uint8_t kCrcs        = 0x04u;
+inline constexpr uint8_t kFlags       = 0x02u;
+inline constexpr uint8_t kRxfne       = 0x02u;
+inline constexpr uint8_t kTxfnf       = 0x02u;
+inline constexpr uint8_t kRlsd        = 0x80u;
+inline constexpr uint8_t kFed         = 0x40u;
+inline constexpr uint8_t kCts         = 0x20u;
+inline constexpr uint8_t kDsr         = 0x10u;
+inline constexpr uint8_t kV54dt       = 0x01u;
+inline constexpr uint8_t kTeof        = 0x02u;
+inline constexpr uint8_t kTxp         = 0x01u;
+inline constexpr uint8_t kTxclkMask   = 0x03u;
+inline constexpr uint8_t kTxclkInternal = 0x00u;
+inline constexpr uint8_t kTxclkSlave  = 0x03u;
+inline constexpr uint8_t kSpeedMask   = 0x1Fu;
+inline constexpr uint8_t kSleep       = 0x80u;
+inline constexpr uint8_t kRren        = 0x04u;
+inline constexpr uint8_t kExl3        = 0x02u;
+inline constexpr uint8_t kEarc        = 0x01u;
+inline constexpr uint8_t kSfres       = 0x80u;
+inline constexpr uint8_t kMeacc       = 0x80u;
+inline constexpr uint8_t kMeaddExt    = 0x40u;
+inline constexpr uint8_t kMemw        = 0x20u;
+inline constexpr uint8_t kMemcr       = 0x10u;
+inline constexpr uint8_t kMeaddhMask  = 0x0Fu;
+inline constexpr uint8_t kTdbia       = 0x80u;
+inline constexpr uint8_t kRdbia       = 0x40u;
+inline constexpr uint8_t kTdbie       = 0x20u;
+inline constexpr uint8_t kTdbe        = 0x08u;
+inline constexpr uint8_t kRdbie       = 0x04u;
+inline constexpr uint8_t kRdbf        = 0x01u;
+inline constexpr uint8_t kNsia        = 0x80u;
+inline constexpr uint8_t kNcia        = 0x40u;
+inline constexpr uint8_t kNsie        = 0x10u;
+inline constexpr uint8_t kNews        = 0x08u;
+inline constexpr uint8_t kNcie        = 0x04u;
+inline constexpr uint8_t kNewc        = 0x01u;
+
+}
