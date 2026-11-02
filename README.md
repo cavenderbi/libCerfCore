@@ -6,7 +6,8 @@ Cross-platform CE Runtime Foundation emulator backend implementation
 
 Visit [root repository for details](https://github.com/gweslab/cerf)
 
-> [!NOTE]
-> Hey - if you are going to build another frontend for CERF I would appreciate and shake your hand if you would mention that your app uses CE Runtime Foundation Emulator or something like this. Thanks.
+> [!WARNING]
+> - Any fork [must show](LICENSE) "Based on CE Runtime Foundation by Yaroslav Kibysh - https://cerf.cx" in its UI
+> - Non-commercial use only. Contact cerf.commercial@yaroslavkibysh.com for commercial usage license.
 
-[MIT](LICENSE) / [3rd Party Notices](THIRD_PARTY_NOTICES.md)
+[CE Runtime Foundation License](LICENSE) / [3rd Party Notices](THIRD_PARTY_NOTICES.md)
