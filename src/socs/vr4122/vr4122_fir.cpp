@@ -1,18 +1,38 @@
-#include "../vr41xx/vr41xx_fir_impl.h"
+#include "../vr41xx/vr41xx_reg_window_impl.h"
 #include "vr4122_id.h"
+
+#include <cstdint>
 
 namespace cerfcore {
 
 namespace {
 
-/* VR4122 FIR base 0x0F000840 (NetBSD hpcmips vripreg.h VR4122_FIR_ADDR); guest
-   serial.dll reads IRSR1 at 0x0F000858 = base+0x18. */
-class Vr4122Fir : public cerf_vr41xx_fir_detail::Vr41xxFirBase<SocId::Vr4122, 0x0F000840u> {
+using cerf_vr41xx_reg_window_detail::ReadKind;
+using cerf_vr41xx_reg_window_detail::Vr41xxRegWindowBase;
+using cerf_vr41xx_reg_window_detail::Vr41xxRegWindowModel;
+using cerf_vr41xx_reg_window_detail::WriteKind;
+
+constexpr uint32_t kOffFrstr = 0x00u;
+constexpr uint32_t kOffIrsr1 = 0x18u;
+
+constexpr Vr41xxRegWindowModel Vr4122FirModel() {
+    Vr41xxRegWindowModel m{0x0F000840u, kOffIrsr1 + 2u, kOffIrsr1 / 2u + 1u, false, {}};
+    m.reg[kOffFrstr / 2u] = {ReadKind::kZero, WriteKind::kFatal};
+    m.reg[kOffIrsr1 / 2u] = {ReadKind::kZero, WriteKind::kDrop};
+    return m;
+}
+
+constexpr Vr41xxRegWindowModel kVr4122FirModel = Vr4122FirModel();
+
+class Vr4122Fir : public Vr41xxRegWindowBase<SocId::Vr4122, kVr4122FirModel> {
 public:
-    using Vr41xxFirBase::Vr41xxFirBase;
+    using Vr41xxRegWindowBase::Vr41xxRegWindowBase;
+
+protected:
+    const char* RegStateName() const override { return "fir_reg"; }
 };
 
-}  /* namespace */
+}
 
 REGISTER_SERVICE(Vr4122Fir);
 

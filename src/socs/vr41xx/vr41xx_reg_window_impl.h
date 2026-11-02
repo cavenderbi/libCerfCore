@@ -16,7 +16,7 @@ namespace cerfcore {
 
 namespace cerf_vr41xx_reg_window_detail {
 
-constexpr uint32_t kMaxRegs = 16u;
+constexpr uint32_t kMaxRegs = 32u;
 
 enum class ReadKind : uint8_t {
     kFatal,
@@ -60,19 +60,14 @@ public:
     using Base::Base;
 
     bool ShouldRegister() override {
-        auto* bd = this->emu_.template TryGet<BoardContext>();
-        return bd && bd->GetSocId() == Soc;
+        return this->emu_.template Get<BoardContext>().GetSocId() == Soc;
     }
 
     void OnReady() override {
         for (uint32_t i = 0; i < M.num_regs; ++i) reg_[i] = ResetValue(i, true);
         this->emu_.template Get<PeripheralDispatcher>().Register(this);
         this->emu_.template Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
-            const bool rtc = kind == ResetLineKind::Rtc;
-            for (uint32_t i = 0; i < M.num_regs; ++i) {
-                if (rtc || M.reg[i].other_reset == OtherReset::kReset) reg_[i] = ResetValue(i, rtc);
-                undefined_[i] = rtc ? uint16_t{0} : M.reg[i].undefined_on_other_reset;
-            }
+            ResetRegisterFile(kind == ResetLineKind::Rtc);
             AfterReset();
         });
     }
@@ -163,6 +158,13 @@ protected:
     }
 
     uint16_t StoredReg(uint32_t i) const { return reg_[i]; }
+
+    void ResetRegisterFile(bool rtc) {
+        for (uint32_t i = 0; i < M.num_regs; ++i) {
+            if (rtc || M.reg[i].other_reset == OtherReset::kReset) reg_[i] = ResetValue(i, rtc);
+            undefined_[i] = rtc ? uint16_t{0} : M.reg[i].undefined_on_other_reset;
+        }
+    }
 
     void ApplyStoredWrite(uint32_t offset, uint16_t value) {
         const uint32_t i = offset / 2u;

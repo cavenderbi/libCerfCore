@@ -1,71 +1,130 @@
 #pragma once
 
-#include <cerfcore/peripherals/peripheral_base.h>
-
-#include <cerfcore/boards/board_context.h>
-#include <cerfcore/core/cerf_emulator.h>
-#include "../../peripherals/peripheral_dispatcher.h"
-#include <cerfcore/state/state_stream.h>
-#include <cerfcore/socs/guest_cpu_reset.h>
+#include "vr41xx_reg_window_impl.h"
 
 #include <cstdint>
+#include <string_view>
 
 namespace cerfcore {
 
 namespace cerf_vr41xx_fir_detail {
 
-/* VR41xx FIR (Fast IrDA Interface Unit): IRSR1 at block offset 0x18
-   (VR4121 UM Table 27-1 p588 / VR4102 UM Table 26-1 p498). */
-template <const std::string_view& Soc, uint32_t Base>
-class Vr41xxFirBase : public Peripheral {
+using cerf_vr41xx_reg_window_detail::ReadKind;
+using cerf_vr41xx_reg_window_detail::Vr41xxRegSpec;
+using cerf_vr41xx_reg_window_detail::Vr41xxRegWindowBase;
+using cerf_vr41xx_reg_window_detail::Vr41xxRegWindowModel;
+using cerf_vr41xx_reg_window_detail::WriteKind;
+
+inline constexpr uint32_t kFirSize = 0x36u;
+
+inline constexpr uint32_t kOffFrstr  = 0x00u;
+inline constexpr uint32_t kOffDpintr = 0x02u;
+inline constexpr uint32_t kOffDpcntr = 0x04u;
+inline constexpr uint32_t kOffImr    = 0x14u;
+inline constexpr uint32_t kOffFsr    = 0x16u;
+inline constexpr uint32_t kOffIrsr1  = 0x18u;
+inline constexpr uint32_t kOffCrcsr  = 0x1Cu;
+inline constexpr uint32_t kOffFircr  = 0x1Eu;
+inline constexpr uint32_t kOffMircr  = 0x20u;
+inline constexpr uint32_t kOffDmacr  = 0x22u;
+inline constexpr uint32_t kOffDmaer  = 0x24u;
+inline constexpr uint32_t kOffRxir   = 0x28u;
+inline constexpr uint32_t kOffIfr    = 0x2Au;
+inline constexpr uint32_t kOffMrxf   = 0x30u;
+
+inline constexpr uint16_t kFrstrFrst      = 0x0001u;
+inline constexpr uint16_t kDpintrPageFlags = 0x000Fu;
+inline constexpr uint16_t kDpintrFdpint5  = 0x0010u;
+inline constexpr uint16_t kDpintrRfu      = 0xFFE0u;
+inline constexpr uint16_t kDpcntrWritable = 0x0001u;
+inline constexpr uint16_t kImrWritable    = 0x00FFu;
+inline constexpr uint16_t kFsrStored      = 0x00F8u;
+inline constexpr uint16_t kFsrTriggers    = 0x0007u;
+inline constexpr uint16_t kFsrTxStop      = 0x0001u;
+inline constexpr uint16_t kIrsr1Writable  = 0x0083u;
+inline constexpr uint16_t kIrsr1IrdaEn    = 0x0080u;
+inline constexpr uint16_t kCrcsrWritable  = 0x00F7u;
+inline constexpr uint16_t kFircrWritable  = 0x00E7u;
+inline constexpr uint16_t kFircrReadOnly  = 0x0018u;
+inline constexpr uint16_t kFircrAfterReset = 0x0085u;
+inline constexpr uint16_t kMircrWritable  = 0x00FFu;
+inline constexpr uint16_t kMircrAfterReset = 0x0049u;
+inline constexpr uint16_t kDmacrWritable  = 0x0047u;
+inline constexpr uint16_t kDmaerDmaEn     = 0x0001u;
+inline constexpr uint16_t kDmaerDmaBusy   = 0x0002u;
+inline constexpr uint16_t kMrxfWritable   = 0x1FFFu;
+
+constexpr Vr41xxRegSpec StoredSpec(uint16_t writable, uint16_t dropped, uint16_t reset) {
+    return {ReadKind::kStored, WriteKind::kStored, writable, reset, static_cast<uint16_t>(~(writable | dropped))};
+}
+
+constexpr Vr41xxRegSpec ZeroReadSpec(WriteKind write, uint16_t writable, uint16_t fatal_on_set) {
+    return {ReadKind::kZero, write, writable, 0u, fatal_on_set};
+}
+
+constexpr Vr41xxRegWindowModel FirModel(uint32_t base, uint16_t crcsr_after_reset, bool fdpint5_write_clears) {
+    Vr41xxRegWindowModel m{base, kFirSize, kFirSize / 2u, false, {}};
+    m.reg[kOffFrstr / 2u]  = StoredSpec(kFrstrFrst, 0u, 0u);
+    m.reg[kOffDpintr / 2u] = ZeroReadSpec(WriteKind::kDrop, kDpintrPageFlags | kDpintrFdpint5,
+                                          fdpint5_write_clears ? kDpintrRfu
+                                                               : static_cast<uint16_t>(kDpintrRfu | kDpintrFdpint5));
+    m.reg[kOffDpcntr / 2u] = StoredSpec(kDpcntrWritable, 0u, 0u);
+    m.reg[kOffImr / 2u]    = StoredSpec(kImrWritable, 0u, 0u);
+    m.reg[kOffFsr / 2u]    = StoredSpec(kFsrStored, kFsrTriggers, 0u);
+    m.reg[kOffIrsr1 / 2u]  = StoredSpec(kIrsr1Writable, 0u, 0u);
+    m.reg[kOffCrcsr / 2u]  = StoredSpec(kCrcsrWritable, 0u, crcsr_after_reset);
+    m.reg[kOffFircr / 2u]  = StoredSpec(kFircrWritable, kFircrReadOnly, kFircrAfterReset);
+    m.reg[kOffMircr / 2u]  = StoredSpec(kMircrWritable, 0u, kMircrAfterReset);
+    m.reg[kOffDmacr / 2u]  = StoredSpec(kDmacrWritable, 0u, 0u);
+    m.reg[kOffDmaer / 2u]  = ZeroReadSpec(WriteKind::kDrop, kDmaerDmaEn, static_cast<uint16_t>(~kDmaerDmaBusy));
+    m.reg[kOffRxir / 2u]   = ZeroReadSpec(WriteKind::kFatal, 0u, 0u);
+    m.reg[kOffIfr / 2u]    = ZeroReadSpec(WriteKind::kFatal, 0u, 0u);
+    m.reg[kOffMrxf / 2u]   = StoredSpec(kMrxfWritable, 0u, 0u);
+    return m;
+}
+
+template <const std::string_view& Soc, const Vr41xxRegWindowModel& M>
+class Vr41xxFirBase : public Vr41xxRegWindowBase<Soc, M> {
+    using Base = Vr41xxRegWindowBase<Soc, M>;
+
 public:
-    using Peripheral::Peripheral;
-
-    bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetSocId() == Soc;
-    }
-    void OnReady() override {
-        emu_.Get<PeripheralDispatcher>().Register(this);
-        /* FRSTR / IRSR1 RTCRST=0 / after-reset=0 (VR4121 UM 27.2.1 p589, 27.2.8 p598;
-           VR4102 UM 26.2.8 p507). */
-        emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) { frstr_ = 0; irsr1_ = 0; });
-    }
-
-    uint32_t MmioBase() const override { return Base; }
-    uint32_t MmioSize() const override { return 0x36u; }   /* Base .. Base+0x35 (RXFL 0x74 16-bit) */
+    using Base::Base;
 
     uint16_t ReadHalf(uint32_t addr) override {
-        const uint32_t off = addr - Base;
-        if (off == kOffFrstr) return frstr_;
-        if (off == kOffIrsr1) return irsr1_;
-        HaltUnsupportedAccess("FIR ReadHalf", addr, 0);
+        const uint32_t off = addr - M.base;
+        RequireReleased(addr, off, 0u);
+        if ((off == kOffDpintr || off == kOffRxir || off == kOffIfr) && IrdaEnabled())
+            this->HaltUnsupportedAccess("FIR ReadHalf with IRDA_EN set", addr, 0);
+        return Base::ReadHalf(addr);
     }
+
     void WriteHalf(uint32_t addr, uint16_t value) override {
-        const uint32_t off = addr - Base;
-        /* FRSTR (VR4121 UM 27.2.1 p589): D0 FRST R/W (1 Reset / 0 Normal); D15:1 RFU read-0. */
-        if (off == kOffFrstr) { frstr_ = value & 0x0001u; return; }
-        /* IRSR1 (VR4121 UM 27.2.8 p598 / VR4102 UM 26.2.8 p507): D7 IRDA_EN, D1 IRDA_MD,
-           D0 MIR_MD R/W; D15:8 + D6:2 RFU write-0/read-0. */
-        if (off == kOffIrsr1) { irsr1_ = value & 0x0083u; return; }
-        HaltUnsupportedAccess("FIR WriteHalf", addr, value);
+        const uint32_t off = addr - M.base;
+        RequireReleased(addr, off, value);
+        if (off == kOffFsr && (value & kFsrTxStop) && IrdaEnabled())
+            this->HaltUnsupportedAccess("FIR WriteHalf FSR TX_STOP with IRDA_EN set", addr, value);
+        if ((off == kOffIrsr1 && (value & kIrsr1IrdaEn) && this->StoredReg(kOffImr / 2u) != 0u) ||
+            (off == kOffImr && (value & kImrWritable) != 0u && IrdaEnabled()))
+            this->HaltUnsupportedAccess("FIR WriteHalf unmasks FIR interrupt output with IRDA_EN set", addr, value);
+        Base::WriteHalf(addr, value);
+        if (off == kOffFrstr && (value & kFrstrFrst)) {
+            this->ResetRegisterFile(false);
+            this->ApplyStoredWrite(kOffFrstr, kFrstrFrst);
+        }
     }
 
-    uint8_t  ReadByte (uint32_t addr) override { HaltUnsupportedAccess("FIR ReadByte", addr, 0); }
-    uint32_t ReadWord (uint32_t addr) override { HaltUnsupportedAccess("FIR ReadWord", addr, 0); }
-    void WriteByte(uint32_t addr, uint8_t  v) override { HaltUnsupportedAccess("FIR WriteByte", addr, v); }
-    void WriteWord(uint32_t addr, uint32_t v) override { HaltUnsupportedAccess("FIR WriteWord", addr, v); }
-
-    void SaveState(StateWriter& w) override { w.Write("frstr", frstr_); w.Write("irsr1", irsr1_); }
-    void RestoreState(StateReader& r) override { r.Read("frstr", frstr_); r.Read("irsr1", irsr1_); }
+protected:
+    const char* RegStateName() const override { return "fir_reg"; }
 
 private:
-    static constexpr uint32_t kOffFrstr = 0x00u;   /* FRSTR at Base+0x00 */
-    static constexpr uint32_t kOffIrsr1 = 0x18u;   /* IRSR1 at Base+0x18 */
-    uint16_t frstr_ = 0;   /* FRSTR D0 FRST */
-    uint16_t irsr1_ = 0;   /* IRSR1 (IRDA_EN / IRDA_MD / MIR_MD) */
+    bool IrdaEnabled() const { return (this->StoredReg(kOffIrsr1 / 2u) & kIrsr1IrdaEn) != 0u; }
+
+    void RequireReleased(uint32_t addr, uint32_t off, uint16_t value) {
+        if (off != kOffFrstr && (this->StoredReg(kOffFrstr / 2u) & kFrstrFrst) != 0u)
+            this->HaltUnsupportedAccess("FIR access while FRSTR FRST holds the FIR in reset", addr, value);
+    }
 };
 
-}  /* namespace cerf_vr41xx_fir_detail */
+}
 
 }

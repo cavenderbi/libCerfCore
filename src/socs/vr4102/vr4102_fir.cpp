@@ -5,13 +5,15 @@ namespace cerfcore {
 
 namespace {
 
-/* VR4102 FIR base, Internal I/O Space 1 0x0C000040-0x0C000075 (VR4102 UM Table 26-1 p498). */
-class Vr4102Fir : public cerf_vr41xx_fir_detail::Vr41xxFirBase<SocId::Vr4102, 0x0C000040u> {
+constexpr cerf_vr41xx_reg_window_detail::Vr41xxRegWindowModel kVr4102FirModel =
+    cerf_vr41xx_fir_detail::FirModel(0x0C000040u, 0x0004u, true);
+
+class Vr4102Fir : public cerf_vr41xx_fir_detail::Vr41xxFirBase<SocId::Vr4102, kVr4102FirModel> {
 public:
     using Vr41xxFirBase::Vr41xxFirBase;
 };
 
-}  /* namespace */
+}
 
 REGISTER_SERVICE(Vr4102Fir);
 
