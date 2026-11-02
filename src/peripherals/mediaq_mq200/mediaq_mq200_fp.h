@@ -20,6 +20,8 @@ public:
     uint32_t Read(uint32_t roff) const;
     void     Write(uint32_t roff, uint32_t value);
 
+    uint32_t Control() const;
+    bool     ControlUnmodeled() const;
     uint32_t PanelGc() const;
     bool     PanelPinsHigh() const;
 

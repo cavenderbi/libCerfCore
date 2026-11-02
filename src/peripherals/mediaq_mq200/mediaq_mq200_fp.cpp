@@ -59,13 +59,13 @@ void MediaQMq200Fp::Write(uint32_t roff, uint32_t value) {
     const uint32_t i = (roff - kFpBlockLo) / 4u;
     bool unmodeled = false;
     switch (i) {
-        case kFp00R: unmodeled = Fp00Unmodeled(value); break;
         case kFp01R: unmodeled = (value & kFp01Unmodeled) != 0u; break;
         case kFp02R: unmodeled = (value & kFp02Unmodeled) != 0u; break;
         case kFp03R:
             unmodeled = (value & kFp03Unmodeled) != 0u;
             value &= ~kFp03ReadOnly;
             break;
+        case kFp00R:
         case kFp04R:
         case kFp05R:
             break;
@@ -81,8 +81,8 @@ void MediaQMq200Fp::Write(uint32_t roff, uint32_t value) {
             break;
     }
     if (unmodeled) {
-        emu_.Get<Fatal>().Die("MediaQMq200Fp: FP%02XR 0x%08X sets a reserved encoding or an "
-                              "unmodeled pin mode, panel type or test mode", i, value);
+        emu_.Get<Fatal>().Die("MediaQMq200Fp: FP%02XR 0x%08X sets a reserved bit or an unmodeled "
+                              "pin or PWM mode", i, value);
     }
     regs_[i] = value;
 }
@@ -98,6 +98,14 @@ bool MediaQMq200Fp::PanelPinsHigh() const {
         if (((v >> pin.mode_shift) & 3u) == kPinGpo && !((v >> pin.data_bit) & 1u)) return false;
     }
     return true;
+}
+
+uint32_t MediaQMq200Fp::Control() const {
+    return regs_[kFp00R];
+}
+
+bool MediaQMq200Fp::ControlUnmodeled() const {
+    return Fp00Unmodeled(regs_[kFp00R]);
 }
 
 uint32_t MediaQMq200Fp::PanelGc() const {

@@ -14,12 +14,19 @@ uint32_t ModuleBit(uint32_t gc, uint32_t gc1_bit, uint32_t gc2_bit) {
 
 }
 
-bool MediaQMq200Panel::Shown(bool fb_served) const {
+bool MediaQMq200Panel::FpiActive() const {
     const uint32_t gc = fp_.PanelGc();
-    if (gc == MediaQMq200Fp::kNoPanel || !fb_served || !fp_.PanelPinsHigh()) return false;
-    if (!power_.Powered(MediaQMq200Power::kModFp) ||
-        !power_.Powered(ModuleBit(gc, MediaQMq200Power::kModGc1, MediaQMq200Power::kModGc2)) ||
-        !power_.Powered(ModuleBit(gc, MediaQMq200Power::kModWin1, MediaQMq200Power::kModWin2))) {
+    if (gc == MediaQMq200Fp::kNoPanel || !power_.Powered(MediaQMq200Power::kModFp) ||
+        !power_.Powered(ModuleBit(gc, MediaQMq200Power::kModGc1, MediaQMq200Power::kModGc2))) {
+        return false;
+    }
+    return (gc_.Reg(gc, MediaQMq200Gc::kCtrl) & MediaQMq200Gc::kCtrlEnable) != 0u;
+}
+
+bool MediaQMq200Panel::Shown(bool fb_served) const {
+    if (!FpiActive() || !fb_served || !fp_.PanelPinsHigh()) return false;
+    const uint32_t gc = fp_.PanelGc();
+    if (!power_.Powered(ModuleBit(gc, MediaQMq200Power::kModWin1, MediaQMq200Power::kModWin2))) {
         return false;
     }
     return gc_.Displays(gc) && Width() > 1u && Height() > 1u;

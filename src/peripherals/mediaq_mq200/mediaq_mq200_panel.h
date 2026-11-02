@@ -21,6 +21,7 @@ public:
                      const MediaQMq200Gc& gc)
         : power_(power), fp_(fp), gc_(gc) {}
 
+    bool     FpiActive() const;
     bool     Shown(bool fb_served) const;
     uint32_t Bpp() const;
     uint32_t Width() const;
