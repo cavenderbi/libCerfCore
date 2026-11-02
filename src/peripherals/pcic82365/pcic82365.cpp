@@ -12,24 +12,16 @@ enum : uint8_t {
     kRegInterruptAndGeneral   = 0x03,
     kRegCardStatusChange      = 0x04,
     kRegStatusChangeIntConfig = 0x05,
-    kRegWindowEnable          = 0x06,
-    kRegIoWindowControl       = 0x07,
-    kRegIoMapFirst            = 0x08,
-    kRegIoMapLast             = 0x0F,
-    kRegMemMapFirst           = 0x10,
-    kRegMemMapLast            = 0x35,
-    kRegIoOffsetFirst         = 0x36,
-    kRegIoOffsetLast          = 0x39,
-    kRegTimingFirst           = 0x3A,
-    kRegTimingLast            = 0x3F,
-    kRegMemPageFirst          = 0x40,   /* MEM_MAP0..4 window-page (extended PCIC) */
-    kRegMemPageLast           = 0x44,
 };
 
 /* REG_INTERFACE_STATUS bits (i82365reg.h PCIC_IF_STATUS_*). */
+constexpr uint8_t kIfsBvd1      = 0x01u;
+constexpr uint8_t kIfsBvd2      = 0x02u;
 constexpr uint8_t kIfsCd1       = 0x04u;
 constexpr uint8_t kIfsCd2       = 0x08u;
+constexpr uint8_t kIfsWriteProtect = 0x10u;
 constexpr uint8_t kIfsCardReady = 0x20u;
+constexpr uint8_t kIfsCardInputs = 0x3Fu;
 
 /* Interface Status bit 6 Card Power On per Power Control bit 4 VCC Power and bit 5 Auto-Power
    (CL-PD6710/'22 data sheet 6.2 p38, Table 6-1 p40; i82365reg.h PCIC_IF_STATUS_POWERACTIVE). */
@@ -39,201 +31,339 @@ constexpr uint8_t kPwrAutoPower   = 0x20u;
 
 /* REG_INTERRUPT_AND_GENERAL_CONTROL CARDTYPE (i82365reg.h PCIC_INTR_CARDTYPE_IO). */
 constexpr uint8_t kIntrCardTypeIo = 0x20u;
+constexpr uint8_t kIntrCardReset  = 0x40u;
+constexpr uint8_t kIntrCscToIntr  = 0x10u;
+constexpr uint8_t kIntrRingEnable = 0x80u;
 
-/* PWR_VCC_BIT1 | PWR_OUTPUT_ENABLE - the powered-on pattern the BSP driver writes. */
-constexpr uint8_t kPowerOnPattern = 0x90u;
+constexpr uint8_t kCscBatteryDead    = 0x01u;
+constexpr uint8_t kCscBatteryWarning = 0x02u;
+constexpr uint8_t kCscReadyChange    = 0x04u;
+constexpr uint8_t kCscDetectChange   = 0x08u;
+constexpr uint8_t kCscGpiChange      = 0x10u;
+constexpr uint8_t kCscMemoryOnly   = 0x06u;
+constexpr uint8_t kCscSourceMask   = 0x0Fu;
+constexpr uint8_t kCscStatusMask   = kCscSourceMask | kCscGpiChange;
 
-constexpr uint8_t kWinIoMap0Enable = 0x40u;
-constexpr uint8_t kWinIoMap1Enable = 0x80u;
-
-constexpr uint8_t kMohRegActive    = 0x40u;
-constexpr uint8_t kMohWriteProtect = 0x80u;
-
-bool IsMemMapReg(uint8_t index) {
-    return index >= kRegMemMapFirst && index <= kRegMemMapLast &&
-           (index & 7u) <= 5u;
-}
+constexpr uint8_t kPwrOutputEnable = 0x80u;
 
 }  /* namespace */
 
-bool Pcic82365::CardPoweredByReg() const {
-    return (reg_power_control_ & kPowerOnPattern) == kPowerOnPattern;
+Pcic82365::SocketDrive Pcic82365::Drive() const {
+    SocketDrive d;
+    const bool auto_power = rules_.auto_power && (reg_power_control_ & kPwrAutoPower) != 0u;
+    d.vcc = rules_.socket_control_power
+        ? vcc_request_
+        : (reg_power_control_ & kPwrVccPower) != 0u && (!auto_power || card_present_);
+    d.outputs = (reg_power_control_ & kPwrOutputEnable) != 0u &&
+                (!rules_.outputs_require_card || card_present_) && !isolated_;
+    d.reset_released = d.outputs && (reg_interrupt_and_gen_ctrl_ & kIntrCardReset) != 0u;
+    return d;
 }
 
-bool Pcic82365::Owns(uint8_t index) {
-    if (index >= kRegInterfaceStatus && index <= kRegIoMapLast) return true;
-    if (IsMemMapReg(index)) return true;
-    if (index >= kRegIoOffsetFirst && index <= kRegIoOffsetLast) return true;
-    if (index >= kRegTimingFirst && index <= kRegTimingLast) return true;
-    if (index >= kRegMemPageFirst && index <= kRegMemPageLast) return true;
-    return false;
+void Pcic82365::ReportDrive(const SocketDrive& before, ExcaWriteEffect* effect) const {
+    const SocketDrive now = Drive();
+    effect->power_on        = now.vcc;
+    effect->power_changed   = now.vcc != before.vcc;
+    effect->outputs_on      = now.outputs;
+    effect->outputs_changed = now.outputs != before.outputs;
+    effect->reset_changed   = now.reset_released != before.reset_released;
+    effect->reset_asserted  = !now.reset_released;
 }
 
-uint8_t Pcic82365::ReadReg(uint8_t index) {
-    if (IsMemMapReg(index)) {
-        return mem_reg_[(index - kRegMemMapFirst) >> 3][index & 7u];
-    }
-    if (index >= kRegIoMapFirst && index <= kRegIoMapLast) {
-        const int win = (index - kRegIoMapFirst) >= 4 ? 1 : 0;
-        switch ((index - kRegIoMapFirst) & 3u) {
-            case 0: return io_start_lo_[win];
-            case 1: return io_start_hi_[win];
-            case 2: return io_end_lo_[win];
-            case 3: return io_end_hi_[win];
-        }
-    }
-    if (index >= kRegIoOffsetFirst && index <= kRegIoOffsetLast) {
-        const int win = (index - kRegIoOffsetFirst) >= 2 ? 1 : 0;
-        return ((index - kRegIoOffsetFirst) & 1u) ? io_off_hi_[win]
-                                                  : io_off_lo_[win];
-    }
-    if (index >= kRegTimingFirst && index <= kRegTimingLast) {
-        return timing_[index - kRegTimingFirst];
-    }
-    if (index >= kRegMemPageFirst && index <= kRegMemPageLast) {
-        return mem_page_[index - kRegMemPageFirst];
-    }
+bool Pcic82365::IoCardInterface() const {
+    return (reg_interrupt_and_gen_ctrl_ & kIntrCardTypeIo) != 0u;
+}
 
+bool Pcic82365::ReadyPin() const {
+    if (isolated_) return (frozen_inputs_ & kIfsCardReady) != 0u;
+    return Drive().vcc ? !ready_ireq_low_ : rules_.card_inputs_high_without_vcc;
+}
+
+uint8_t Pcic82365::StatusChangeMask() const {
+    uint8_t mask = kCscStatusMask;
+    if (IoCardInterface()) mask = static_cast<uint8_t>(mask & ~kCscMemoryOnly);
+    if (IoCardInterface() && rules_.ring_indicate_masks_status_change &&
+        (reg_interrupt_and_gen_ctrl_ & kIntrRingEnable) != 0u)
+        mask = static_cast<uint8_t>(mask & ~kCscBatteryDead);
+    return mask;
+}
+
+void Pcic82365::LatchIfEnabled(uint8_t bit) {
+    if (!rules_.latch_requires_enable || (reg_status_change_int_cfg_ & bit) != 0u)
+        reg_card_status_change_ |= bit;
+}
+
+void Pcic82365::TrackPins() {
+    const bool pin = ReadyPin();
+    if (pin != ready_pin_) {
+        ready_pin_ = pin;
+        if (!IoCardInterface() && (pin || rules_.ready_change_any_edge)) LatchIfEnabled(kCscReadyChange);
+    }
+    const uint8_t bvd = static_cast<uint8_t>(InterfaceStatus() & (kIfsBvd1 | kIfsBvd2));
+    if (bvd != bvd_pins_) {
+        LatchBatteryChanges(bvd_pins_, bvd);
+        bvd_pins_ = bvd;
+    }
+}
+
+void Pcic82365::LatchBatteryChanges(uint8_t bvd_before, uint8_t bvd_now) {
+    const bool bvd1_was = (bvd_before & kIfsBvd1) != 0u;
+    const bool bvd1_now = (bvd_now & kIfsBvd1) != 0u;
+    const bool bvd2_was = (bvd_before & kIfsBvd2) != 0u;
+    const bool bvd2_now = (bvd_now & kIfsBvd2) != 0u;
+    if (IoCardInterface()) {
+        if (bvd1_was != bvd1_now && (!bvd1_now || rules_.stschg_change_any_edge) &&
+            (StatusChangeMask() & kCscBatteryDead) != 0u)
+            LatchIfEnabled(kCscBatteryDead);
+        return;
+    }
+    const bool dead_pin_was = rules_.battery_dead_pin == ExcaBatteryDeadPin::kBvd1Low ? bvd1_was : bvd2_was;
+    const bool dead_pin_now = rules_.battery_dead_pin == ExcaBatteryDeadPin::kBvd1Low ? bvd1_now : bvd2_now;
+    if (dead_pin_was && !dead_pin_now) LatchIfEnabled(kCscBatteryDead);
+    bool warning_entered = false;
+    switch (rules_.battery_warning) {
+        case ExcaBatteryWarning::kBvd2Fall:
+            warning_entered = bvd2_was && !bvd2_now;
+            break;
+        case ExcaBatteryWarning::kEnterBvd1HighBvd2Low:
+            warning_entered = (bvd1_now && !bvd2_now) && !(bvd1_was && !bvd2_was);
+            break;
+        case ExcaBatteryWarning::kEnterBvd2HighBvd1Low:
+            warning_entered = (bvd2_now && !bvd1_now) && !(bvd2_was && !bvd1_was);
+            break;
+    }
+    if (warning_entered) LatchIfEnabled(kCscBatteryWarning);
+}
+
+void Pcic82365::CardDetectChanged(bool present, ExcaWriteEffect* effect) {
+    pin_present_ = present;
+    if (isolated_) return;
+    const SocketDrive drive_before = Drive();
+    ApplyCardDetect(present);
+    ReportDrive(drive_before, effect);
+    TrackPins();
+}
+
+void Pcic82365::ApplyCardDetect(bool present) {
+    card_present_ = present;
+    if (!present && configuration_reset_on_removal_) ResetConfiguration();
+    LatchIfEnabled(kCscDetectChange);
+}
+
+void Pcic82365::SetInterfaceIsolated(bool on, ExcaWriteEffect* effect) {
+    if (on == isolated_) return;
+    const SocketDrive drive_before = Drive();
+    if (on) frozen_inputs_ = static_cast<uint8_t>(InterfaceStatus() & kIfsCardInputs);
+    isolated_ = on;
+    if (!on) {
+        if (pin_present_ != card_present_) ApplyCardDetect(pin_present_);
+        ready_ireq_low_ = pin_ireq_low_;
+    }
+    ReportDrive(drive_before, effect);
+    TrackPins();
+}
+
+void Pcic82365::ResetConfiguration() {
+    reg_interrupt_and_gen_ctrl_ = static_cast<uint8_t>(reg_interrupt_and_gen_ctrl_ & kIntrCscToIntr);
+    windows_.ResetConfiguration();
+}
+
+void Pcic82365::SoftwareCardDetect() {
+    if ((reg_status_change_int_cfg_ & kCscDetectChange) != 0u)
+        reg_card_status_change_ |= kCscDetectChange;
+}
+
+void Pcic82365::LatchGpiChange() {
+    reg_card_status_change_ |= kCscGpiChange;
+}
+
+void Pcic82365::ClearGpiChange() {
+    reg_card_status_change_ = static_cast<uint8_t>(reg_card_status_change_ & ~kCscGpiChange);
+}
+
+void Pcic82365::RequestVccFromSocketControl(bool vcc_on, ExcaWriteEffect* effect) {
+    const SocketDrive drive_before = Drive();
+    vcc_request_ = vcc_on;
+    ReportDrive(drive_before, effect);
+    TrackPins();
+}
+
+void Pcic82365::SetReadyIreqLow(bool low) {
+    pin_ireq_low_ = low;
+    if (isolated_) return;
+    ready_ireq_low_ = low;
+    TrackPins();
+}
+
+uint8_t Pcic82365::InterfaceStatus() const {
+    if (isolated_)
+        return static_cast<uint8_t>(frozen_inputs_ | (Drive().vcc ? kIfsCardPowerOn : 0u));
+    uint8_t v = 0u;
+    if (card_present_)
+        v |= kIfsCd1 | kIfsCd2;
+    const bool vcc = Drive().vcc;
+    if (vcc)
+        v |= kIfsCardPowerOn;
+    if (vcc || rules_.card_inputs_high_without_vcc) {
+        v |= kIfsBvd1 | kIfsBvd2;
+        if (!card_present_ || !vcc)
+            v |= kIfsWriteProtect;
+    }
+    if (ReadyPin())
+        v |= kIfsCardReady;
+    return v;
+}
+
+uint8_t Pcic82365::ActiveStatusChangeBits() const {
+    const uint8_t enabled = static_cast<uint8_t>((reg_status_change_int_cfg_ & kCscSourceMask) | kCscGpiChange);
+    return static_cast<uint8_t>(reg_card_status_change_ & enabled & StatusChangeMask());
+}
+
+void Pcic82365::Reset() {
+    vcc_request_                = false;
+    reg_power_control_          = 0u;
+    reg_interrupt_and_gen_ctrl_ = 0u;
+    reg_card_status_change_     = 0u;
+    reg_status_change_int_cfg_  = 0u;
+    windows_.Reset();
+    isolated_       = false;
+    frozen_inputs_  = 0u;
+    card_present_   = pin_present_;
+    ready_ireq_low_ = pin_ireq_low_;
+    ready_pin_ = ReadyPin();
+    bvd_pins_ = static_cast<uint8_t>(InterfaceStatus() & (kIfsBvd1 | kIfsBvd2));
+}
+
+bool Pcic82365::ReservedPowerCode(uint8_t value) const {
+    const bool a = rules_.power_reserved_field_a != 0u &&
+                   (value & rules_.power_reserved_field_a) == rules_.power_reserved_code_a;
+    const bool b = rules_.power_reserved_field_b != 0u &&
+                   (value & rules_.power_reserved_field_b) == rules_.power_reserved_code_b;
+    return a || b;
+}
+
+bool Pcic82365::ReservedIrqSelect(uint8_t code) const {
+    return ((rules_.irq_select_reserved >> code) & 1u) != 0u;
+}
+
+bool Pcic82365::Owns(uint8_t index) const {
+    if (index >= kRegInterfaceStatus && index <= kRegStatusChangeIntConfig) return true;
+    return windows_.Owns(index);
+}
+
+bool Pcic82365::ReadReg(uint8_t index, uint8_t* value) {
+    if (windows_.Read(index, value)) return true;
     switch (index) {
-        case kRegInterfaceStatus: {
-            uint8_t v = 0u;
-            if (card_present_) {
-                v |= kIfsCd1 | kIfsCd2;
-                const bool io_card = (reg_interrupt_and_gen_ctrl_ & kIntrCardTypeIo) != 0u;
-                if (CardPoweredByReg() && !(io_card && card_irq_)) v |= kIfsCardReady;
-            }
-            if ((reg_power_control_ & kPwrVccPower) &&
-                (!(reg_power_control_ & kPwrAutoPower) || card_present_)) {
-                v |= kIfsCardPowerOn;
-            }
-            return v;
-        }
-        case kRegPowerControl:          return reg_power_control_;
-        case kRegInterruptAndGeneral:   return reg_interrupt_and_gen_ctrl_;
-        case kRegCardStatusChange: {
-            const uint8_t v = reg_card_status_change_;
-            reg_card_status_change_ = 0u;   /* read clears */
-            return v;
-        }
-        case kRegStatusChangeIntConfig: return reg_status_change_int_cfg_;
-        case kRegWindowEnable:          return reg_window_enable_;
-        case kRegIoWindowControl:       return reg_io_window_control_;
-        default:                        return 0u;
+        case kRegInterfaceStatus:
+            *value = InterfaceStatus();
+            return true;
+        case kRegPowerControl:
+            *value = reg_power_control_;
+            return true;
+        case kRegInterruptAndGeneral:
+            *value = reg_interrupt_and_gen_ctrl_;
+            return true;
+        case kRegCardStatusChange:
+            *value = ReadCardStatusChange();
+            return true;
+        case kRegStatusChangeIntConfig:
+            *value = reg_status_change_int_cfg_;
+            return true;
+        default:
+            return false;
     }
 }
 
-bool Pcic82365::WriteReg(uint8_t index, uint8_t value, bool* power_on) {
-    if (IsMemMapReg(index)) {
-        mem_reg_[(index - kRegMemMapFirst) >> 3][index & 7u] = value;
-        return false;
-    }
-    if (index >= kRegIoMapFirst && index <= kRegIoMapLast) {
-        const int win = (index - kRegIoMapFirst) >= 4 ? 1 : 0;
-        switch ((index - kRegIoMapFirst) & 3u) {
-            case 0: io_start_lo_[win] = value; break;
-            case 1: io_start_hi_[win] = value; break;
-            case 2: io_end_lo_[win]   = value; break;
-            case 3: io_end_hi_[win]   = value; break;
-        }
-        return false;
-    }
-    if (index >= kRegIoOffsetFirst && index <= kRegIoOffsetLast) {
-        const int win = (index - kRegIoOffsetFirst) >= 2 ? 1 : 0;
-        if ((index - kRegIoOffsetFirst) & 1u) io_off_hi_[win] = value;
-        else                                  io_off_lo_[win] = value;
-        return false;
-    }
-    if (index >= kRegTimingFirst && index <= kRegTimingLast) {
-        timing_[index - kRegTimingFirst] = value;
-        return false;
-    }
-    if (index >= kRegMemPageFirst && index <= kRegMemPageLast) {
-        mem_page_[index - kRegMemPageFirst] = value;
-        return false;
-    }
+uint8_t Pcic82365::ReadCardStatusChange() {
+    uint8_t v = static_cast<uint8_t>(reg_card_status_change_ & StatusChangeMask());
+    if (rules_.status_read_masked_by_enable)
+        v = static_cast<uint8_t>(v & reg_status_change_int_cfg_ & kCscSourceMask);
+    if (!explicit_status_clear_)
+        reg_card_status_change_ = 0u;
+    return v;
+}
 
+bool Pcic82365::WriteReg(uint8_t index, uint8_t value, ExcaWriteEffect* effect) {
+    const SocketDrive drive_before = Drive();
+    if (!StoreReg(index, value)) return false;
+    ReportDrive(drive_before, effect);
+    TrackPins();
+    return true;
+}
+
+bool Pcic82365::StoreReg(uint8_t index, uint8_t value) {
+    if (windows_.Store(index, value)) return true;
     switch (index) {
-        case kRegPowerControl: {
-            const bool was = CardPoweredByReg();
-            reg_power_control_ = value;
-            const bool now = CardPoweredByReg();
-            *power_on = now;
-            return now != was;
-        }
-        case kRegInterruptAndGeneral:   reg_interrupt_and_gen_ctrl_ = value; return false;
-        case kRegStatusChangeIntConfig: reg_status_change_int_cfg_  = value; return false;
-        case kRegWindowEnable:          reg_window_enable_          = value; return false;
-        case kRegIoWindowControl:       reg_io_window_control_      = value; return false;
-        default:                        return false;   /* interface-status / csc: not writable */
+        case kRegInterfaceStatus:
+            return true;
+        case kRegPowerControl:
+            if (ReservedPowerCode(value)) return false;
+            reg_power_control_ = static_cast<uint8_t>(value & ~rules_.power_control_reserved);
+            if (rules_.socket_control_power) vcc_request_ = (reg_power_control_ & kPwrVccPower) != 0u;
+            return true;
+        case kRegInterruptAndGeneral:
+            if (ReservedIrqSelect(static_cast<uint8_t>(value & kCardIrqSelectMask))) return false;
+            reg_interrupt_and_gen_ctrl_ = value;
+            return true;
+        case kRegStatusChangeIntConfig:
+            if (ReservedIrqSelect(static_cast<uint8_t>(value >> kCscIrqSelectShift))) return false;
+            reg_status_change_int_cfg_ = value;
+            return true;
+        case kRegCardStatusChange:
+            if (explicit_status_clear_)
+                reg_card_status_change_ = static_cast<uint8_t>(reg_card_status_change_ & ~(value & kCscStatusMask));
+            return true;
+        default:
+            return false;
     }
-}
-
-bool Pcic82365::MapIo(uint32_t bus_io, uint32_t* card_io) const {
-    auto u16 = [](uint8_t lo, uint8_t hi) -> uint32_t {
-        return static_cast<uint32_t>(lo) | (static_cast<uint32_t>(hi) << 8);
-    };
-    for (int win : {1, 0}) {
-        const uint8_t enable_bit = (win == 1) ? kWinIoMap1Enable : kWinIoMap0Enable;
-        if (!(reg_window_enable_ & enable_bit)) continue;
-        const uint32_t start = u16(io_start_lo_[win], io_start_hi_[win]);
-        const uint32_t end   = u16(io_end_lo_[win],   io_end_hi_[win]);
-        if (bus_io < start || bus_io > end) continue;
-        const uint32_t offset = u16(io_off_lo_[win], io_off_hi_[win]) & 0xFFFEu;
-        *card_io = (bus_io + offset) & 0xFFFFu;
-        return true;
-    }
-    return false;
-}
-
-bool Pcic82365::MapMem(uint32_t bus_off, uint32_t* card_addr,
-                       bool* attribute, bool* writable) const {
-    const uint32_t host_page = bus_off >> 12;
-    for (int win = 0; win < 5; ++win) {
-        if (!(reg_window_enable_ & (1u << win))) continue;
-        const uint8_t* r = mem_reg_[win];
-        const uint32_t pg    = static_cast<uint32_t>(mem_page_[win]) << 12;
-        const uint32_t start = pg | static_cast<uint32_t>(r[0]) | (static_cast<uint32_t>(r[1] & 0x0Fu) << 8);
-        const uint32_t end   = pg | static_cast<uint32_t>(r[2]) | (static_cast<uint32_t>(r[3] & 0x0Fu) << 8);
-        if (host_page < start || host_page > end) continue;
-        const uint32_t offset = static_cast<uint32_t>(r[4]) | (static_cast<uint32_t>(r[5] & 0x3Fu) << 8);
-        *card_addr = (bus_off + (offset << 12)) & 0x3FFFFFFu;
-        *attribute = (r[5] & kMohRegActive)    != 0u;
-        *writable  = (r[5] & kMohWriteProtect) == 0u;
-        return true;
-    }
-    return false;
 }
 
 void Pcic82365::SaveState(StateWriter& w) const {
-    w.Write<uint8_t>("card_irq", card_irq_ ? 1u : 0u);
-    w.Write("reg_power_control", reg_power_control_); w.Write("reg_interrupt_and_gen_ctrl", reg_interrupt_and_gen_ctrl_);
-    w.Write("reg_card_status_change", reg_card_status_change_); w.Write("reg_status_change_int_cfg", reg_status_change_int_cfg_);
-    w.Write("reg_window_enable", reg_window_enable_); w.Write("reg_io_window_control", reg_io_window_control_);
-    w.WriteBytes("io_start_lo", io_start_lo_, sizeof(io_start_lo_));
-    w.WriteBytes("io_start_hi", io_start_hi_, sizeof(io_start_hi_));
-    w.WriteBytes("io_end_lo", io_end_lo_, sizeof(io_end_lo_));
-    w.WriteBytes("io_end_hi", io_end_hi_, sizeof(io_end_hi_));
-    w.WriteBytes("io_off_lo", io_off_lo_, sizeof(io_off_lo_));
-    w.WriteBytes("io_off_hi", io_off_hi_, sizeof(io_off_hi_));
-    w.WriteBytes("mem_reg", mem_reg_, sizeof(mem_reg_));
-    w.WriteBytes("mem_page", mem_page_, sizeof(mem_page_));
-    w.WriteBytes("timing", timing_, sizeof(timing_));
+    w.Write<uint8_t>("card_present", card_present_ ? 1u : 0u);
+    w.Write<uint8_t>("ready_ireq_low", ready_ireq_low_ ? 1u : 0u);
+    w.Write<uint8_t>("ready_pin", ready_pin_ ? 1u : 0u);
+    w.Write("bvd_pins", bvd_pins_);
+    w.Write<uint8_t>("vcc_request", vcc_request_ ? 1u : 0u);
+    w.Write("reg_power_control", reg_power_control_);
+    w.Write("reg_interrupt_and_gen_ctrl", reg_interrupt_and_gen_ctrl_);
+    w.Write("reg_card_status_change", reg_card_status_change_);
+    w.Write("reg_status_change_int_cfg", reg_status_change_int_cfg_);
+    windows_.SaveState(w);
+    w.Write<uint8_t>("pin_present", pin_present_ ? 1u : 0u);
+    w.Write<uint8_t>("pin_ireq_low", pin_ireq_low_ ? 1u : 0u);
+    w.Write<uint8_t>("isolated", isolated_ ? 1u : 0u);
+    w.Write("frozen_inputs", frozen_inputs_);
 }
 
 void Pcic82365::RestoreState(StateReader& r) {
-    uint8_t irq = 0u; r.Read("card_irq", irq); card_irq_ = (irq != 0u);
-    r.Read("reg_power_control", reg_power_control_); r.Read("reg_interrupt_and_gen_ctrl", reg_interrupt_and_gen_ctrl_);
-    r.Read("reg_card_status_change", reg_card_status_change_); r.Read("reg_status_change_int_cfg", reg_status_change_int_cfg_);
-    r.Read("reg_window_enable", reg_window_enable_); r.Read("reg_io_window_control", reg_io_window_control_);
-    r.ReadBytes("io_start_lo", io_start_lo_, sizeof(io_start_lo_));
-    r.ReadBytes("io_start_hi", io_start_hi_, sizeof(io_start_hi_));
-    r.ReadBytes("io_end_lo", io_end_lo_, sizeof(io_end_lo_));
-    r.ReadBytes("io_end_hi", io_end_hi_, sizeof(io_end_hi_));
-    r.ReadBytes("io_off_lo", io_off_lo_, sizeof(io_off_lo_));
-    r.ReadBytes("io_off_hi", io_off_hi_, sizeof(io_off_hi_));
-    r.ReadBytes("mem_reg", mem_reg_, sizeof(mem_reg_));
-    r.ReadBytes("mem_page", mem_page_, sizeof(mem_page_));
-    r.ReadBytes("timing", timing_, sizeof(timing_));
+    uint8_t present = 0u;
+    r.Read("card_present", present);
+    card_present_ = present != 0u;
+    uint8_t ready_ireq_low = 0u;
+    r.Read("ready_ireq_low", ready_ireq_low);
+    ready_ireq_low_ = ready_ireq_low != 0u;
+    uint8_t pin = 0u;
+    r.Read("ready_pin", pin);
+    ready_pin_ = pin != 0u;
+    r.Read("bvd_pins", bvd_pins_);
+    uint8_t vcc = 0u;
+    r.Read("vcc_request", vcc);
+    vcc_request_ = vcc != 0u;
+    r.Read("reg_power_control", reg_power_control_);
+    r.Read("reg_interrupt_and_gen_ctrl", reg_interrupt_and_gen_ctrl_);
+    r.Read("reg_card_status_change", reg_card_status_change_);
+    r.Read("reg_status_change_int_cfg", reg_status_change_int_cfg_);
+    windows_.RestoreState(r);
+    uint8_t pin_present = 0u;
+    r.Read("pin_present", pin_present);
+    pin_present_ = pin_present != 0u;
+    uint8_t pin_ireq_low = 0u;
+    r.Read("pin_ireq_low", pin_ireq_low);
+    pin_ireq_low_ = pin_ireq_low != 0u;
+    uint8_t isolated = 0u;
+    r.Read("isolated", isolated);
+    isolated_ = isolated != 0u;
+    r.Read("frozen_inputs", frozen_inputs_);
 }
 
 }

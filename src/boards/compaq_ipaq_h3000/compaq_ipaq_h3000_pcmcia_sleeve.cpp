@@ -32,8 +32,7 @@ public:
           slots_{ &slot0_, &slot1_ } {}
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::CompaqIpaqH3000;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CompaqIpaqH3000;
     }
 
     void OnReady() override {
@@ -62,19 +61,19 @@ public:
         slots_[1]->SetPowered(on);
     }
 
-    /* PcmciaSlotHost. */
     void OnCardDetectChanged(PcmciaSlot& slot) override {
         const int n = SocketOf(slot);
         emu_.Get<Sa11xxGpio>().DriveInputPin(kGpioCd[n], !slot.HasCard());
     }
-    void OnCardIrqAsserted(PcmciaSlot& slot) override {
+    void OnReadyIreqLow(PcmciaSlot& slot) override {
         emu_.Get<Sa11xxGpio>().DriveInputPin(kGpioReady[SocketOf(slot)],
                                              false);
     }
-    void OnCardIrqDeasserted(PcmciaSlot& slot) override {
+    void OnReadyIreqHigh(PcmciaSlot& slot) override {
         emu_.Get<Sa11xxGpio>().DriveInputPin(kGpioReady[SocketOf(slot)],
                                              true);
     }
+    uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
 private:
     int SocketOf(const PcmciaSlot& slot) const {

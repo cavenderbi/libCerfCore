@@ -4,6 +4,7 @@
 
 #include "../../peripherals/pcmcia/pcmcia_slot.h"
 
+#include <atomic>
 #include <cstdint>
 
 namespace cerfcore {
@@ -47,17 +48,18 @@ public:
     uint16_t StatusReg() const;
 
     void OnCardDetectChanged(PcmciaSlot& slot) override;
-    void OnCardIrqAsserted  (PcmciaSlot& slot) override;
-    void OnCardIrqDeasserted(PcmciaSlot& slot) override;
+    void OnReadyIreqLow     (PcmciaSlot& slot) override;
+    void OnReadyIreqHigh    (PcmciaSlot& slot) override;
+    uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
     void PostRestore() override;
 
 private:
-    PcmciaSlot slot0_;
-    bool       reg_space_ = false;
-    bool       in_reset_  = false;
+    PcmciaSlot        slot0_;
+    bool              reg_space_ = false;
+    std::atomic<bool> ready_ireq_low_{false};
 };
 
 }

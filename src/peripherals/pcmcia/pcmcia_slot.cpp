@@ -16,19 +16,23 @@
 
 namespace cerfcore {
 
-namespace {
-
-constexpr uint8_t  kFloat8  = PcmciaCard::kBusFloat8;
-constexpr uint16_t kFloat16 = PcmciaCard::kBusFloat16;
-
-}  /* namespace */
+uint16_t PcmciaSlot::UndrivenDataWord() const {
+    const uint8_t lane = host_.UndrivenDataLane();
+    return static_cast<uint16_t>((lane << 8) | lane);
+}
 
 PcmciaSlot::PcmciaSlot(CerfEmulator& emu, PcmciaSlotHost& host,
                        std::string label)
     : emu_(emu), host_(host), label_(std::move(label)) {}
 
 void PcmciaSlot::PublishPinsLocked() {
-    const uint8_t v = (card_ ? kPinPresent : 0u) | (powered_ ? kPinPowered : 0u);
+    uint8_t v = (card_ ? kPinPresent : 0u) | (powered_ ? kPinPowered : 0u);
+    if (card_) {
+        const PcmciaVoltageSense vs = card_->VoltageSense();
+        if (vs.vs1_grounded)    v |= kPinVs1Grounded;
+        if (vs.vs2_grounded)    v |= kPinVs2Grounded;
+        if (vs.low_voltage_key) v |= kPinLowVoltageKey;
+    }
     pins_.store(v, std::memory_order_release);
 }
 
@@ -42,14 +46,33 @@ void PcmciaSlot::SetPowered(bool on) {
             if (on) card_->PowerOn();
             else    card_->PowerOff();
         }
+        if (!on) DriveLine(kLineBusy, false);
     }
     host_.OnCardPowerChanged(*this);
 }
 
-void PcmciaSlot::ResetCard() {
+void PcmciaSlot::SetResetLine(bool asserted) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
+    if (reset_asserted_ == asserted) return;
+    reset_asserted_ = asserted;
     if (!card_ || !powered_) return;
+    if (asserted) {
+        if (card_->HoldsReadyBusyInReset()) DriveLine(kLineBusy, true);
+        return;
+    }
     card_->SocketReset();
+    DriveLine(kLineBusy, false);
+}
+
+void PcmciaSlot::DriveLine(uint8_t source, bool low) {
+    const uint8_t before = low
+        ? line_.fetch_or(source, std::memory_order_acq_rel)
+        : line_.fetch_and(static_cast<uint8_t>(~source), std::memory_order_acq_rel);
+    const uint8_t after = low ? static_cast<uint8_t>(before | source)
+                              : static_cast<uint8_t>(before & ~source);
+    if ((before != 0u) == (after != 0u)) return;
+    if (after != 0u) host_.OnReadyIreqLow(*this);
+    else             host_.OnReadyIreqHigh(*this);
 }
 
 void PcmciaSlot::SetCardEnabled(bool on) {
@@ -63,7 +86,7 @@ bool PcmciaSlot::CardSelectedLocked() {
 
 uint8_t PcmciaSlot::ReadAttribute8(uint32_t offset) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!CardSelectedLocked()) return kFloat8;
+    if (!CardSelectedLocked()) return host_.UndrivenDataLane();
     return card_->ReadAttribute8(offset);
 }
 
@@ -73,15 +96,23 @@ void PcmciaSlot::WriteAttribute8(uint32_t offset, uint8_t value) {
     card_->WriteAttribute8(offset, value);
 }
 
+uint16_t PcmciaSlot::ReadAttribute16(uint32_t offset) {
+    return static_cast<uint16_t>((host_.UndrivenDataLane() << 8) | ReadAttribute8(offset & ~1u));
+}
+
+void PcmciaSlot::WriteAttribute16(uint32_t offset, uint16_t value) {
+    WriteAttribute8(offset & ~1u, static_cast<uint8_t>(value));
+}
+
 uint8_t PcmciaSlot::ReadCommon8(uint32_t offset) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!CardSelectedLocked()) return kFloat8;
+    if (!CardSelectedLocked()) return host_.UndrivenDataLane();
     return card_->ReadCommon8(offset);
 }
 
 uint16_t PcmciaSlot::ReadCommon16(uint32_t offset) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!CardSelectedLocked()) return kFloat16;
+    if (!CardSelectedLocked()) return UndrivenDataWord();
     return card_->ReadCommon16(offset);
 }
 
@@ -99,13 +130,13 @@ void PcmciaSlot::WriteCommon16(uint32_t offset, uint16_t value) {
 
 uint8_t PcmciaSlot::ReadIo8(uint32_t offset) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!CardSelectedLocked()) return kFloat8;
+    if (!CardSelectedLocked()) return host_.UndrivenDataLane();
     return card_->ReadIo8(offset);
 }
 
 uint16_t PcmciaSlot::ReadIo16(uint32_t offset) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    if (!CardSelectedLocked()) return kFloat16;
+    if (!CardSelectedLocked()) return UndrivenDataWord();
     return card_->ReadIo16(offset);
 }
 
@@ -121,8 +152,22 @@ void PcmciaSlot::WriteIo16(uint32_t offset, uint16_t value) {
     card_->WriteIo16(offset, value);
 }
 
-void PcmciaSlot::RaiseIrq() { host_.OnCardIrqAsserted(*this); }
-void PcmciaSlot::ClearIrq() { host_.OnCardIrqDeasserted(*this); }
+bool PcmciaSlot::Iois16(uint32_t offset) {
+    std::lock_guard<std::mutex> lk(bus_mutex_);
+    if (!CardSelectedLocked())
+        return false;
+    return card_->Iois16(offset);
+}
+
+bool PcmciaSlot::InputAcknowledge(uint32_t offset) {
+    std::lock_guard<std::mutex> lk(bus_mutex_);
+    if (!CardSelectedLocked())
+        return false;
+    return card_->InputAcknowledge(offset);
+}
+
+void PcmciaSlot::RaiseIrq() { DriveLine(kLineIreq, true); }
+void PcmciaSlot::ClearIrq() { DriveLine(kLineIreq, false); }
 
 void PcmciaSlot::InsertLocked(std::unique_ptr<PcmciaCard> card) {
     card_ = std::move(card);
@@ -142,6 +187,7 @@ void PcmciaSlot::EjectLocked() {
     card_.reset();
     ++generation_;
     PublishPinsLocked();
+    DriveLine(kLineIreq | kLineBusy, false);
 }
 
 void PcmciaSlot::InsertCard(std::unique_ptr<PcmciaCard> card) {
@@ -166,6 +212,8 @@ void PcmciaSlot::OnShutdown() {
 void PcmciaSlot::SaveSlotState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
     w.Write<uint8_t>("powered", powered_ ? 1u : 0u);
+    w.Write<uint8_t>("reset_line", reset_asserted_ ? 1u : 0u);
+    w.Write<uint8_t>("card_busy", (line_.load(std::memory_order_acquire) & kLineBusy) != 0u ? 1u : 0u);
     const bool has = (card_ != nullptr);
     w.Write<uint8_t>("has", has ? 1u : 0u);
     if (!has) return;
@@ -190,21 +238,25 @@ void PcmciaSlot::PostRestoreSlot() {
 
 void PcmciaSlot::RestoreSlotState(StateReader& r) {
     std::lock_guard<std::mutex> lk(bus_mutex_);
-    uint8_t powered = 0, has = 0;
+    uint8_t powered = 0, reset_line = 0, card_busy = 0, has = 0;
     r.Read("powered", powered);
+    r.Read("reset_line", reset_line);
+    r.Read("card_busy", card_busy);
     r.Read("has", has);
+    reset_asserted_ = reset_line != 0u;
     if (!has) {
-        /* Saved socket was empty; eject any live card so the restored
-           desktop matches exactly. */
         if (card_) EjectLocked();
         powered_ = (powered != 0);
         PublishPinsLocked();
+        line_.store(card_busy != 0u ? kLineBusy : 0u, std::memory_order_release);
         return;
     }
-    uint32_t idlen = 0; r.Read("id_count", idlen);
+    uint32_t idlen = 0;
+    r.Read("id_count", idlen);
     std::string id(static_cast<size_t>(idlen), '\0');
     if (idlen) r.ReadBytes("id", &id[0], idlen);
-    uint32_t blen = 0; r.Read("binding_count", blen);
+    uint32_t blen = 0;
+    r.Read("binding_count", blen);
     std::u16string units(static_cast<size_t>(blen), u'\0');
     if (blen) r.ReadBytes("binding", &units[0], blen * sizeof(char16_t));
     const std::string binding = Utf16ToUtf8(units);
@@ -228,6 +280,7 @@ void PcmciaSlot::RestoreSlotState(StateReader& r) {
     }
     card_->RestoreState(r);
     r.LeaveFrame();
+    line_.store(card_busy != 0u ? kLineBusy : 0u, std::memory_order_release);
 }
 
 void PcmciaSlot::EjectCard() {

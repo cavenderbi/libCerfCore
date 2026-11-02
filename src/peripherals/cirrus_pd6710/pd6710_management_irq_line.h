@@ -10,6 +10,7 @@ public:
     ~Pd6710ManagementIrqLine() override = default;
 
     virtual void Pulse() = 0;
+    virtual void SetLevel(bool level) = 0;
 };
 
 }

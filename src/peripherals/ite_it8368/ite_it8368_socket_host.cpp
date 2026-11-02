@@ -22,12 +22,12 @@ void IteIt8368SocketHost::OnCardDetectChanged(PcmciaSlot&) {
     emu_.Get<IteIt8368>().NotifyCardDetect();
 }
 
-void IteIt8368SocketHost::OnCardIrqAsserted(PcmciaSlot&) {
-    emu_.Get<IteIt8368>().SetCardIrq(true);
+void IteIt8368SocketHost::OnReadyIreqLow(PcmciaSlot&) {
+    emu_.Get<IteIt8368>().SetReadyIreqLow(true);
 }
 
-void IteIt8368SocketHost::OnCardIrqDeasserted(PcmciaSlot&) {
-    emu_.Get<IteIt8368>().SetCardIrq(false);
+void IteIt8368SocketHost::OnReadyIreqHigh(PcmciaSlot&) {
+    emu_.Get<IteIt8368>().SetReadyIreqLow(false);
 }
 
 }

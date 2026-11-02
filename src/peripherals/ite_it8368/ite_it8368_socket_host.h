@@ -17,8 +17,9 @@ public:
     void OnShutdown() override;
 
     void OnCardDetectChanged(PcmciaSlot&) override;
-    void OnCardIrqAsserted(PcmciaSlot&) override;
-    void OnCardIrqDeasserted(PcmciaSlot&) override;
+    void OnReadyIreqLow(PcmciaSlot&) override;
+    void OnReadyIreqHigh(PcmciaSlot&) override;
+    uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
 protected:
     PcmciaSlot& Slot() { return slot0_; }

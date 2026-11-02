@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cerfcore/peripherals/peripheral_base.h>
+#include "../floating_bus.h"
 
 namespace cerfcore {
 
@@ -44,6 +45,7 @@ private:
                        uint32_t* card_offset) const;
 
     PcmciaSlot* sockets_[2] = {};
+    FloatingBus floating_;
 };
 
 }

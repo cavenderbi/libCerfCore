@@ -61,8 +61,6 @@ constexpr uint16_t kPinCrdDetMask = kPinCrdDet1 | kPinCrdDet2;
 constexpr uint16_t kPinCrdVccMask = kPinCrdVccOn1 | kPinCrdVccOn0;
 constexpr uint16_t kPinCrdVppMask = kPinCrdVppOn1 | kPinCrdVppOn0;
 
-/* The pins the chip drives as outputs; it8368.c:262-265 enables exactly these
-   and leaves the rest as card status inputs. */
 constexpr uint16_t kDrivablePins = kPinCrdVccMask | kPinCrdVppMask | kPinBcrdRst;
 
 /* CRDSW is an output-capable pin the Velo drives high (nk.exe sub_9F40F688);
@@ -79,10 +77,6 @@ constexpr uint16_t kCtrlCardEn    = 0x0004;
 constexpr uint16_t kCtrlGlobalEn  = 0x0002;
 constexpr uint16_t kCtrlIntTriEn  = 0x0001;
 
-/* Bit 6 is a self-clearing soft reset, undocumented in it8368reg.h: pcmcia.dll
-   sub_149120C writes CTRL 0x0040 alone, settles, then reconfigures every
-   register; the card-enable CTRL read-modify-write (it8368.c:294-298) carries no
-   reset bit. */
 constexpr uint16_t kCtrlSoftReset = 0x0040;
 
 constexpr uint16_t kCtrlKnown = kCtrlFixAttrIo | kCtrlAddrSel | kCtrlByteSwap |
@@ -91,9 +85,7 @@ constexpr uint16_t kCtrlKnown = kCtrlFixAttrIo | kCtrlAddrSel | kCtrlByteSwap |
 }  /* namespace */
 
 bool IteIt8368::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    if (!bd) return false;
-    const std::string_view board = bd->GetBoardFamilyId();
+    const std::string_view board = emu_.Get<BoardContext>().GetBoardFamilyId();
     return board == BoardFamilyId::PhilipsNino || board == BoardFamilyId::PhilipsVelo1 ||
            board == BoardFamilyId::SharpMobilonHc;
 }
@@ -104,32 +96,21 @@ void IteIt8368::OnReady() {
 
 bool IteIt8368::CardInterfaceEnabled() const { return (ctrl_ & kCtrlCardEn) != 0; }
 
-/* Attribute decodes from A25 ($0200_0000) with CTRL FIXATTRIO clear, as the Velo OAL
-   leaves it (nk.exe sub_9F40F688 writes CTRL = $0A): pcmcia.dll reads the CIS at its
-   $0A00_0000 attribute window while MEM_CONFIG3 CARD1IOEN stays set, which the legacy
-   CARDnIOEN decode (it8368.c:562-571) would route to I/O space instead. */
 bool IteIt8368::FixedAttributeIo() const { return true; }
 
-/* An undriven card pin floats high, so an empty socket reads CRDDET1 and CRDDET2
-   set (it8368.c:419 treats either as "no card"). */
 uint16_t IteIt8368::GpioDataInLocked() const {
     const uint16_t driven   = static_cast<uint16_t>(gpio_dataout_ & gpio_dir_);
     const uint16_t undriven = static_cast<uint16_t>(kGpioMask & ~gpio_dir_);
     uint16_t in = static_cast<uint16_t>(driven | undriven);
 
     if (!slot_->HasCard()) return in;
-    /* Grounded on the card body: pcmcia.dll sub_188145C tests them before Vcc. */
     in &= static_cast<uint16_t>(~kPinCrdDetMask);
 
-    /* sub_18817C4 reads the pins below only while GPIODATAOUT holds CRDVCCON0. */
     if (!slot_->IsPowered()) return in;
 
-    /* High is write-protected (sub_18817C4 -> socket status bit 0). */
     in &= static_cast<uint16_t>(~kPinBcrdWp);
 
-    /* READY/-IREQ: sub_188145C sets CTRL CARDEN only if it reads high, and
-       sub_1881694 arms its falling edge as the card interrupt (it8368.c:447). */
-    if (card_irq_) in &= static_cast<uint16_t>(~kPinBcrdRdy);
+    if (ready_ireq_low_) in &= static_cast<uint16_t>(~kPinBcrdRdy);
     else           in |= kPinBcrdRdy;
     return in;
 }
@@ -143,9 +124,9 @@ void IteIt8368::LatchInputEdgesLocked() {
     UpdateIntLocked();
 }
 
-void IteIt8368::SetCardIrq(bool asserted) {
+void IteIt8368::SetReadyIreqLow(bool low) {
     std::lock_guard<std::mutex> lk(mu_);
-    card_irq_ = asserted;
+    ready_ireq_low_ = low;
     LatchInputEdgesLocked();
 }
 
@@ -154,8 +135,6 @@ void IteIt8368::NotifyCardDetect() {
     LatchInputEdgesLocked();
 }
 
-/* GLOBALEN alone enables interrupt driving (it8368.c:293-298); the Velo takes card
-   interrupts with INTTRIEN clear (nk.exe sub_9F40F688 writes CTRL = $0A). */
 bool IteIt8368::IntLevelLocked() const {
     const bool driving = (ctrl_ & kCtrlGlobalEn) != 0u;
     const bool pending = ((gpio_posintstat_ & gpio_posinten_) |
@@ -177,10 +156,6 @@ void IteIt8368::UpdateIntLocked() {
 IteIt8368::BusOps IteIt8368::ApplyOutputsLocked() {
     const uint16_t driven = static_cast<uint16_t>(gpio_dataout_ & gpio_dir_);
 
-    /* CRDVPPON0 alone is Vpp = Vcc (it8368reg.h:106), which a card takes as its
-       operating Vpp; CRDVPPON1 raises the 12 V programming supply (it8368reg.h:107),
-       and both together tri-state Vpp (it8368reg.h:108). Only Vcc reaches the socket,
-       so only the 12 V rail is an unmodeled power state. */
     if (driven & kPinCrdVppOn1) {
         emu_.Get<Fatal>().Die("IteIt8368: CRDVPPON1 (Vpp 12 V) unmodeled");
     }
@@ -192,11 +167,7 @@ IteIt8368::BusOps IteIt8368::ApplyOutputsLocked() {
     ops.drove_pins = true;
     ops.power_on   = (driven & kPinCrdVccMask) != 0u;
 
-    /* it8368.c:686-699 asserts BCRDRST, holds it, then clears it; the card
-       leaves reset on that falling edge. */
-    const bool rst_now = (driven & kPinBcrdRst) != 0u;
-    ops.release_reset = rst_asserted_ && !rst_now;
-    rst_asserted_ = rst_now;
+    ops.reset_asserted = (driven & kPinBcrdRst) != 0u;
 
     LatchInputEdgesLocked();
     return ops;
@@ -220,7 +191,7 @@ IteIt8368::BusOps IteIt8368::SoftResetLocked() {
 
 void IteIt8368::ApplyBusOps(const BusOps& ops) {
     slot_->SetPowered(ops.power_on);
-    if (ops.release_reset) slot_->ResetCard();
+    slot_->SetResetLine(ops.reset_asserted);
 }
 
 uint16_t IteIt8368::ReadReg(uint32_t off) {
@@ -233,8 +204,6 @@ uint16_t IteIt8368::ReadReg(uint32_t off) {
            debug-probe strobe; the output register reads back its latch. */
         case kRegMfioDataOut: return mfio_dataout_;
 
-        /* it8368reg.h IT8368_MFIODIR_REG 0x06 (R/W, mask IT8368_MFIODIR_MASK);
-           NetBSD it8368.c:244-246 RMWs it: read -> |= mask -> write. */
         case kRegMfioDir: return mfio_dir_;
 
         case kRegGpioDataIn:
@@ -258,8 +227,6 @@ uint16_t IteIt8368::ReadReg(uint32_t off) {
         case kRegMfioSel:        return mfio_sel_;
         case kRegReserved08:     return 0;
 
-        /* it8368reg.h IT8368_MFIODATAIN_REG 0x0e; NetBSD it8368.c:243-246 drives
-           every MFIO as an output. */
         case kRegMfioDataIn:
             return static_cast<uint16_t>(mfio_dataout_ & mfio_dir_);
 
@@ -268,7 +235,6 @@ uint16_t IteIt8368::ReadReg(uint32_t off) {
         case kRegMfioPosIntStat: return mfio_posintstat_;
         case kRegMfioNegIntStat: return mfio_negintstat_;
 
-        /* NetBSD it8368.c:253-259 clears MFIOPOSINTEN / MFIONEGINTEN. */
         case kRegMfioPosIntEn:
         case kRegMfioNegIntEn:   return 0;
 
@@ -347,7 +313,6 @@ IteIt8368::BusOps IteIt8368::WriteRegLocked(uint32_t off, uint16_t value) {
             }
             return {};
 
-        /* Write one to clear (it8368.c:337-339 clears a single latched pin). */
         case kRegGpioPosIntStat:
             gpio_posintstat_ &= static_cast<uint16_t>(~value);
             UpdateIntLocked();
@@ -357,7 +322,6 @@ IteIt8368::BusOps IteIt8368::WriteRegLocked(uint32_t off, uint16_t value) {
             UpdateIntLocked();
             return {};
 
-        /* Write one to clear (it8368.c:337-339). */
         case kRegMfioPosIntStat:
             mfio_posintstat_ &= static_cast<uint16_t>(~value);
             return {};
@@ -376,15 +340,9 @@ IteIt8368::BusOps IteIt8368::WriteRegLocked(uint32_t off, uint16_t value) {
             if (value & ~kCtrlKnown) {
                 emu_.Get<Fatal>().Die("IteIt8368: CTRL 0x%04X sets a reserved bit", value);
             }
-            /* ADDRSEL remaps LHA[14:13] onto the card window (it8368.c:238-241
-               clears it), which would move every card offset the decoder derives. */
             if (value & kCtrlAddrSel) {
                 emu_.Get<Fatal>().Die("IteIt8368: CTRL ADDRSEL unmodeled");
             }
-            /* HC-4100 pcmcia.dll enables the card with BYTESWAP clear:
-               sub_1491BF8 sets CARDEN, sub_14918E4 sets GLOBALEN, and BYTESWAP
-               is set nowhere (init sub_149120C, enable, reset). NetBSD
-               it8368e_attach (it8368.c:294-298) ORs GLOBALEN|CARDEN the same. */
             ctrl_ = value;
             UpdateIntLocked();
             return {};
@@ -430,8 +388,7 @@ void IteIt8368::SaveState(StateWriter& w) {
     w.Write("mfio_sel", mfio_sel_);
     w.Write("ctrl", ctrl_);
     w.Write("prev_datain", prev_datain_);
-    w.Write<uint8_t>("rst_asserted", rst_asserted_ ? 1u : 0u);
-    w.Write<uint8_t>("card_irq", card_irq_ ? 1u : 0u);
+    w.Write<uint8_t>("ready_ireq_low", ready_ireq_low_ ? 1u : 0u);
 }
 
 void IteIt8368::RestoreState(StateReader& r) {
@@ -449,12 +406,9 @@ void IteIt8368::RestoreState(StateReader& r) {
     r.Read("mfio_sel", mfio_sel_);
     r.Read("ctrl", ctrl_);
     r.Read("prev_datain", prev_datain_);
-    uint8_t rst = 0;
-    r.Read("rst_asserted", rst);
-    rst_asserted_ = rst != 0u;
-    uint8_t irq = 0;
-    r.Read("card_irq", irq);
-    card_irq_ = irq != 0u;
+    uint8_t ready_ireq_low = 0;
+    r.Read("ready_ireq_low", ready_ireq_low);
+    ready_ireq_low_ = ready_ireq_low != 0u;
 
     /* Every peripheral downstream of the INT pin restores its own copy of the
        line - the pin level in Pr31x00Io's mfio_din_, the latched edge in the

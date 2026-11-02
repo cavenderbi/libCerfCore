@@ -1,9 +1,12 @@
 #pragma once
 
 #include <cerfcore/core/service.h>
+#include "../floating_bus.h"
+#include "../pcic82365/exca_socket_sequencer.h"
 #include "../pcic82365/pcic82365.h"
 #include "../pcmcia/pcmcia_slot.h"
 
+#include <array>
 #include <cstdint>
 #include <mutex>
 
@@ -29,40 +32,52 @@ public:
     void RestoreState(StateReader& r);
     void PostRestore();
 
-    /* PCIC register file at I/O ports 0x3E0 (INDEX) / 0x3E1 (DATA). */
     uint8_t ReadPcicByte (uint32_t port);
     void    WritePcicByte(uint32_t port, uint8_t value);
 
-    /* I/O window decode: bus_io is the 16-bit I/O bus address; on hit
-       *card_io receives the card-local I/O address. */
-    bool MapIo(uint32_t bus_io, uint32_t* card_io);
+    bool     MapIo(uint32_t bus_io, uint32_t* card_io, PcmciaIoWidth* width);
+    bool     MapMem(uint32_t bus_off, uint32_t* card_addr,
+                    bool* attribute, bool* writable, bool* sixteen_bit);
+    uint32_t MaskFloppyStatusBit7(uint32_t bus_io, uint32_t value, unsigned bytes);
+    bool     InpackGated();
 
-    /* Memory window decode: bus_off is the offset into the 16 MB
-       PCMCIA memory space; on hit *card_addr receives the card-local
-       address, *attribute the REG bit, *writable the inverted
-       write-protect bit. */
-    bool MapMem(uint32_t bus_off, uint32_t* card_addr,
-                bool* attribute, bool* writable);
-
-    /* PcmciaSlotHost. */
     void OnCardDetectChanged(PcmciaSlot& slot) override;
-    void OnCardIrqAsserted  (PcmciaSlot& slot) override;
-    void OnCardIrqDeasserted(PcmciaSlot& slot) override;
+    void OnReadyIreqLow     (PcmciaSlot& slot) override;
+    void OnReadyIreqHigh    (PcmciaSlot& slot) override;
+    uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
 private:
     uint8_t ReadIndexedDataLocked();
-    /* Returns true when the write flipped socket power; *power_on is
-       the new state. Applied to the slot after the lock drops -
-       SetPowered takes the slot bus lock, which ranks above
-       state_mutex_. */
-    bool WriteIndexedDataLocked(uint8_t value, bool* power_on);
-
+    void WriteIndexedDataLocked(uint8_t value, ExcaWriteEffect* effect);
+    void SetReadyIreqLow(bool low);
+    void ResetController();
+    void ResetRegistersLocked();
+    bool ManagementToIntrLocked() const;
+    bool PulseManagementLocked() const;
+    bool RoutedToWiredIrqLocked(const char* source, uint8_t select) const;
+    void RouteManagementLocked(uint8_t* to_intr, uint8_t* to_irq_pin) const;
+    void UpdateManagementLineLocked();
+    void DriveCardLineLocked(bool force);
+    bool SuspendedLocked() const;
+    [[noreturn]] void RefuseIndexLocked(const char* access);
 
     PcmciaSlot slot_;
+    ExcaSocketSequencer sequencer_;
 
     mutable std::mutex state_mutex_;
 
     uint8_t index_ = 0u;
+    uint8_t intr_bits_ = 0u;
+    uint8_t irq_pin_bits_ = 0u;
+    bool    card_line_level_ = false;
+    uint8_t misc_ctrl1_ = 0u;
+    uint8_t fifo_scratch_ = 0u;
+    uint8_t misc_ctrl2_ = 0u;
+    uint8_t ata_control_ = 0u;
+    uint8_t scratchpad_ = 0u;
+    bool    card_request_ = false;
+    std::array<uint8_t, 6> timing_ = {};
+    FloatingBus floating_;
 
     uint8_t reg_chip_info_ = 0u;   /* PD6710-specific chip-detect probe register (0x1F) */
 

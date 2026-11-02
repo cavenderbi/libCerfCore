@@ -28,8 +28,7 @@ public:
     using PciHostBridge::PciHostBridge;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetSocId() == SocId::Vr5500;
+        return emu_.Get<BoardContext>().GetSocId() == SocId::Vr5500;
     }
 
     void RegisterPciDevice(PciDevice* dev) override { devices_.push_back(dev); }
@@ -81,8 +80,9 @@ public:
         w.Write("pciw0", pciw0_);
         w.Write<uint32_t>("devices_count", static_cast<uint32_t>(devices_.size()));
         for (PciDevice* d : devices_) {
-            w.Write<uint16_t>("pci_dev_fnc", static_cast<uint16_t>((d->PciDev() << 8) | d->PciFnc()));
+            w.BeginFrame(static_cast<uint32_t>((d->PciDev() << 8) | d->PciFnc()));
             d->SaveState(w);
+            w.EndFrame();
         }
     }
     void RestoreState(StateReader& r) override {
@@ -93,16 +93,20 @@ public:
         if (n != devices_.size())
             r.Reject("Vrc5477Pci: %u devices, this build has %zu", n, devices_.size());
         for (uint32_t i = 0; i < n; ++i) {
-            uint16_t tag = 0;
-            r.Read("pci_dev_fnc", tag);
+            const uint32_t tag = r.EnterFrame();
             const uint8_t dev = static_cast<uint8_t>(tag >> 8);
             const uint8_t fnc = static_cast<uint8_t>(tag & 0xFFu);
             size_t match = devices_.size();
-            for (size_t k = 0; k < devices_.size(); ++k)
-                if (devices_[k]->PciDev() == dev && devices_[k]->PciFnc() == fnc) { match = k; break; }
+            for (size_t k = 0; k < devices_.size(); ++k) {
+                if (devices_[k]->PciDev() == dev && devices_[k]->PciFnc() == fnc) {
+                    match = k;
+                    break;
+                }
+            }
             if (match == devices_.size())
                 r.Reject("Vrc5477Pci: no device dev=%u fnc=%u in this build", dev, fnc);
             devices_[match]->RestoreState(r);
+            r.LeaveFrame();
         }
     }
 

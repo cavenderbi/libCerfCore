@@ -24,8 +24,7 @@ public:
         : Service(emu), slot_(emu, *this, "PC Card slot") {}
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::Pangolin;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Pangolin;
     }
 
     void OnReady() override {
@@ -41,18 +40,18 @@ public:
 
     void OnShutdown() override { slot_.OnShutdown(); }
 
-    /* PcmciaSlotHost. */
     void OnCardDetectChanged(PcmciaSlot& slot) override {
         const bool present = slot.HasCard();
         slot.SetPowered(present);
-        emu_.Get<Sa11xxGpio>().DriveInputPin(kGpioCd, !present);   /* present => CD low */
+        emu_.Get<Sa11xxGpio>().DriveInputPin(kGpioCd, !present);
     }
-    void OnCardIrqAsserted(PcmciaSlot&) override {
-        emu_.Get<Sa11xxGpio>().DriveInputPin(kGpioIrq, false);     /* nIREQ low = asserted */
+    void OnReadyIreqLow(PcmciaSlot&) override {
+        emu_.Get<Sa11xxGpio>().DriveInputPin(kGpioIrq, false);
     }
-    void OnCardIrqDeasserted(PcmciaSlot&) override {
+    void OnReadyIreqHigh(PcmciaSlot&) override {
         emu_.Get<Sa11xxGpio>().DriveInputPin(kGpioIrq, true);
     }
+    uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
 private:
     PcmciaSlot slot_;

@@ -38,8 +38,7 @@ CasioTomcatPcCard::CasioTomcatPcCard(CerfEmulator& emu)
     : Peripheral(emu), slot0_(emu, *this, "CompactFlash slot") {}
 
 bool CasioTomcatPcCard::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::CasioTomcat;
+    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CasioTomcat;
 }
 
 void CasioTomcatPcCard::OnReady() {
@@ -49,10 +48,10 @@ void CasioTomcatPcCard::OnReady() {
     emu_.Get<PcmciaAutoInsert>().InsertLaunchCompactFlash(slot0_);
     emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
         reg_space_ = false;
-        in_reset_  = false;
     });
     emu_.Get<GuestCpuReset>().RegisterResetReleaseListener([this] {
         slot0_.SetPowered(false);
+        slot0_.SetResetLine(false);
         emu_.Get<Vr41xxGiu>().SetPinLevel(kCardIreqGiuPin, true);
     });
 }
@@ -94,14 +93,13 @@ void CasioTomcatPcCard::SetRegSpace(bool on) { reg_space_ = on; }
 void CasioTomcatPcCard::SetSocketPower(bool on) { slot0_.SetPowered(on); }
 
 void CasioTomcatPcCard::SetResetStrobe(bool on) {
-    if (in_reset_ && !on) slot0_.ResetCard();
-    in_reset_ = on;
+    slot0_.SetResetLine(on);
 }
 
 uint16_t CasioTomcatPcCard::StatusReg() const {
     uint16_t v = kStatusD3;
     if (!slot0_.HasCard()) v |= kStatusCardAbsent;
-    if (slot0_.IsPowered() && !in_reset_) v |= kStatusReady;
+    if (slot0_.IsPowered() && !ready_ireq_low_.load(std::memory_order_acquire)) v |= kStatusReady;
     return v;
 }
 
@@ -109,23 +107,27 @@ uint16_t CasioTomcatPcCard::StatusReg() const {
    which samples (+0x04 & 6) once a second and calls SetInterruptEvent(21) on a change. */
 void CasioTomcatPcCard::OnCardDetectChanged(PcmciaSlot&) {}
 
-void CasioTomcatPcCard::OnCardIrqAsserted(PcmciaSlot&) {
+void CasioTomcatPcCard::OnReadyIreqLow(PcmciaSlot&) {
+    ready_ireq_low_.store(true, std::memory_order_release);
     emu_.Get<Vr41xxGiu>().SetPinLevel(kCardIreqGiuPin, false);
 }
 
-void CasioTomcatPcCard::OnCardIrqDeasserted(PcmciaSlot&) {
+void CasioTomcatPcCard::OnReadyIreqHigh(PcmciaSlot&) {
+    ready_ireq_low_.store(false, std::memory_order_release);
     emu_.Get<Vr41xxGiu>().SetPinLevel(kCardIreqGiuPin, true);
 }
 
 void CasioTomcatPcCard::SaveState(StateWriter& w) {
     w.Write("reg_space", reg_space_);
-    w.Write("in_reset", in_reset_);
+    w.Write<uint8_t>("ready_ireq_low", ready_ireq_low_.load(std::memory_order_acquire) ? 1u : 0u);
     slot0_.SaveSlotState(w);
 }
 
 void CasioTomcatPcCard::RestoreState(StateReader& r) {
     r.Read("reg_space", reg_space_);
-    r.Read("in_reset", in_reset_);
+    uint8_t ready_ireq_low = 0u;
+    r.Read("ready_ireq_low", ready_ireq_low);
+    ready_ireq_low_.store(ready_ireq_low != 0u, std::memory_order_release);
     slot0_.RestoreSlotState(r);
 }
 

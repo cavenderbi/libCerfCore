@@ -152,7 +152,9 @@ void SerialPcCard::WriteIo8(uint32_t offset, uint8_t value) {
     if (offset - kIoBase < kRegCount) uart_->WriteReg8(offset - kIoBase, value);
 }
 uint16_t SerialPcCard::ReadIo16(uint32_t offset) {
-    return (uint16_t)(ReadIo8(offset) | (ReadIo8(offset + 1u) << 8));
+    const uint16_t even = ReadIo8(offset);
+    const uint16_t odd = ReadIo8(offset + 1u);
+    return static_cast<uint16_t>(even | (odd << 8));
 }
 /* mode_/host_port_/cis_/endpoint_ are identity / host binding; the PCMCIA
    config regs + the 16550 UART register file are the card state. uart_ is

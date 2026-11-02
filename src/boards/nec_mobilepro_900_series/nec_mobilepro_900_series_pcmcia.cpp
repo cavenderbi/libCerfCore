@@ -25,8 +25,7 @@ NecMobilepro900SeriesPcmcia::NecMobilepro900SeriesPcmcia(CerfEmulator& emu)
       slot1_(emu, *this, "PC Card slot") {}
 
 bool NecMobilepro900SeriesPcmcia::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::NecMobilepro900Series;
+    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecMobilepro900Series;
 }
 
 void NecMobilepro900SeriesPcmcia::OnReady() {
@@ -55,7 +54,9 @@ int NecMobilepro900SeriesPcmcia::SocketOf(const PcmciaSlot& slot) const {
 }
 
 void NecMobilepro900SeriesPcmcia::ResetSocket(int socket) {
-    (socket == 1 ? slot1_ : slot0_).ResetCard();
+    PcmciaSlot& slot = socket == 1 ? slot1_ : slot0_;
+    slot.SetResetLine(true);
+    slot.SetResetLine(false);
 }
 
 bool NecMobilepro900SeriesPcmcia::SocketHasCard(int socket) const {
@@ -69,11 +70,11 @@ void NecMobilepro900SeriesPcmcia::OnCardDetectChanged(PcmciaSlot& slot) {
     emu_.Get<Pxa255Gpio>().SetInputLevel(kGpioNcd[socket], !present);
 }
 
-void NecMobilepro900SeriesPcmcia::OnCardIrqAsserted(PcmciaSlot& slot) {
+void NecMobilepro900SeriesPcmcia::OnReadyIreqLow(PcmciaSlot& slot) {
     emu_.Get<Pxa255Gpio>().SetInputLevel(kGpioCardIrq[SocketOf(slot)], false);
 }
 
-void NecMobilepro900SeriesPcmcia::OnCardIrqDeasserted(PcmciaSlot& slot) {
+void NecMobilepro900SeriesPcmcia::OnReadyIreqHigh(PcmciaSlot& slot) {
     emu_.Get<Pxa255Gpio>().SetInputLevel(kGpioCardIrq[SocketOf(slot)], true);
 }
 

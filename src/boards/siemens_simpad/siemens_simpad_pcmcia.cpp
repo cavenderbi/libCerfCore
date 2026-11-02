@@ -24,8 +24,7 @@ public:
         : SiemensSimpadCs3Sink(emu), slot_(emu, *this, "PC Card slot") {}
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimpad;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SiemensSimpad;
     }
 
     void OnReady() override {
@@ -46,18 +45,18 @@ public:
        is powered-while-occupied (OnCardDetectChanged) and these bits are inert here. */
     void OnCs3LatchChanged(uint16_t /*latch*/) override {}
 
-    /* PcmciaSlotHost. */
     void OnCardDetectChanged(PcmciaSlot& slot) override {
         const bool present = slot.HasCard();
         slot.SetPowered(present);
         emu_.Get<Sa11xxGpio>().DriveInputPin(kGpioCd, !present);
     }
-    void OnCardIrqAsserted(PcmciaSlot&) override {
+    void OnReadyIreqLow(PcmciaSlot&) override {
         emu_.Get<Sa11xxGpio>().DriveInputPin(kGpioIrq, false);
     }
-    void OnCardIrqDeasserted(PcmciaSlot&) override {
+    void OnReadyIreqHigh(PcmciaSlot&) override {
         emu_.Get<Sa11xxGpio>().DriveInputPin(kGpioIrq, true);
     }
+    uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
 private:
     PcmciaSlot slot_;

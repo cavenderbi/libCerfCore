@@ -61,17 +61,15 @@ constexpr int kSubSourceAdc  = 10;
 }  /* namespace */
 
 bool S3C2410Adc::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetSocId() == SocId::S3c2410;
+    return emu_.Get<BoardContext>().GetSocId() == SocId::S3c2410;
 }
 
 void S3C2410Adc::OnReady() {
     emu_.Get<PeripheralDispatcher>().Register(this);
-    emu_.Get<S3C2410SubSourceLevels>().Register(kMainSourceAdc, kSubSourceTc,
-                                                this);
+    emu_.Get<S3C2410HeldSourceLevels>().RegisterSub(kMainSourceAdc, kSubSourceTc, this);
 }
 
-bool S3C2410Adc::SubSourceAsserted(int sub_source_bit) {
+bool S3C2410Adc::LevelAsserted(int sub_source_bit) {
     if (sub_source_bit != kSubSourceTc) return false;
     std::lock_guard<std::mutex> lk(state_mutex_);
     return PenInterruptAssertedLocked();

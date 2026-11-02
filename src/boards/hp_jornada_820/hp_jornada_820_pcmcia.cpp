@@ -28,8 +28,7 @@ HpJornada820Pcmcia::HpJornada820Pcmcia(CerfEmulator& emu)
       slot1_(emu, *this, "CompactFlash slot") {}
 
 bool HpJornada820Pcmcia::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::HpJornada820;
+    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::HpJornada820;
 }
 
 void HpJornada820Pcmcia::OnReady() {
@@ -64,15 +63,11 @@ void HpJornada820Pcmcia::OnCardDetectChanged(PcmciaSlot& slot) {
     emu_.Get<HpJornada820CompanionAsic>().RaisePcmciaStatusChange(socket);
 }
 
-/* Card IREQ is aggregated by the companion ASIC: it latches the per-socket
-   pending bit (companion 0x166400 bit25/26, read by the OAL OEMInterruptHandler
-   sub_80059BB0 -> SYSINTR 28) and drives the shared GPIO14 line. The OAL clears
-   pending W1C when it acks, so deassert is a no-op here. */
-void HpJornada820Pcmcia::OnCardIrqAsserted(PcmciaSlot& slot) {
+void HpJornada820Pcmcia::OnReadyIreqLow(PcmciaSlot& slot) {
     const int socket = (&slot == &slot1_) ? 1 : 0;
     emu_.Get<HpJornada820CompanionAsic>().RaisePcmciaCardIrq(socket);
 }
-void HpJornada820Pcmcia::OnCardIrqDeasserted(PcmciaSlot&) {}
+void HpJornada820Pcmcia::OnReadyIreqHigh(PcmciaSlot&) {}
 
 REGISTER_SERVICE(HpJornada820Pcmcia);
 

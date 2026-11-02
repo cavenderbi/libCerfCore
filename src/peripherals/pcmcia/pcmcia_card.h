@@ -13,20 +13,23 @@ class PcmciaSlot;
 class StateWriter;
 class StateReader;
 
-/* One emulated 16-bit PC Card. Instances live from insert to eject and
-   one card type may occupy two slots at once - multi-instance by
-   contract. Attribute memory is valid on even bytes only; the socket
-   controller synthesizes halfword attribute reads. */
+struct PcmciaVoltageSense {
+    bool vs1_grounded;
+    bool vs2_grounded;
+    bool low_voltage_key;
+};
+
 class PcmciaCard {
 public:
-    /* PC Card Standard Vol. 2 Electrical, 4.15.1 Configuration Option Register. */
     static constexpr uint8_t  kBusFloat8  = 0xFFu;
-    static constexpr uint16_t kBusFloat16 = 0xFFFFu;
 
     explicit PcmciaCard(CerfEmulator& emu) : emu_(emu) {}
     virtual ~PcmciaCard() = default;
 
     virtual std::string DisplayName() const = 0;
+
+    virtual PcmciaVoltageSense VoltageSense() const = 0;
+    virtual bool HoldsReadyBusyInReset() const = 0;
 
     /* Stable hibernation type tag: the slot writes it so a saved card's
        register state is applied only when the same card type is present. */
@@ -70,6 +73,8 @@ public:
     virtual uint16_t ReadIo16 (uint32_t offset)                      = 0;
     virtual void     WriteIo8 (uint32_t offset, uint8_t  value)      = 0;
     virtual void     WriteIo16(uint32_t offset, uint16_t value)      = 0;
+    virtual bool     Iois16   (uint32_t offset)                      = 0;
+    virtual bool     InputAcknowledge(uint32_t offset)               = 0;
 
     /* Called by the slot right after AttachSlot, under the slot's bus
        lock. The card hooks up its host-side transports here (e.g. the

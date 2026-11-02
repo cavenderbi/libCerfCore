@@ -115,7 +115,9 @@ void HpPalmtopVgaCard::WriteCommon8(uint32_t offset, uint8_t value) {
 uint16_t HpPalmtopVgaCard::ReadCommon16(uint32_t offset) {
     if (offset - kFbBase < VgaController::kFbSize - 1u)
         return cerf::le::U16(controller_.Framebuffer(), offset - kFbBase);
-    return (uint16_t)(ReadCommon8(offset) | (ReadCommon8(offset + 1u) << 8));
+    const uint16_t even = ReadCommon8(offset);
+    const uint16_t odd = ReadCommon8(offset + 1u);
+    return static_cast<uint16_t>(even | (odd << 8));
 }
 
 /* window_ is the host external-display window (re-derived from the restored

@@ -25,8 +25,7 @@ public:
         : Service(emu), slot_(emu, *this, "CF / PC Card slot") {}
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::AskeyPc3xx;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::AskeyPc3xx;
     }
 
     void OnReady() override {
@@ -42,18 +41,18 @@ public:
 
     void OnShutdown() override { slot_.OnShutdown(); }
 
-    /* PcmciaSlotHost. */
     void OnCardDetectChanged(PcmciaSlot& slot) override {
         const bool present = slot.HasCard();
         slot.SetPowered(present);
         emu_.Get<Pxa255Gpio>().SetInputLevel(kGpioCd, !present);
     }
-    void OnCardIrqAsserted(PcmciaSlot&) override {
+    void OnReadyIreqLow(PcmciaSlot&) override {
         emu_.Get<Pxa255Gpio>().SetInputLevel(kGpioReady, false);
     }
-    void OnCardIrqDeasserted(PcmciaSlot&) override {
+    void OnReadyIreqHigh(PcmciaSlot&) override {
         emu_.Get<Pxa255Gpio>().SetInputLevel(kGpioReady, true);
     }
+    uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
 private:
     PcmciaSlot slot_;

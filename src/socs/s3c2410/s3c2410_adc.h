@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cerfcore/peripherals/peripheral_base.h>
-#include "s3c2410_sub_source_levels.h"
+#include "s3c2410_held_source_levels.h"
 
 #include <cstdint>
 #include <mutex>
@@ -12,7 +12,7 @@ namespace cerfcore {
    ADCTSC 0x58000004, ADCDLY 0x58000008, ADCDAT0 0x5800000C, ADCDAT1
    0x58000010; Acc. Unit W for all five, R/W for the first three and R for
    the two data registers. */
-class S3C2410Adc : public Peripheral, public S3C2410LevelSubSource {
+class S3C2410Adc : public Peripheral, public S3C2410HeldLevelSource {
 public:
     using Peripheral::Peripheral;
 
@@ -32,7 +32,7 @@ public:
     /* UM p. 16-10 ADCDAT0 UPDOWN: 0 = Stylus down, 1 = Stylus up. */
     void SetPen(bool down, uint16_t sample_x, uint16_t sample_y);
 
-    bool SubSourceAsserted(int sub_source_bit) override;
+    bool LevelAsserted(int sub_source_bit) override;
 
 private:
     void     ConvertLocked();

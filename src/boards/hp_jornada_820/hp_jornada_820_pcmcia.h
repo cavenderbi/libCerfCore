@@ -22,10 +22,10 @@ public:
     /* Companion-ASIC status forward (PA 0x181E0800, off_12A9458[512]). */
     uint32_t ReadSocketStatus() const;
 
-    /* PcmciaSlotHost. */
     void OnCardDetectChanged(PcmciaSlot& slot) override;
-    void OnCardIrqAsserted  (PcmciaSlot& slot) override;
-    void OnCardIrqDeasserted(PcmciaSlot& slot) override;
+    void OnReadyIreqLow     (PcmciaSlot& slot) override;
+    void OnReadyIreqHigh    (PcmciaSlot& slot) override;
+    uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
 private:
     PcmciaSlot slot0_;

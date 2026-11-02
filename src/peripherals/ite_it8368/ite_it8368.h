@@ -37,9 +37,7 @@ public:
     uint16_t ReadReg(uint32_t off);
     void     WriteReg(uint32_t off, uint16_t value);
 
-    /* The socket's card pins. PcmciaSlot calls these from the guest's bus thread
-       and from a card's own worker thread, so they take mu_. */
-    void SetCardIrq(bool asserted);
+    void SetReadyIreqLow(bool low);
     void NotifyCardDetect();
 
     /* Pr31x00CardBuffer. */
@@ -50,13 +48,10 @@ public:
     void RestoreState(StateReader& r);
 
 private:
-    /* Driving the output pins is a socket bus transaction, and PcmciaSlot's
-       bus lock ranks above mu_ (pcmcia_slot.h): a guest card access runs
-       bus -> card -> RaiseIrq -> mu_, so mu_ is released across these. */
     struct BusOps {
-        bool drove_pins   = false;
-        bool power_on     = false;
-        bool release_reset = false;
+        bool drove_pins     = false;
+        bool power_on       = false;
+        bool reset_asserted = false;
     };
 
     BusOps   WriteRegLocked(uint32_t off, uint16_t value);
@@ -87,10 +82,8 @@ private:
     uint16_t ctrl_            = 0;
     bool     int_asserted_    = false;
 
-    /* Every GPIO starts undriven, and an undriven card pin floats high. */
-    uint16_t prev_datain_  = 0x1FFF;
-    bool     rst_asserted_ = false;
-    bool     card_irq_     = false;
+    uint16_t prev_datain_    = 0x1FFF;
+    bool     ready_ireq_low_ = false;
 };
 
 }

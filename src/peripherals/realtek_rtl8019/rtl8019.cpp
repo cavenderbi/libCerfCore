@@ -19,14 +19,10 @@ namespace cerfcore {
 namespace {
 
 const uint8_t kCisData[] = {
-    /* linux-2.6.25 drivers/pcmcia/cistpl.c parse_device();
-       cistpl.h:91 DTYPE_NULL, :99 DTYPE_FUNCSPEC. */
     0x01, 5, 0x00, 0x39, 0xD0, 0x39, 0xFF,
     0x17, 3, 0xD8, 0x08, 0xFF,
     /* linux-2.6.25 drivers/pcmcia/cistpl.h CISTPL_FUNCID_NETWORK. */
     0x21, 2, 0x06, 0x00,
-    /* linux-2.6.25 drivers/net/pcmcia/pcnet_cs.c:1703
-       PCMCIA_DEVICE_PROD_ID12("PCMCIA", "Ethernet Card", ...). */
     0x15, 24, 0x04, 0x01,
               'P', 'C', 'M', 'C', 'I', 'A', 0x00,
               'E', 't', 'h', 'e', 'r', 'n', 'e', 't', ' ',
@@ -38,11 +34,7 @@ const uint8_t kCisData[] = {
        parse_power(). DP8390D Preliminary DC Specifications, printed
        1-168: VCC = 5V +/-5%. */
     0x1B, 5, 0xC1, 0x01, 0x01, 0x01, 0x55,
-    /* linux-2.6.25 drivers/pcmcia/cistpl.c parse_io();
-       cistpl.h:414-417. Base 0x300 is where
-       drivers/net/pcmcia/pcnet_cs.c try_io_port() begins its probe. */
     0x1B, 7, 0x01, 0x08, 0xEA, 0x60, 0x00, 0x03, 0x1F,
-    /* linux-2.6.25 drivers/pcmcia/cistpl.c:445. */
     0x14, 0,
     0xFF, 0,
 };
@@ -67,11 +59,11 @@ constexpr uint8_t kCcsrPwrDwn  = 0x04;
 constexpr uint8_t kCcsrIoIs8   = 0x20;
 constexpr uint8_t kCcsrChanged = 0x80;
 
-/* linux-2.6.25 drivers/net/pcmcia/pcnet_cs.c:503 try_io_port() probes
-   from 0x300 in steps of 0x20. */
 constexpr uint8_t  kCorConfigIndex = 0x01;
 constexpr uint32_t kIoBlockBase    = 0x300;
 constexpr uint32_t kIoBlockSize    = 0x20;
+constexpr uint32_t kRemoteDmaPortFirst = 0x10;
+constexpr uint32_t kRemoteDmaPortLast  = 0x17;
 
 }
 
@@ -209,7 +201,7 @@ uint8_t Rtl8019::ReadAttribute8(uint32_t offset) {
            function: "only even byte data is valid". */
         return kCisData[offset / 2u];
     }
-    return kBusFloat8;
+    return slot_->UndrivenDataLane();
 }
 
 void Rtl8019::WriteAttribute8(uint32_t offset, uint8_t value) {
@@ -253,16 +245,13 @@ void Rtl8019::WriteAttribute8(uint32_t offset, uint8_t value) {
                           "unsupported register", offset, value);
 }
 
-/* linux-2.6.25 drivers/net/pcmcia/pcnet_cs.c:1481-1516
-   setup_shmem_window(): packet RAM as a common-memory window at
-   start_pg << 8. */
 uint8_t Rtl8019::ReadCommon8(uint32_t offset) {
     std::lock_guard<std::mutex> lk(state_mutex_);
     if (offset >= Dp8390::kRamBase &&
         offset < Dp8390::kRamBase + Dp8390::kRamSize) {
         return card_ram_[offset - Dp8390::kRamBase];
     }
-    return kBusFloat8;
+    return slot_->UndrivenDataLane();
 }
 
 uint16_t Rtl8019::ReadCommon16(uint32_t offset) {
@@ -272,7 +261,7 @@ uint16_t Rtl8019::ReadCommon16(uint32_t offset) {
         base + 1u < Dp8390::kRamBase + Dp8390::kRamSize) {
         return cerf::le::U16(card_ram_.data(), base - Dp8390::kRamBase);
     }
-    return kBusFloat16;
+    return slot_->UndrivenDataWord();
 }
 
 void Rtl8019::WriteCommon8(uint32_t offset, uint8_t value) {
@@ -318,9 +307,17 @@ bool Rtl8019::MapCardIoLocked(uint32_t card_io, uint32_t* reg) const {
     return true;
 }
 
+bool Rtl8019::Iois16(uint32_t card_io) {
+    std::lock_guard<std::mutex> lk(state_mutex_);
+    uint32_t offset = 0u;
+    if (IoIgnoredLocked() || !MapCardIoLocked(card_io, &offset))
+        return false;
+    return offset >= kRemoteDmaPortFirst && offset <= kRemoteDmaPortLast;
+}
+
 uint8_t Rtl8019::ReadIo8(uint32_t card_io) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    if (IoIgnoredLocked()) return kBusFloat8;
+    if (IoIgnoredLocked()) return slot_->UndrivenDataLane();
     uint32_t offset;
     if (!MapCardIoLocked(card_io, &offset)) {
         emu_.Get<Fatal>().Die("[NE2000] read8 io 0x%X outside configured "
@@ -331,7 +328,7 @@ uint8_t Rtl8019::ReadIo8(uint32_t card_io) {
 
 uint16_t Rtl8019::ReadIo16(uint32_t card_io) {
     std::lock_guard<std::mutex> lk(state_mutex_);
-    if (IoIgnoredLocked()) return kBusFloat16;
+    if (IoIgnoredLocked()) return slot_->UndrivenDataWord();
     uint32_t offset;
     if (!MapCardIoLocked(card_io, &offset)) {
         emu_.Get<Fatal>().Die("[NE2000] read16 io 0x%X outside configured "

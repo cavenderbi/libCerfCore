@@ -22,6 +22,8 @@ public:
     ~Rtl8019() override;
 
     std::string DisplayName() const override { return kDisplayName; }
+    PcmciaVoltageSense VoltageSense() const override { return { false, false, false }; }
+    bool HoldsReadyBusyInReset() const override { return false; }
     std::string TooltipDetail() const override;
     const char* IconResource() const override { return "pcmcia_enabled_ethernet"; }
 
@@ -43,6 +45,8 @@ public:
     uint16_t ReadIo16 (uint32_t offset)                      override;
     void     WriteIo8 (uint32_t offset, uint8_t  value)      override;
     void     WriteIo16(uint32_t offset, uint16_t value)      override;
+    bool     Iois16   (uint32_t offset)                      override;
+    bool     InputAcknowledge(uint32_t)                      override { return false; }
 
     std::vector<WidgetControl> CardControls() override;
 

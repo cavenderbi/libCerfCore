@@ -17,9 +17,12 @@ class PcmciaSlotHost {
 public:
     virtual ~PcmciaSlotHost() = default;
     virtual void OnCardDetectChanged(PcmciaSlot& slot) = 0;
-    virtual void OnCardIrqAsserted  (PcmciaSlot& slot) = 0;
-    virtual void OnCardIrqDeasserted(PcmciaSlot& slot) = 0;
+    virtual void OnReadyIreqLow     (PcmciaSlot& slot) = 0;
+    virtual void OnReadyIreqHigh    (PcmciaSlot& slot) = 0;
     virtual void OnCardPowerChanged (PcmciaSlot&) {}
+    virtual uint8_t UndrivenDataLane() const = 0;
+
+    static constexpr uint8_t kUnstatedUndrivenDataLane = 0xFFu;
 };
 
 /* One physical PCMCIA socket. Lock hierarchy: bus_mutex_ > backend rx-callback
@@ -28,22 +31,22 @@ class PcmciaSlot : public HostWidget {
 public:
     PcmciaSlot(CerfEmulator& emu, PcmciaSlotHost& host, std::string label);
 
-    /* Guest bus surface. Empty or unpowered socket reads float high
-       (PCMCIA bus convention: no card drives the data lines). */
-
-    /* CD/Vcc pin state. Lock-free by construction: a socket host reads these
-       from inside its own lock, and bus_mutex_ ranks above it. */
     bool HasCard()   const { return (pins_.load(std::memory_order_acquire) & kPinPresent) != 0u; }
     bool IsPowered() const {
         constexpr uint8_t live = kPinPresent | kPinPowered;
         return (pins_.load(std::memory_order_acquire) & live) == live;
     }
+    bool Vs1Grounded()   const { return (pins_.load(std::memory_order_acquire) & kPinVs1Grounded) != 0u; }
+    bool Vs2Grounded()   const { return (pins_.load(std::memory_order_acquire) & kPinVs2Grounded) != 0u; }
+    bool LowVoltageKey() const { return (pins_.load(std::memory_order_acquire) & kPinLowVoltageKey) != 0u; }
     void SetPowered(bool on);
     void SetCardEnabled(bool on);
-    void ResetCard();          /* socket RESET pin pulse */
+    void SetResetLine(bool asserted);
 
     uint8_t  ReadAttribute8 (uint32_t offset);
     void     WriteAttribute8(uint32_t offset, uint8_t value);
+    uint16_t ReadAttribute16 (uint32_t offset);
+    void     WriteAttribute16(uint32_t offset, uint16_t value);
     uint8_t  ReadCommon8  (uint32_t offset);
     uint16_t ReadCommon16 (uint32_t offset);
     void     WriteCommon8 (uint32_t offset, uint8_t  value);
@@ -52,6 +55,10 @@ public:
     uint16_t ReadIo16 (uint32_t offset);
     void     WriteIo8 (uint32_t offset, uint8_t  value);
     void     WriteIo16(uint32_t offset, uint16_t value);
+    bool     Iois16   (uint32_t offset);
+    bool     InputAcknowledge(uint32_t offset);
+    uint8_t  UndrivenDataLane() const { return host_.UndrivenDataLane(); }
+    uint16_t UndrivenDataWord() const;
 
     /* Card-side IRQ line, callable from any card thread; no bus lock. */
     void RaiseIrq();
@@ -87,7 +94,13 @@ public:
 private:
     static constexpr uint8_t kPinPresent = 0x01u;
     static constexpr uint8_t kPinPowered = 0x02u;
+    static constexpr uint8_t kPinVs1Grounded   = 0x04u;
+    static constexpr uint8_t kPinVs2Grounded   = 0x08u;
+    static constexpr uint8_t kPinLowVoltageKey = 0x10u;
+    static constexpr uint8_t kLineIreq = 0x01u;
+    static constexpr uint8_t kLineBusy = 0x02u;
     void PublishPinsLocked();
+    void DriveLine(uint8_t source, bool low);
     bool CardSelectedLocked();
     const char* IconResourceLocked() const;
 
@@ -115,8 +128,10 @@ private:
     std::unique_ptr<PcmciaCard> card_;
     bool                        powered_ = false;
     bool                        enabled_ = true;
+    bool                        reset_asserted_ = false;
     uint64_t                    generation_ = 0;
     std::atomic<uint8_t>        pins_{0};
+    std::atomic<uint8_t>        line_{0};
 
     std::string ui_last_res_;
 };

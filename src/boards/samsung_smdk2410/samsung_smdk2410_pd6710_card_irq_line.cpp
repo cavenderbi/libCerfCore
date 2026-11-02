@@ -9,15 +9,21 @@ namespace cerfcore {
 
 namespace {
 
-constexpr int kPd6710CardEintNumber = 8;
+constexpr int      kPd6710CardEintNumber = 8;
+constexpr uint32_t kIrqPinsDrivingNothing = 0xCEB0u;
 
 class SamsungSmdk2410Pd6710CardIrqLine : public Pd6710CardIrqLine {
 public:
     using Pd6710CardIrqLine::Pd6710CardIrqLine;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SamsungSmdk2410;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SamsungSmdk2410;
+    }
+
+    uint8_t WiredIrqSelect() const override { return 3u; }
+
+    bool IrqPinDrivesNothing(uint8_t select) const override {
+        return ((kIrqPinsDrivingNothing >> select) & 1u) != 0u;
     }
 
     /* CL-PD6710/'22 data sheet v3.1 p. 58 §9.1 Misc Control 1 (index 16h)

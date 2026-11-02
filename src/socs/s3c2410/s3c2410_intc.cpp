@@ -12,7 +12,7 @@
 #include <cerfcore/state/state_stream.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include "s3c2410_eint_source.h"
-#include "s3c2410_sub_source_levels.h"
+#include "s3c2410_held_source_levels.h"
 
 #include <array>
 #include <bit>
@@ -27,8 +27,7 @@ public:
     using IrqController::IrqController;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetSocId() == SocId::S3c2410;
+        return emu_.Get<BoardContext>().GetSocId() == SocId::S3c2410;
     }
     void OnReady() override;
 
@@ -285,7 +284,7 @@ void S3C2410Intc::WriteReg(uint32_t offset, uint32_t value) {
         else                      jit_->ClearInterruptPending();
     }
 
-    emu_.Get<S3C2410SubSourceLevels>().ReassertStillHeld(cleared_sub);
+    emu_.Get<S3C2410HeldSourceLevels>().ReassertStillHeld(cleared_main, cleared_sub);
     if (cleared_main != 0u) {
         emu_.Get<S3C2410EintSource>().ReassertHeldLevelEints(cleared_main);
     }
@@ -318,8 +317,7 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetSocId() == SocId::S3c2410;
+        return emu_.Get<BoardContext>().GetSocId() == SocId::S3c2410;
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);

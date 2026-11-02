@@ -34,6 +34,8 @@ public:
     ~HpPalmtopVgaCard() override;
 
     std::string DisplayName() const override { return kDisplayName; }
+    PcmciaVoltageSense VoltageSense() const override { return { false, false, false }; }
+    bool HoldsReadyBusyInReset() const override { return false; }
     const char* IconResource() const override { return "pcmcia_enabled_vga"; }
 
     void OnInserted() override;
@@ -58,6 +60,8 @@ public:
     uint16_t ReadIo16 (uint32_t offset)                      override;
     void     WriteIo8 (uint32_t offset, uint8_t  value)      override;
     void     WriteIo16(uint32_t offset, uint16_t value)      override;
+    bool     Iois16   (uint32_t)                             override { return true; }
+    bool     InputAcknowledge(uint32_t)                      override { return false; }
 
 private:
     /* Re-poll the controller's mode after a register write; size/show the

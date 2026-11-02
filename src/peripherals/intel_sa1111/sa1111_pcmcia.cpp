@@ -64,8 +64,7 @@ public:
           slots_{ &slot0_, &slot1_ } {}
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::HpJornada700;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::HpJornada700;
     }
 
     void OnShutdown() override {
@@ -80,16 +79,16 @@ public:
         std::lock_guard<std::mutex> lk(state_mutex_);
         w.Write("pccr", pccr_);
         w.Write("pcssr", pcssr_);
-        w.WriteBytes("irq_asserted", irq_asserted_, sizeof(irq_asserted_));
+        w.WriteBytes("ready_ireq_low",ready_ireq_low_, sizeof(ready_ireq_low_));
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
         r.Read("pccr", pccr_);
         r.Read("pcssr", pcssr_);
-        r.ReadBytes("irq_asserted", irq_asserted_, sizeof(irq_asserted_));
+        r.ReadBytes("ready_ireq_low",ready_ireq_low_, sizeof(ready_ireq_low_));
     }
     void PostRestore() override {
-        UpdateResetSignals(true);
+        UpdateResetSignals();
         for (int n = 0; n < 2; ++n) {
             DriveCardDetect(*slots_[n]);
             DriveReady(n);
@@ -102,8 +101,9 @@ public:
     }
     void OnCardPowerChanged(PcmciaSlot& slot) override { DriveReady(SocketOf(slot)); }
 
-    void OnCardIrqAsserted(PcmciaSlot& slot) override { SetCardIrq(SocketOf(slot), true); }
-    void OnCardIrqDeasserted(PcmciaSlot& slot) override { SetCardIrq(SocketOf(slot), false); }
+    void OnReadyIreqLow(PcmciaSlot& slot) override { SetReadyIreqLow(SocketOf(slot), true); }
+    void OnReadyIreqHigh(PcmciaSlot& slot) override { SetReadyIreqLow(SocketOf(slot), false); }
+    uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
 protected:
     void OnUnitReady() override {
@@ -113,8 +113,8 @@ protected:
         widgets.Register(slots_[1]);
         sbi_ = &emu_.Get<Sa1111Sbi>();
         emu_.Get<Sa1111SystemController>().RegisterClockListener(
-            [this] { UpdateResetSignals(false); });
-        UpdateResetSignals(true);
+            [this] { UpdateResetSignals(); });
+        UpdateResetSignals();
     }
 
     uint32_t UnitReadWord(uint32_t addr) override {
@@ -140,7 +140,7 @@ protected:
                     std::lock_guard<std::mutex> lk(state_mutex_);
                     pcssr_ = value & kPcssrDefined;
                 }
-                UpdateResetSignals(false);
+                UpdateResetSignals();
                 return;
             }
         }
@@ -159,7 +159,7 @@ protected:
             DriveCardDetect(*slots_[0]);
             DriveCardDetect(*slots_[1]);
         }
-        UpdateResetSignals(false);
+        UpdateResetSignals();
     }
 
 private:
@@ -176,7 +176,7 @@ private:
 
     /* Table 12-3 (page 12-7) S0_READY_nIREQ: "Input from PC Card Socket RDY/nIRQ signal. This
        signal can be accessed through Status Register and used as an interrupt source." */
-    bool ReadyPinLocked(int n) const { return slots_[n]->IsPowered() && !irq_asserted_[n]; }
+    bool ReadyPinLocked(int n) const { return slots_[n]->IsPowered() && !ready_ireq_low_[n]; }
 
     void PublishReadyLocked(int n) {
         emu_.Get<Sa1111Intc>().SetSourceLevel(n == 0 ? kIntS0Ready : kIntS1Ready,
@@ -188,9 +188,9 @@ private:
         PublishReadyLocked(n);
     }
 
-    void SetCardIrq(int n, bool asserted) {
+    void SetReadyIreqLow(int n, bool low) {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        irq_asserted_[n] = asserted;
+        ready_ireq_low_[n] = low;
         PublishReadyLocked(n);
     }
 
@@ -215,7 +215,7 @@ private:
             std::lock_guard<std::mutex> lk(state_mutex_);
             pccr_ = value & kPccrDefined;
         }
-        UpdateResetSignals(false);
+        UpdateResetSignals();
     }
 
     /* Table 12-3 (printed 12-7) S0_RESET: "This signal needs a weak pull-up on board. The
@@ -235,22 +235,19 @@ private:
         return !ChipHeld() && (pccr_ & (kPccrS0Flt << n)) != 0u && !sbi_->SleepRequested();
     }
 
-    void UpdateResetSignals(bool quiet) {
-        bool released[2] = {};
+    void UpdateResetSignals() {
+        bool asserted[2] = {};
         bool enabled[2]  = {};
         {
             std::lock_guard<std::mutex> lk(state_mutex_);
             for (int n = 0; n < 2; ++n) {
-                const bool asserted = ResetAssertedLocked(n);
-                released[n]         = reset_asserted_[n] && !asserted;
-                reset_asserted_[n]  = asserted;
-                enabled[n]          = CardEnabledLocked(n);
+                asserted[n] = ResetAssertedLocked(n);
+                enabled[n]  = CardEnabledLocked(n);
             }
         }
-        for (int n = 0; n < 2; ++n) slots_[n]->SetCardEnabled(enabled[n]);
-        if (quiet) return;
         for (int n = 0; n < 2; ++n) {
-            if (released[n]) slots_[n]->ResetCard();
+            slots_[n]->SetCardEnabled(enabled[n]);
+            slots_[n]->SetResetLine(asserted[n]);
         }
     }
 
@@ -263,8 +260,7 @@ private:
     std::mutex state_mutex_;
     uint32_t   pccr_  = 0u;
     uint32_t   pcssr_ = 0u;
-    bool       irq_asserted_[2]   = {};
-    bool       reset_asserted_[2] = {true, true};
+    bool       ready_ireq_low_[2] = {};
 };
 
 }  /* namespace */
