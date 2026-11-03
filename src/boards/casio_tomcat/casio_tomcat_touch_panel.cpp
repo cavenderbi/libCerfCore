@@ -1,4 +1,5 @@
 #include "../../socs/vr41xx/vr41xx_piu_panel.h"
+#include "../../socs/vr41xx/vr41xx_piu_regs.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
@@ -12,24 +13,20 @@ namespace cerfcore {
 
 namespace {
 
-/* casio_cassiopeia_e55 touch.dll sub_14D05DC issues one command scan, PIUCMDREG = 0xCC0, whose
-   ADCMD(3:0) is 0; none of the eight functions holding an xref to the mapped base reads
-   PIUAB0REG. */
-constexpr uint16_t kAdcmdCommandScan = 0;
+using cerf_vr41xx_piu_detail::kAdcmdTpx0;
 
 class CasioTomcatTouchPanel : public Vr41xxPiuPanel {
 public:
     using Vr41xxPiuPanel::Vr41xxPiuPanel;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::CasioTomcat;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CasioTomcat;
     }
 
     std::optional<uint16_t> ConvertCommandPort(uint16_t adcmd,
                                                uint16_t /*pos_x*/,
                                                uint16_t /*pos_y*/) override {
-        if (adcmd != kAdcmdCommandScan) {
+        if (adcmd != kAdcmdTpx0) {
             emu_.Get<Fatal>().Die("CasioTomcatTouchPanel: PIUCMDREG ADCMD=0x%X selects "
                                   "an A/D port this board's panel does not drive", adcmd);
         }

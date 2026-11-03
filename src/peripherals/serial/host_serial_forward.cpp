@@ -146,6 +146,15 @@ void HostSerialForward::OnGuestTx(const uint8_t* data, size_t n) {
 
 void HostSerialForward::ResendModemInputs() { last_ms_.store(kModemLinesUnpushed); }
 
+void HostSerialForward::PostRestore() {
+    if (!port_.IsOpen()) {
+        OnOpen();
+        return;
+    }
+    ApplyLineConfig(uart_->GetLineConfig());
+    ResendModemInputs();
+}
+
 void HostSerialForward::OnControlLines(bool dtr, bool rts) {
     std::lock_guard<std::mutex> lk(ctl_mu_);
     dtr_ = dtr;

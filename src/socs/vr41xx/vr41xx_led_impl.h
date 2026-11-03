@@ -6,6 +6,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
+#include <cerfcore/host/guest_deep_sleep.h>
 #include "../../core/steady_time.h"
 #include <cerfcore/host/host_widget.h>
 #include <cerfcore/host/host_widget_registry.h>
@@ -35,11 +36,7 @@ constexpr uint32_t kOffCnt   = 0x08u;
 constexpr uint32_t kOffAstc  = 0x0Au;
 constexpr uint32_t kOffInt   = 0x0Cu;
 
-/* LEDHLTCLREG and LEDHLTCHREG, initial value 0x0000, listed between LEDLTSREG and LEDCNTREG in
-   the operation flow's "Register initial setting" (VR4111 UM 24.3 p499 / VR4131 UM 19.3 p364).
-   The VR4102 manual names neither, but nec_mobilepro_700_ce2 leddrv.dll sub_153054C writes both
-   on that chip: @0x15305AC "sh $zero, 0x244($t7)" and @0x15305B8 "sh $zero, 0x246($t8)". */
-constexpr uint16_t kHltcPowerOn = 0x0000u;
+constexpr uint16_t kHltcUnstated = 0x0000u;
 
 /* HTS[4..0] is "Values compared to bits 15 to 11 of LED HL Time Count" (VR4111 UM 24.2.1 p494)
    and LTS[6..0] "Values compared to bits 17 to 11" (24.2.2 p495), both scaling bit 11 as
@@ -86,7 +83,7 @@ constexpr WidgetRgb kClrDark{50, 55, 50};
 constexpr WidgetRgb kClrRim{90, 95, 90};
 constexpr WidgetRgb kClrRimBlink{120, 230, 130};
 
-template <const std::string_view& Soc, uint32_t Base>
+template <const std::string_view& Soc, uint32_t Base, Vr41xxRtcxDomain kClock>
 class Vr41xxLedBase : public Peripheral, public HostWidget {
 public:
     using Peripheral::Peripheral;
@@ -101,35 +98,39 @@ public:
             std::lock_guard<std::mutex> lk(state_mutex_);
             UpdateLocked();
         });
-        rtcx_.Attach([this] {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            UpdateLocked();
-        });
+        if constexpr (kClock == Vr41xxRtcxDomain::Peripheral) {
+            rtcx_.Attach([this] {
+                std::lock_guard<std::mutex> lk(state_mutex_);
+                UpdateLocked();
+            });
+        } else {
+            rtcx_.Attach();
+            emu_.Get<GuestDeepSleep>().RegisterParkClock([this] {
+                std::lock_guard<std::mutex> lk(state_mutex_);
+                UpdateLocked();
+            });
+        }
         clock_->RegisterRateListener([this] {
             std::lock_guard<std::mutex> lk(state_mutex_);
             rtcx_.Rescale();
             ArmAutoStopLocked();
         });
-        hltc_anchor_tick_ = rtcx_.Now();
+        blink_anchor_tick_ = rtcx_.Now();
         emu_.Get<PeripheralDispatcher>().Register(this);
         emu_.Get<HostWidgetRegistry>().Register(this);
-        /* LEDASTCREG and LEDINTREG carry identical RTCRST and Other-resets rows, while
-           LEDHTSREG, LEDLTSREG and LEDCNTREG carry "Previous value is retained" on Other
-           resets (VR4111 UM 24.2.1-24.2.5 p494-p498 / VR4102 UM 23.2.1-23.2.5 p454-p458 /
-           VR4131 UM 19.2.1-19.2.5 p359-p363). */
-        emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
+        emu_.Get<GuestDeepSleep>().RegisterSleepEntryListener([this] {
             std::lock_guard<std::mutex> lk(state_mutex_);
-            astc_ = kAstcPowerOn;
-            int_  = 0;
+            ApplyOtherResetLocked();
+        });
+        emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
+            if (emu_.Get<GuestCpuReset>().DeliveredResetWasResume()) return;
+            std::lock_guard<std::mutex> lk(state_mutex_);
             if (kind == ResetLineKind::Rtc) {
                 cnt_ = kCntPowerOn;
                 hts_ = kHtsPowerOn;
                 lts_ = kLtsPowerOn;
-                ReanchorHltcLocked(kHltcPowerOn);
             }
-            if (cnt_ & kCntEnable) ArmBlinkLocked();
-            else                   astc_remaining_ = 0;
-            UpdateLocked();
+            ApplyOtherResetLocked();
         });
     }
 
@@ -143,8 +144,8 @@ public:
         switch (addr - Base) {
             case kOffHts: return hts_;
             case kOffLts: return lts_;
-            case kOffHltcl: return static_cast<uint16_t>(HltcNowLocked());
-            case kOffHltch: return static_cast<uint16_t>(HltcNowLocked() >> 16);
+            case kOffHltcl:
+            case kOffHltch: return kHltcUnstated;
             case kOffCnt: return cnt_;
             /* LEDASTCREG "The set value is read during a read" (VR4111 UM 24.2.4 p497). */
             case kOffAstc: return astc_;
@@ -167,11 +168,7 @@ public:
                 NoteTimeChangeLocked("LEDLTSREG", value);
                 break;
             case kOffHltcl:
-                ReanchorHltcLocked((HltcNowLocked() & 0xFFFF0000u) | value);
-                break;
             case kOffHltch:
-                ReanchorHltcLocked((HltcNowLocked() & 0x0000FFFFu) |
-                                   (static_cast<uint32_t>(value) << 16));
                 break;
             case kOffCnt:
                 WriteCntLocked(static_cast<uint16_t>(value & kCntMask));
@@ -203,18 +200,20 @@ public:
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write("cnt", cnt_); w.Write("hts", hts_); w.Write("lts", lts_); w.Write("astc", astc_); w.Write("int", int_);
-        w.Write("hltc", HltcNowLocked());
-        w.Write("astc_remaining",
-                (cnt_ & kCntEnable) ? RemainingAtLocked(PairIndexLocked()) : astc_remaining_);
+        const uint64_t  elapsed = BlinkTicksLocked();
+        const CountFold fold    = (cnt_ & kCntEnable) ? FoldedLocked(PairIndexAt(elapsed))
+                                                      : CountFold{cnt_, int_, astc_remaining_};
+        w.Write("cnt", fold.cnt); w.Write("hts", hts_); w.Write("lts", lts_); w.Write("astc", astc_); w.Write("int", fold.intr);
+        w.Write("blink_elapsed", elapsed);
+        w.Write("astc_remaining", fold.remaining);
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
         r.Read("cnt", cnt_); r.Read("hts", hts_); r.Read("lts", lts_); r.Read("astc", astc_); r.Read("int", int_);
-        uint32_t hltc = 0;
-        r.Read("hltc", hltc); r.Read("astc_remaining", astc_remaining_);
+        uint64_t blink_elapsed = 0;
+        r.Read("blink_elapsed", blink_elapsed); r.Read("astc_remaining", astc_remaining_);
         rtcx_.Rebase();
-        ReanchorHltcLocked(hltc);
+        ReanchorBlinkLocked(blink_elapsed);
         last_pair_index_ = (cnt_ & kCntEnable) ? PairIndexLocked() : 0;
     }
     void PostRestore() override {
@@ -253,33 +252,37 @@ public:
     }
 
 private:
-    uint64_t HltcTicksLocked() {
-        return hltc_base_ + (rtcx_.Now() - hltc_anchor_tick_);
+    uint64_t BlinkTicksLocked() {
+        return blink_base_ + (rtcx_.Now() - blink_anchor_tick_);
     }
-    uint32_t HltcNowLocked() {
-        return static_cast<uint32_t>(HltcTicksLocked());
-    }
-    uint64_t HltcUnitsLocked() {
-        return HltcTicksLocked() >> kHltcUnitShift;
-    }
-    void ReanchorHltcLocked(uint32_t value) {
-        hltc_base_        = value;
-        hltc_anchor_tick_ = rtcx_.Now();
-        if (cnt_ & kCntEnable) last_pair_index_ = PairIndexLocked();
+    void ReanchorBlinkLocked(uint64_t elapsed) {
+        blink_base_        = elapsed;
+        blink_anchor_tick_ = rtcx_.Now();
     }
 
+    uint64_t PairIndexAt(uint64_t elapsed) const {
+        return (elapsed >> kHltcUnitShift) / (hts_ + lts_);
+    }
     uint64_t PairIndexLocked() {
-        return HltcUnitsLocked() / (hts_ + lts_);
+        return PairIndexAt(BlinkTicksLocked());
+    }
+
+    void ApplyOtherResetLocked() {
+        astc_ = kAstcPowerOn;
+        int_  = 0;
+        if (cnt_ & kCntEnable) ArmBlinkLocked();
+        else                   astc_remaining_ = 0;
+        UpdateLocked();
     }
 
     void ArmAutoStopLocked() {
-        if (!(cnt_ & kCntEnable) || !(cnt_ & kCntStop)) {
+        if (!(cnt_ & kCntEnable) || !(cnt_ & kCntStop) || astc_remaining_ == 0u) {
             clock_->Disarm(event_);
             return;
         }
         const uint64_t period = static_cast<uint64_t>(hts_) + lts_;
         const uint64_t stop   = (last_pair_index_ + astc_remaining_) * period;
-        rtcx_.ArmAt(event_, hltc_anchor_tick_ + ((stop << kHltcUnitShift) - hltc_base_));
+        rtcx_.ArmAt(event_, blink_anchor_tick_ + ((stop << kHltcUnitShift) - blink_base_));
     }
 
     void UpdateLocked() {
@@ -304,8 +307,6 @@ private:
         astc_remaining_  = value;
     }
 
-    /* Zero in LEDHTSREG or LEDLTSREG is prohibited at the blinking start condition
-       (VR4111 UM 24.3 p499; the VR4131 equivalent is 19.3 p364). */
     void NoteTimeChangeLocked(const char* reg, uint16_t value) {
         if (!(cnt_ & kCntEnable)) return;
         LOG(Periph, "[LED] %s=0x%04X written while LEDENABLE is set; blink timing undefined\n",
@@ -317,9 +318,6 @@ private:
         last_pair_index_ = PairIndexLocked();
     }
 
-    /* "Setting these registers to 0 is prohibited because this operation may cause undefined
-       operation", bracketing LEDHTSREG / LEDLTSREG / LEDASTCREG at the blinking start
-       condition (VR4111 UM 24.3 p499); the VR4131 equivalent is 19.3 p364. */
     void WriteCntLocked(uint16_t value) {
         const bool was_enabled = (cnt_ & kCntEnable) != 0u;
         const bool now_enabled = (value & kCntEnable) != 0u;
@@ -329,30 +327,36 @@ private:
                                       "LEDLTSREG=0x%04X LEDASTCREG=0x%04X; zero is prohibited",
                                       hts_, lts_, astc_);
             cnt_ = value;
+            ReanchorBlinkLocked(0u);
             ArmBlinkLocked();
             return;
         }
         cnt_ = value;
     }
 
-    /* "The pair of operations in which the LED is switched ON once and OFF once is counted as
-       '1' by this counter. The counter counts down from the set value and an LEDINT interrupt
-       occurs when it reaches zero" (VR4111 UM 24.2.4 p497); at zero the flow clears LEDENABLE
-       and LEDSTOP and sets LEDINT (24.3 p499 / VR4131 UM 19.3 p364). */
-    uint16_t RemainingAtLocked(uint64_t idx) const {
-        if (!(cnt_ & kCntEnable) || !(cnt_ & kCntStop) || idx <= last_pair_index_)
-            return astc_remaining_;
+    struct CountFold {
+        uint16_t cnt;
+        uint16_t intr;
+        uint16_t remaining;
+    };
+    CountFold FoldedLocked(uint64_t idx) const {
+        CountFold fold{cnt_, int_, astc_remaining_};
+        if (!(cnt_ & kCntEnable) || idx <= last_pair_index_) return fold;
         const uint64_t advance = idx - last_pair_index_;
-        return advance >= astc_remaining_ ? 0 : static_cast<uint16_t>(astc_remaining_ - advance);
+        fold.remaining = advance >= astc_remaining_ ? 0u : static_cast<uint16_t>(astc_remaining_ - advance);
+        if (astc_remaining_ == 0u || fold.remaining != 0u || !(cnt_ & kCntStop)) return fold;
+        fold.cnt  = static_cast<uint16_t>(cnt_ & ~(kCntStop | kCntEnable));
+        fold.intr = static_cast<uint16_t>(int_ | kIntLedint);
+        return fold;
     }
     void EvaluateLocked() {
         if (!(cnt_ & kCntEnable)) return;
-        const uint64_t idx = PairIndexLocked();
-        astc_remaining_  = RemainingAtLocked(idx);
+        const uint64_t  idx  = PairIndexLocked();
+        const CountFold fold = FoldedLocked(idx);
+        cnt_             = fold.cnt;
+        int_             = fold.intr;
+        astc_remaining_  = fold.remaining;
         last_pair_index_ = idx;
-        if (!(cnt_ & kCntStop) || astc_remaining_) return;
-        cnt_ = static_cast<uint16_t>(cnt_ & ~(kCntStop | kCntEnable));
-        int_ = static_cast<uint16_t>(int_ | kIntLedint);
     }
     void DriveIcuLocked() {
         emu_.Get<Vr41xxIcu>().SetSysint2Source(kIcuLedintBit, (int_ & kIntLedint) != 0);
@@ -366,15 +370,15 @@ private:
     uint16_t astc_  = kAstcPowerOn;
     uint16_t int_   = 0;
 
-    uint32_t hltc_base_ = 0;
+    uint64_t blink_base_ = 0;
 
     uint64_t last_pair_index_ = 0;
     uint16_t astc_remaining_  = 0;
 
     GuestCycleClock*        clock_            = nullptr;
     GuestCycleClock::Event* event_            = nullptr;
-    Vr41xxRtcxTicks         rtcx_{emu_, Vr41xxRtcxDomain::Peripheral};
-    uint64_t                hltc_anchor_tick_ = 0;
+    Vr41xxRtcxTicks         rtcx_{emu_, kClock};
+    uint64_t                blink_anchor_tick_ = 0;
 
     bool draw_lit_   = false;
     bool draw_blink_ = false;

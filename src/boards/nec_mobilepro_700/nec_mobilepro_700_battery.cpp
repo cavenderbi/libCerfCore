@@ -1,33 +1,24 @@
-#include "nec_mobilepro_700_battery.h"
+#include "../nec_vrc4172_battery.h"
 
-#include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/host/host_widget_registry.h>
-#include "../../peripherals/nec_vrc4172/vrc4172_gpio.h"
 #include <cerfcore/boards/board_context.h>
+#include <cerfcore/core/cerf_emulator.h>
 #include "nec_mobilepro_700_family_id.h"
 
 namespace cerfcore {
 
 namespace {
 
-constexpr int kOffAcPin = 5;
+class NecMobilepro700Battery : public NecVrc4172Battery {
+public:
+    using NecVrc4172Battery::NecVrc4172Battery;
+
+    bool ShouldRegister() override {
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecMobilepro700;
+    }
+};
 
 }
 
-bool NecMobilePro700Battery::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecMobilepro700;
-}
-
-void NecMobilePro700Battery::OnReady() {
-    emu_.Get<HostWidgetRegistry>().Register(&battery_);
-    battery_.SetChangeHandler([this] { DriveAcPin(); });
-    DriveAcPin();
-}
-
-void NecMobilePro700Battery::DriveAcPin() {
-    emu_.Get<Vrc4172Gpio>().SetPinLevel(kOffAcPin, battery_.IsOnBattery());
-}
-
-REGISTER_SERVICE(NecMobilePro700Battery);
+REGISTER_SERVICE_AS(NecMobilepro700Battery, NecVrc4172Battery);
 
 }

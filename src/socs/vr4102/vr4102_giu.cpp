@@ -28,6 +28,8 @@ constexpr Vr41xxGiuModel kModel = {
     /*podat_l_retained_on_reset=*/false,
     /* GIUPODATH Other-resets row: every bit 0 (UM 18.2.16 p380). */
     /*podat_h_retained_on_reset=*/false,
+    0x3AFFFFFFF7FFFull,
+    0x500000000000ull,
 };
 
 class Vr4102Giu : public Vr41xxGiuBase<SocId::Vr4102, kModel> {

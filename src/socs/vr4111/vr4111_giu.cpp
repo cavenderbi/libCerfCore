@@ -28,6 +28,8 @@ constexpr Vr41xxGiuModel kModel = {
     /*podat_l_retained_on_reset=*/true,
     /* GIUPODATH Other-resets row: "Previous value is retained" (UM 19.2.16 p416). */
     /*podat_h_retained_on_reset=*/true,
+    0xFFFF7FFFull,
+    0u,
 };
 
 class Vr4111Giu : public Vr41xxGiuBase<SocId::Vr4111, kModel> {

@@ -1,6 +1,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/host/keyboard_map.h>
 #include <cerfcore/boards/board_context.h>
+#include "../nec_vr41xx_keyboard_input.h"
 #include "nec_mobilepro_700_family_id.h"
 
 #include <vector>
@@ -9,16 +10,12 @@ namespace cerfcore {
 
 namespace {
 
-/* device_code = KIU matrix index (16*KIUDATn + bit), reversed from keybddr's
-   scan-index -> VKey table (sub_15B4848 @ 0x15B0978). L/R modifiers fold to
-   VK_SHIFT/CONTROL/MENU (host_input_capture), so they bind the left cells. */
-class NecMobilePro700KeyboardMap : public KeyboardMap {
+class NecMobilepro700KeyboardMap : public KeyboardMap {
 public:
     using KeyboardMap::KeyboardMap;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::NecMobilepro700;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecMobilepro700;
     }
 
     const std::vector<KeyBinding>& Bindings() const override {
@@ -98,13 +95,14 @@ public:
             {0x78u, 93u, nullptr, 0u, 0u},
             {0x74u, 94u, nullptr, 0u, 0u},
             {0x70u, 95u, nullptr, 0u, 0u},
+            {0xDFu, kNecVr41xxPowerSwitchCode, "Power", 0u, 0u},
         };
         return kBindings;
     }
 };
 
-}  // namespace
+}
 
-REGISTER_SERVICE_AS(NecMobilePro700KeyboardMap, KeyboardMap);
+REGISTER_SERVICE_AS(NecMobilepro700KeyboardMap, KeyboardMap);
 
 }

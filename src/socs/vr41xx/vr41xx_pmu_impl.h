@@ -1,18 +1,23 @@
 #pragma once
 
 #include "vr41xx_giu.h"
+#include "vr41xx_icu.h"
 #include "vr41xx_pmu.h"
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/host/guest_deep_sleep.h>
+#include "../../execution/engine_bridge.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
+#include <cerfengine/host_request_channel.h>
 
 #include <atomic>
 #include <cstdint>
+#include <mutex>
+#include <vector>
 
 namespace cerfcore {
 
@@ -22,12 +27,11 @@ constexpr uint32_t kOffIntReg  = 0x00u;
 constexpr uint32_t kOffCntReg  = 0x02u;
 constexpr uint32_t kOffWaitReg = 0x08u;
 
-/* PMUINTREG D9 RTCINTR "RTC alarm interrupt detection", D10 DCDST "DCD# pin state"
-   (VR4102 UM 15.2.1 p328); GIUIOSELL: "GPIO15 (DCD#) is fixed as input" (VR4102 UM
-   18.2.1, VR4121 UM 19.2.1). */
 constexpr uint16_t kIntRtcIntr = 0x0200u;
 constexpr uint16_t kIntDcdSt   = 0x0400u;
-constexpr int      kDcdPin     = 15;
+
+constexpr uint16_t kIntPowerSwIntr   = 0x0001u;
+constexpr uint16_t kSysint1PowerIntr = 0x0002u;
 
 /* PMUCNTREG "Other resets" row: D15-8 "Holds the value before reset", D7-0 as RTCRST
    (VR4102 UM 15.2.2 p330, VR4111 UM 16.2.2 p366, VR4121 UM 16.2.2 p411, VR4131 UM 12.2.2 p227). */
@@ -53,6 +57,7 @@ struct Vr41xxPmuModel {
        reset." */
     uint16_t int_held_on_reset  = 0xFFFFu;
     uint16_t int_watchdog_cause = 0;
+    bool     power_holds_wake_factors = false;
 };
 
 template <const std::string_view& Soc, const Vr41xxPmuModel& M>
@@ -61,13 +66,9 @@ public:
     using Vr41xxPmu::Vr41xxPmu;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetSocId() == Soc;
+        return emu_.Get<BoardContext>().GetSocId() == Soc;
     }
 
-    /* An RTC reset "resets all peripheral units including the RTC unit"; an RSTSW
-       reset "resets all peripheral units except for RTC and PMU" (VR4111 UM
-       16.1.1(1)/(2), Table 16-1). */
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);
         emu_.Get<GuestCpuReset>().SetCauseLatch(this);
@@ -80,28 +81,47 @@ public:
         sleep.RegisterParkWakeSource([this] {
             return wake_pending_.load(std::memory_order_acquire);
         });
+        host_requests_ = &emu_.Get<EngineBridge>().Engine().Get<cerfengine::HostRequestChannel>();
+        host_requests_->RegisterListener([this] { ApplyPowerPinInput(); });
+        sleep.RegisterParkClock([this] { ApplyPowerPinInput(); });
         if (M.int_power_wake != 0u) {
-            sleep.RegisterUserWakeInput([this] { SetIntBits(M.int_power_wake); });
+            sleep.RegisterUserWakeInput([this] {
+                std::lock_guard<std::mutex> lk(power_mtx_);
+                SetIntBits(M.int_power_wake);
+                PublishPowerIntrLocked();
+            });
         }
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
             hibernating_.store(false, std::memory_order_release);
             wake_pending_.store(false, std::memory_order_release);
             const uint16_t cause = pending_cause_.exchange(0u, std::memory_order_acq_rel);
+            std::lock_guard<std::mutex> lk(power_mtx_);
+            if (kind == ResetLineKind::Rtc) rtc_alarm_held_ = false;
             if (kind != ResetLineKind::Rtc) {
                 const uint16_t kept = emu_.Get<GuestCpuReset>().DeliveredResetWasResume()
                     ? IntReg()
                     : static_cast<uint16_t>(IntReg() & M.int_held_on_reset);
                 StoreIntReg(static_cast<uint16_t>(kept | cause));
+                PublishPowerIntrLocked();
                 const uint16_t held = cntreg_.load(std::memory_order_acquire) & kCntHeldOnReset;
                 cntreg_.store(static_cast<uint16_t>(held | (M.cnt_power_on & ~kCntHeldOnReset)),
                               std::memory_order_release);
                 return;
             }
             StoreIntReg(static_cast<uint16_t>(M.int_power_on | cause));
+            PublishPowerIntrLocked();
             cntreg_.store(M.cnt_power_on, std::memory_order_release);
             waitreg_ = M.wait_power_on;
             ResetExt();
         });
+    }
+
+    void SetPowerSwitch(bool high) override {
+        {
+            std::lock_guard<std::mutex> lk(pin_mtx_);
+            pin_levels_.push_back(high);
+        }
+        host_requests_->Request();
     }
 
     uint32_t MmioBase() const override { return M.base; }
@@ -112,11 +132,20 @@ public:
     void LatchWatchdogReset() override { LatchResetCause(M.int_watchdog_cause); }
 
     void LatchSleepWakeCause() override {}
-    void ClearSleepWakeCause() override { ClearIntBits(M.int_power_wake); }
+    void ClearSleepWakeCause() override {
+        std::lock_guard<std::mutex> lk(power_mtx_);
+        ClearIntBits(M.int_power_wake);
+        PublishPowerIntrLocked();
+    }
+
+    bool PowerHoldsWakeFactors() const override {
+        return M.power_holds_wake_factors && power_high_.load(std::memory_order_acquire);
+    }
 
     void OnGpioLevel(int pin, bool prev, bool level) override {
         if (prev == level || !hibernating_.load(std::memory_order_acquire)) return;
-        if (pin == kDcdPin) {
+        if (PowerHoldsWakeFactors()) return;
+        if (pin == Vr41xxGiu::kDcdPin) {
             if (!level) wake_pending_.store(true, std::memory_order_release);
             return;
         }
@@ -140,13 +169,20 @@ public:
         wake_pending_.store(true, std::memory_order_release);
     }
 
-    void LatchRtcAlarmWake() override { SetIntBits(kIntRtcIntr); }
+    void LatchRtcAlarmWake() override {
+        std::lock_guard<std::mutex> lk(power_mtx_);
+        if (PowerHoldsWakeFactors()) {
+            rtc_alarm_held_ = true;
+            return;
+        }
+        SetIntBits(kIntRtcIntr);
+    }
 
     uint16_t ReadHalf(uint32_t addr) override {
         switch (addr - M.base) {
             case kOffIntReg:
                 return static_cast<uint16_t>(
-                    IntReg() | (emu_.Get<Vr41xxGiu>().GetPinLevel(kDcdPin) ? kIntDcdSt : 0u));
+                    IntReg() | (emu_.Get<Vr41xxGiu>().GetPinLevel(Vr41xxGiu::kDcdPin) ? kIntDcdSt : 0u));
             case kOffCntReg: return cntreg_.load(std::memory_order_acquire);
             default: return ReadHalfExt(addr);
         }
@@ -154,7 +190,12 @@ public:
 
     void WriteHalf(uint32_t addr, uint16_t value) override {
         switch (addr - M.base) {
-            case kOffIntReg: AckIntReg(value); return;
+            case kOffIntReg: {
+                std::lock_guard<std::mutex> lk(power_mtx_);
+                AckIntReg(value);
+                PublishPowerIntrLocked();
+                return;
+            }
             case kOffCntReg:
                 if ((value & M.cnt_write_zero) != 0u ||
                     (value & M.cnt_write_one) != M.cnt_write_one) {
@@ -174,7 +215,10 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write("int_reg", IntReg());
+        {
+            std::lock_guard<std::mutex> lk(power_mtx_);
+            w.Write("int_reg", static_cast<uint16_t>(IntReg() | (rtc_alarm_held_ ? kIntRtcIntr : 0u)));
+        }
         w.Write("cntreg", cntreg_.load(std::memory_order_acquire));
         w.Write("waitreg", waitreg_);
         w.Write<uint8_t>("hibernating", hibernating_.load(std::memory_order_acquire) ? 1u : 0u);
@@ -210,6 +254,18 @@ public:
         cntreg_.store(cnt, std::memory_order_release);
         hibernating_.store(hib != 0u, std::memory_order_release);
         wake_pending_.store(pend != 0u, std::memory_order_release);
+        {
+            std::lock_guard<std::mutex> pin_lk(pin_mtx_);
+            pin_levels_.clear();
+        }
+        std::lock_guard<std::mutex> lk(power_mtx_);
+        power_high_.store(false, std::memory_order_release);
+        rtc_alarm_held_ = false;
+    }
+
+    void PostRestore() override {
+        std::lock_guard<std::mutex> lk(power_mtx_);
+        PublishPowerIntrLocked();
     }
 
 protected:
@@ -251,6 +307,52 @@ protected:
         pending_cause_.fetch_or(bits, std::memory_order_acq_rel);
     }
 
+    void PublishPowerIntrLocked() {
+        emu_.Get<Vr41xxIcu>().SetSysint1Source(kSysint1PowerIntr, (IntReg() & kIntPowerSwIntr) != 0u);
+    }
+
+    void ApplyPowerPinInput() {
+        std::vector<bool> levels;
+        {
+            std::lock_guard<std::mutex> lk(pin_mtx_);
+            levels.swap(pin_levels_);
+        }
+        bool changed = false;
+        for (const bool high : levels) {
+            std::lock_guard<std::mutex> lk(power_mtx_);
+            if (ApplyPowerSwitchLocked(high)) changed = true;
+        }
+        if (changed) emu_.Get<GuestDeepSleep>().RefreshParkWakeDue();
+    }
+
+    bool ApplyPowerSwitchLocked(bool high) {
+        const bool was_high = power_high_.load(std::memory_order_acquire);
+        if (high == was_high) return false;
+        power_high_.store(high, std::memory_order_release);
+        if (!high) {
+            if (!rtc_alarm_held_) return true;
+            rtc_alarm_held_ = false;
+            SetIntBits(kIntRtcIntr);
+            if (hibernating_.load(std::memory_order_acquire))
+                wake_pending_.store(true, std::memory_order_release);
+            return true;
+        }
+        if (hibernating_.load(std::memory_order_acquire)) {
+            SetIntBits(M.int_power_wake);
+            wake_pending_.store(true, std::memory_order_release);
+        } else {
+            SetIntBits(kIntPowerSwIntr);
+        }
+        PublishPowerIntrLocked();
+        return true;
+    }
+
+    std::mutex                       pin_mtx_;
+    std::vector<bool>                pin_levels_;
+    cerfengine::HostRequestChannel*  host_requests_ = nullptr;
+    std::mutex            power_mtx_;
+    std::atomic<bool>     power_high_{false};
+    bool                  rtc_alarm_held_ = false;
     std::atomic<uint16_t> intreg_{M.int_power_on};
     std::atomic<uint16_t> pending_cause_{0};
     std::atomic<uint16_t> cntreg_{M.cnt_power_on};

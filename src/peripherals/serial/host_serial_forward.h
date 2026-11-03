@@ -30,6 +30,7 @@ public:
     void OnOpen()  override;
     void OnClose() override;
     void ResendModemInputs() override;
+    void PostRestore() override;
 
 private:
     void ReaderLoop();

@@ -169,6 +169,22 @@ bool PcmciaSlot::InputAcknowledge(uint32_t offset) {
 void PcmciaSlot::RaiseIrq() { DriveLine(kLineIreq, true); }
 void PcmciaSlot::ClearIrq() { DriveLine(kLineIreq, false); }
 
+ExternalDeviceClock::Timer& PcmciaSlot::CardTimer() {
+    if (!card_timer_) card_timer_ = &emu_.Get<ExternalDeviceClock>().AddTimer([this] { OnCardTimer(); });
+    return *card_timer_;
+}
+
+void PcmciaSlot::ArmCardTimer(int64_t delay_ns) {
+    emu_.Get<ExternalDeviceClock>().Arm(CardTimer(), delay_ns);
+}
+
+void PcmciaSlot::DisarmCardTimer() { emu_.Get<ExternalDeviceClock>().Disarm(CardTimer()); }
+
+void PcmciaSlot::OnCardTimer() {
+    std::lock_guard<std::mutex> lk(bus_mutex_);
+    if (card_) card_->OnSlotTimer();
+}
+
 void PcmciaSlot::InsertLocked(std::unique_ptr<PcmciaCard> card) {
     card_ = std::move(card);
     ++generation_;
@@ -214,6 +230,7 @@ void PcmciaSlot::SaveSlotState(StateWriter& w) {
     w.Write<uint8_t>("powered", powered_ ? 1u : 0u);
     w.Write<uint8_t>("reset_line", reset_asserted_ ? 1u : 0u);
     w.Write<uint8_t>("card_busy", (line_.load(std::memory_order_acquire) & kLineBusy) != 0u ? 1u : 0u);
+    emu_.Get<ExternalDeviceClock>().SaveTimer(CardTimer(), w, "card_timer_");
     const bool has = (card_ != nullptr);
     w.Write<uint8_t>("has", has ? 1u : 0u);
     if (!has) return;
@@ -229,10 +246,9 @@ void PcmciaSlot::SaveSlotState(StateWriter& w) {
     w.EndFrame();
 }
 
-/* Called by the controller with its own lock released: the card may drive its socket IRQ
-   from here, which re-enters the controller. */
 void PcmciaSlot::PostRestoreSlot() {
     std::lock_guard<std::mutex> lk(bus_mutex_);
+    emu_.Get<ExternalDeviceClock>().ResumeTimer(CardTimer());
     if (card_) card_->PostRestore();
 }
 
@@ -242,6 +258,7 @@ void PcmciaSlot::RestoreSlotState(StateReader& r) {
     r.Read("powered", powered);
     r.Read("reset_line", reset_line);
     r.Read("card_busy", card_busy);
+    emu_.Get<ExternalDeviceClock>().RestoreTimer(CardTimer(), r, "card_timer_");
     r.Read("has", has);
     reset_asserted_ = reset_line != 0u;
     if (!has) {

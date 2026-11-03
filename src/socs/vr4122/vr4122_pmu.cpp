@@ -94,6 +94,11 @@ public:
         emu_.Get<Fatal>().Die("Vr4122Pmu::LatchWatchdogReset: no watchdog unit on the VR4122");
     }
 
+    void SetPowerSwitch(bool high) override {
+        emu_.Get<Fatal>().Die("Vr4122Pmu::SetPowerSwitch(%d): the VR4122 POWER pin is not modeled",
+                              static_cast<int>(high));
+    }
+
     void SaveState(StateWriter& w) override {
         Vr41xxPmuBase::SaveState(w);
         w.Write("int2reg", int2reg_.load(std::memory_order_acquire));

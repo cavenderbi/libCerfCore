@@ -4,14 +4,19 @@
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../execution/engine_bridge.h"
+#include <cerfcore/host/guest_deep_sleep.h>
+#include <cerfengine/mips/mips_interrupt_channel.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
 #include "../../tracing/kernel_debug_sink.h"
 #include <cerfcore/socs/guest_cpu_reset.h>
+#include "vr41xx_giu.h"
 #include "vr41xx_icu.h"
 
 #include <cstdint>
 #include <mutex>
+#include <optional>
 #include <string>
 
 namespace cerfcore {
@@ -32,6 +37,16 @@ constexpr uint32_t kOffReset  = 0x18u;   /* DSIURESETREG (VR4121 23.2.12, VR4102
    general-purpose output; D15:4 RFU, "Write 0 to these bits. 0 is returned after a read"
    (VR4121 UM 23.2.1, VR4102 UM 22.2.1). */
 constexpr uint16_t kPortWritable = 0x000Fu;
+constexpr uint16_t kPortCdDin    = 0x0008u;
+constexpr uint16_t kPortCdDout   = 0x0004u;
+constexpr uint16_t kPortCdRts    = 0x0002u;
+constexpr uint16_t kPortCdCts    = 0x0001u;
+constexpr uint16_t kAsim00Rxe0   = 0x0040u;
+
+constexpr int kGpioDdout = 44;
+constexpr int kGpioDdin  = 45;
+constexpr int kGpioDrts  = 46;
+constexpr int kGpioDcts  = 47;
 
 /* ASIM00REG D6 RXE0 reception enable, D5:4 PS0(1:0) parity, D3 CL0 character length,
    D2 SL0 stop bits are R/W; D7 is an RFU that reads back 1 ("Write 1 to this bit. 1 is
@@ -81,15 +96,34 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetSocId() == Soc;
+        return emu_.Get<BoardContext>().GetSocId() == Soc;
     }
 
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
             std::lock_guard<std::mutex> lk(mtx_);
+            hibernating_ = false;
             ApplyResetLocked(kind);
+        });
+        channel_ = &emu_.Get<EngineBridge>().Engine().Get<cerfengine::MipsInterruptChannel>();
+        channel_->RegisterSuspendListener([this] {
+            SetPowerDown([this] { suspended_ = channel_->Suspended(); });
+        });
+        emu_.Get<GuestDeepSleep>().RegisterSleepEntryListener([this] {
+            SetPowerDown([this] { hibernating_ = true; });
+        });
+        auto& giu = emu_.Get<Vr41xxGiu>();
+        giu_ = &giu;
+        giu.RegisterAlternateFunction(kGpioDdout, kGpioDdout, [this](int) {
+            return PinDrive(kPortCdDout, Vr41xxPinDrive::kHigh);
+        });
+        giu.RegisterAlternateFunction(kGpioDdin, kGpioDdin, [this](int) {
+            return PinDrive(kPortCdDin, Vr41xxPinDrive::kUndriven);
+        });
+        giu.RegisterAlternateFunction(kGpioDrts, kGpioDrts, [this](int) { return DrtsDrive(); });
+        giu.RegisterAlternateFunction(kGpioDcts, kGpioDcts, [this](int) {
+            return PinDrive(kPortCdCts, Vr41xxPinDrive::kUndriven);
         });
     }
 
@@ -116,13 +150,20 @@ public:
     }
 
     void WriteHalf(uint32_t addr, uint16_t value) override {
-        bool    transmitted = false;
-        uint8_t tx_byte     = 0;
+        bool    transmitted   = false;
+        bool    drive_changed = false;
+        uint8_t tx_byte       = 0;
         {
             std::lock_guard<std::mutex> lk(mtx_);
             switch (addr - M.base) {
-                case kOffPort:   portreg_ = static_cast<uint16_t>(value & kPortWritable);  break;
-                case kOffAsim00: asim00_  = static_cast<uint16_t>(value & kAsim00Writable); break;
+                case kOffPort:
+                    portreg_      = static_cast<uint16_t>(value & kPortWritable);
+                    drive_changed = true;
+                    break;
+                case kOffAsim00:
+                    asim00_       = static_cast<uint16_t>(value & kAsim00Writable);
+                    drive_changed = true;
+                    break;
                 case kOffAsim01: asim01_  = static_cast<uint16_t>(value & kAsim01Writable); break;
                 case kOffBprm0:  bprm0_   = static_cast<uint16_t>(value & kBprmWritable);   break;
                 case kOffTxs0L:
@@ -140,7 +181,10 @@ public:
                         HaltUnsupportedAccess("VR41xx DSIU DSIURESETREG reserved bits",
                                               addr, value);
                     }
-                    if (value & kDsiuRst) ApplyDsiuResetLocked();
+                    if (value & kDsiuRst) {
+                        ApplyDsiuResetLocked();
+                        drive_changed = true;
+                    }
                     break;
                 default: Peripheral::WriteHalf(addr, value); break;
             }
@@ -148,26 +192,61 @@ public:
         if (transmitted) {
             emu_.Get<KernelDebugSink>().EmitChar(static_cast<char>(tx_byte), tx_line_, "DSIU");
         }
+        if (drive_changed) giu_->NotifyOutputDriveChanged();
     }
 
     void SaveState(StateWriter& w) override {
         std::lock_guard<std::mutex> lk(mtx_);
         w.Write("portreg", portreg_); w.Write("asim00", asim00_); w.Write("asim01", asim01_);
         w.Write("txs0l", txs0l_);   w.Write("intr0", intr0_);  w.Write("bprm0", bprm0_);
+        w.Write<uint8_t>("hibernating", hibernating_ ? 1u : 0u);
     }
 
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(mtx_);
         r.Read("portreg", portreg_); r.Read("asim00", asim00_); r.Read("asim01", asim01_);
         r.Read("txs0l", txs0l_);   r.Read("intr0", intr0_);  r.Read("bprm0", bprm0_);
+        uint8_t hibernating = 0u;
+        r.Read("hibernating", hibernating);
+        hibernating_ = hibernating != 0u;
     }
 
     void PostRestore() override {
         std::lock_guard<std::mutex> lk(mtx_);
+        suspended_ = channel_->Suspended();
         DriveIcuLocked();
     }
 
 private:
+    std::optional<Vr41xxPinDrive> PinDrive(uint16_t general_purpose_bit, Vr41xxPinDrive drive) {
+        std::lock_guard<std::mutex> lk(mtx_);
+        if (portreg_ & general_purpose_bit) return std::nullopt;
+        return drive;
+    }
+
+    std::optional<Vr41xxPinDrive> DrtsDrive() {
+        std::lock_guard<std::mutex> lk(mtx_);
+        return DrtsDriveLocked();
+    }
+
+    std::optional<Vr41xxPinDrive> DrtsDriveLocked() const {
+        if (portreg_ & kPortCdRts) return std::nullopt;
+        if (hibernating_ || suspended_) return Vr41xxPinDrive::kHigh;
+        return (asim00_ & kAsim00Rxe0) ? Vr41xxPinDrive::kLow : Vr41xxPinDrive::kHigh;
+    }
+
+    template <class Apply>
+    void SetPowerDown(Apply apply) {
+        bool changed = false;
+        {
+            std::lock_guard<std::mutex> lk(mtx_);
+            const auto before = DrtsDriveLocked();
+            apply();
+            changed = DrtsDriveLocked() != before;
+        }
+        if (changed) giu_->NotifyOutputDriveChanged();
+    }
+
     /* "Writing data to a transmission shift register (TXS0REG or TXS0LREG) activates the
        transmit operation" and "Once one frame of data has been sent, a transmit complete
        interrupt request (Dsiu_Intst0) occurs" (VR4121 UM 23.3.2, VR4102 UM 22.3.2). */
@@ -207,6 +286,10 @@ private:
     }
 
     std::mutex mtx_;
+    Vr41xxGiu* giu_ = nullptr;
+    cerfengine::MipsInterruptChannel* channel_ = nullptr;
+    bool       hibernating_ = false;
+    bool       suspended_   = false;
 
     uint16_t portreg_ = 0;                 /* PORTREG   RTCRST row */
     uint16_t asim00_  = 0;                 /* ASIM00REG reset row, less the D7 fixed read */

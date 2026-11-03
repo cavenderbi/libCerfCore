@@ -459,7 +459,7 @@
           "row": [
             { "button": { "keys": ["VK_CONTROL"] } }, { "button": { "keys": ["VK_LWIN"] } },
             { "button": { "keys": ["VK_MENU"] } }, { "button": { "keys": ["VK_F12"] } },
-            { "grow": 5, "button": { "keys": ["VK_SPACE"] } }, { "button": { "keys": ["VK_MENU"] } },
+            { "grow": 5, "button": { "keys": ["VK_SPACE"] } }, { "button": { "keys": ["VK_RMENU"] } },
             "jornada_left", "jornada_up", "jornada_down", "jornada_right"
           ]
         }

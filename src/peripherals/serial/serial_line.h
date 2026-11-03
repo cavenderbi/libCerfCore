@@ -58,6 +58,9 @@ public:
        PC-Card line binds this in its own ctor and leaves the default; an on-SoC
        UART takes it from the endpoint router on attach (nullptr on detach). */
     virtual void SetEndpoint(SerialEndpoint*) {}
+
+    virtual void ArmEndpointTimer(int64_t delay_ns) = 0;
+    virtual void DisarmEndpointTimer() = 0;
 };
 
 }

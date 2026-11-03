@@ -2,19 +2,26 @@
 
 #include "../../execution/guest_cycle_clock.h"
 #include <cerfcore/peripherals/peripheral_base.h>
+#include "vr41xx_giu.h"
+#include "vr41xx_kiu_key_matrix.h"
+#include "vr41xx_kiu_sequencer.h"
 #include "vr41xx_rtcx_ticks.h"
 
+#include <atomic>
 #include <cstdint>
+#include <functional>
 #include <mutex>
+#include <optional>
+#include <vector>
+
+namespace cerfengine {
+class HostRequestChannel;
+}
 
 namespace cerfcore {
 
 class Vr41xxKiuKeyPins;
 
-/* KIUSCANREP STPREP[5:0] 000000 is "64 times" on the VR4102 (UM 21.2.2 p425) and RFU on the
-   VR4111 (UM 22.2.2 p463) and VR4121 (UM 22.2.2 p514). VR4111 Figure 22-3 p473 and VR4121
-   Figure 22-5 p525 carry Notes 1, 2 and 6; VR4102 chapter 21 contains no sequencer figure
-   and documents none of those three rules. */
 struct Vr41xxKiuModel {
     uint32_t stprep_zero_count;
     bool     scanstart_auto_clear;
@@ -22,11 +29,13 @@ struct Vr41xxKiuModel {
     bool     keyen_stop_deferred;
     bool     gpen_retained_on_other_reset;
     bool     gpen_survives_kiurst;
+    bool     scanline_none_drives_all;
+    bool     scan_pins_drive_piod;
 };
 
 /* NEC VR41xx KIU (Keyboard Interface Unit): VR4102 UM ch.21, VR4111 UM ch.22, VR4121 UM
    ch.22. Register map: VR4102 Table 21-1, VR4111 Table 22-1 p459, VR4121 Table 22-1. */
-class Vr41xxKiu : public Peripheral {
+class Vr41xxKiu : public Peripheral, private Vr41xxKiuSequencerHost {
 public:
     using Peripheral::Peripheral;
 
@@ -48,6 +57,8 @@ public:
        96-entry table at 0x15B0978. */
     void SetKeyState(uint8_t matrix_index, bool pressed);
 
+    void RegisterKportListener(std::function<void(uint8_t kport)> fn);
+
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
     void PostRestore() override;
@@ -58,22 +69,11 @@ protected:
 private:
     mutable std::mutex mtx_;
 
-    /* KIUDAT0-5 content; every bit resets to 0 on both rows (VR4111 UM 22.2.1 p460,
-       VR4102 UM 21.2.1 p424, VR4121 UM 22.2.1 p512). */
-    uint16_t matrix_[6] = {0, 0, 0, 0, 0, 0};
-    /* KPORT[7..0] key contact (VR4111 UM 22.2.2 p463 D0 ATSCAN, VR4102 UM 21.2.2 p426
-       "the key scan operation automatically starts after key contact is detected",
-       VR4121 UM 22.2.2 p514). */
-    uint16_t held_[6]   = {0, 0, 0, 0, 0, 0};
-    /* KIUSCANREP reset row: D0 ATSCAN = 1, every other bit 0 (VR4111 UM 22.2.2 p463,
-       VR4102 UM 21.2.2 p425, VR4121 UM 22.2.2 p514). */
-    uint16_t scanrep_   = 0x0001;
+    Vr41xxKiuKeyMatrix key_matrix_;
+    Vr41xxKiuSequencer seq_{*this};
     /* KIUINT, both reset rows 0 (VR4111 UM 22.2.6 p468, VR4102 UM 21.2.6 p431,
        VR4121 UM 22.2.6 p520). */
     uint16_t causes_    = 0;
-    /* KIUSCANS SSTAT[1:0], reset 00 Stopped (VR4111 UM 22.2.3 p465, VR4102 UM 21.2.3 p427,
-       VR4121 UM 22.2.3 p516). */
-    uint16_t sstat_     = 0;
     /* KIUWKI WINTVL(9:0) x 30 us, 0 = No Wait, reset rows 0 (VR4111 UM 22.2.5 p467,
        VR4102 UM 21.2.5 p430, VR4121 UM 22.2.5 p519). */
     uint16_t wintvl_    = 0;
@@ -84,26 +84,17 @@ private:
        VR4121 UM 22.2.9 p524). */
     uint16_t scanline_  = 0;
     uint16_t gpen_      = 0;
-    /* Scans whose data stayed 0, against KIUSCANREP STPREP[5:0] (VR4111 UM 22.2.2 p463,
-       VR4102 UM 21.2.2 p425, VR4121 UM 22.2.2 p514). */
-    uint16_t zero_scans_ = 0;
     /* KIUDAT0-5 hold data no read has taken since the last scan stored it (VR4111 UM 22.2.6
        p468 D2 KDATLOST, VR4102 UM 21.2.6 p431, VR4121 UM 22.2.6 p520). */
     bool     data_unread_ = false;
     bool     scan_in_flight_ = false;
-    /* KEYEN cleared during a scanning operation stops the sequencer "after that scanning
-       operation has completed" (VR4111 UM Figure 22-3 p473 Note 1, VR4121 UM Figure 22-5
-       p525 Note 1). */
-    bool     stop_after_scan_ = false;
-    /* SCANSTART "set to 1 during the interval or scanning mode", the case Note 6 exempts from
-       the automatic clear (VR4111 UM Figure 22-3 p473 Note 6, VR4121 UM Figure 22-5 p525
-       Note 6). */
-    bool     scanstart_set_while_running_ = false;
-    /* SCANSTP "set to 1" before the status changes to scanning, which the sequencer reaches
-       through waitkeyin from stopped as well; the arc returns to waitkeyin stating no automatic
-       clear (VR4111 UM Figure 22-3 p473 Note 3, VR4121 UM Figure 22-5 p525), and the figure-less
-       VR4102 states none on 21.2.2 p425 or p426 while its D3 is R/W with reset 0 (p425). */
-    bool     scanstp_set_in_waitkeyin_ = false;
+    uint32_t next_slot_ = 0;
+    uint16_t scan_wks_ = 0x7FFF;
+    bool     scan_key_data_ = false;
+    bool     undefined_ = false;
+    bool     hibernating_ = false;
+    uint8_t  kport_ = 0;
+    std::vector<std::function<void(uint8_t)>> kport_listeners_;
     /* End of the scan period or of the KIUWKI interval now in progress (VR4111 UM 22.2.4
        p466 / 22.2.5 p467, VR4102 UM 21.2.4 p429 / 21.2.5 p430, VR4121 UM 22.2.4 p518 /
        22.2.5 p519). */
@@ -112,26 +103,47 @@ private:
     GuestCycleClock*        clock_ = nullptr;
     GuestCycleClock::Event* event_ = nullptr;
     Vr41xxKiuKeyPins*       key_pins_ = nullptr;
+    Vr41xxGiu*              giu_ = nullptr;
+    cerfengine::HostRequestChannel* host_requests_ = nullptr;
+    uint64_t                drive_signature_ = 0;
+    std::atomic<bool>       drive_changed_{false};
     Vr41xxRtcxTicks         rtcx_{emu_, Vr41xxRtcxDomain::Peripheral};
 
-    bool EnabledLocked() const;
-    bool AnyKeyDownLocked();
-    uint32_t ScanRegsLocked();
-    void LatchScanLocked();
-    void BeginScanLocked();
-    void EnterWaitKeyInLocked();
-    void ReevaluateWaitKeyInLocked();
-    void ClearScanStpLocked();
-    void CompleteScanLocked();
-    void ApplyScanRepLocked();
+    bool SequencerFrozen() const override;
+    bool SequencerTouch() override;
+    void SequencerTouchPulse() override;
+    bool SequencerScanLinesNone() const override;
+    void SequencerScanEntered() override;
+    void SequencerScanDataStored() override;
+    [[noreturn]] void SequencerHalt(const char* op, uint16_t scanrep) override;
+
+    struct KscanDrive {
+        uint16_t released  = 0;
+        uint16_t undefined = 0;
+        uint16_t driven    = 0;
+        uint16_t high      = 0;
+    };
+    KscanDrive KscanDriveMasksLocked() const;
+    std::optional<Vr41xxPinDrive> KscanDriveLocked(int gpio);
+    uint64_t DriveSignatureLocked() const;
+    void NoteDriveLocked();
+    void FlushDriveChange();
+    bool TimedLocked() const;
+    uint16_t PiodLocked() const;
+    bool TouchLocked() const;
+    void LatchDueSlotsLocked(uint64_t now, uint16_t piod);
+    void EnterUndefinedLocked();
+    uint8_t DrivenKportLocked();
+    void NotifyKportLocked(uint8_t kport);
+    void PublishKportLocked(bool force);
+    void PulseKportLocked(uint16_t lines, uint16_t piod);
     void ArmScanLocked(uint64_t start);
     void AdvancePhaseLocked();
+    void AdvancePhaseLocked(uint16_t piod);
     void ArmEventLocked();
     void UpdateLocked();
     void ApplyHostKeysLocked();
-    uint32_t ScanLinesLocked();
     uint32_t ScanPeriodTicksLocked();
-    uint32_t StpRepCountLocked() const;
     void PublishCausesLocked();
     void ApplyResetLocked();
     void RequireTclockIfTimedLocked(const char* operation);

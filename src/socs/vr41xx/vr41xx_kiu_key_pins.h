@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cerfcore/core/service.h>
+#include "vr41xx_kiu_regs.h"
 
 #include <cstdint>
 #include <mutex>
@@ -13,7 +14,7 @@ class Vr41xxKiuKeyPins : public Service {
 public:
     using Service::Service;
 
-    static constexpr uint32_t kRegs = 6u;
+    static constexpr uint32_t kRegs = cerf_vr41xx_kiu_regs::kDataRegs;
 
     bool ShouldRegister() override;
     void OnReady() override;

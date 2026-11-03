@@ -20,7 +20,7 @@ constexpr uint32_t kMmBlockHi = 0x6000u;
 constexpr uint32_t kMm00MiuEnable   = 1u << 0;
 constexpr uint32_t kMm00MiuResetOff = 1u << 1;
 constexpr uint32_t kMm00Reserved    = 0xFFFFFFF8u;
-constexpr uint32_t kMm01BusClock    = 1u << 0;
+constexpr uint32_t kMm01ClockSelect = 1u << 0;
 constexpr uint32_t kMm01Reserved    = 0x3C000F00u;
 constexpr uint32_t kMm04Reserved    = 0xFFF0E0E0u;
 
@@ -106,8 +106,7 @@ bool MediaQMq200Memory::MiuPoweredDown() const {
 const char* MediaQMq200Memory::MiuBlocked() const {
     if (power_.InD3()) return "the chip is in D3";
     if (const char* why = MiuPowerDown()) return why;
-    const auto clk = power_.State((mm01_ & kMm01BusClock) ? MediaQMq200Power::kBusClock
-                                                          : MediaQMq200Power::kPll1);
+    const auto clk = power_.State(power_.MemoryClockSource((mm01_ & kMm01ClockSelect) != 0u));
     if (clk.kind == MediaQMq200Power::ClockState::Stopped) return "the memory clock is stopped";
     if (clk.kind == MediaQMq200Power::ClockState::Unmodeled) return clk.why;
     return nullptr;

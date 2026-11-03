@@ -38,7 +38,7 @@ public:
                 emu_.Get<Fatal>().UserError("FATAL: guest_additions.autorun entry '%s' exceeds %u characters",
                                             s.c_str(), CerfVirt::kArEntryWchars - 1);
             }
-            LOG(GuestAdditions, "autorun[%u] = '%s'", (unsigned)entries_.size(), s.c_str());
+            LOG(GuestAdditions, "autorun[%u] = '%s'\n", (unsigned)entries_.size(), s.c_str());
             entries_.push_back(std::move(w));
         }
         emu_.Get<PeripheralDispatcher>().Register(this);

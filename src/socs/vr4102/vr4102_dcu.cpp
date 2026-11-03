@@ -1,4 +1,4 @@
-#include "../vr41xx/vr41xx_reg_window_impl.h"
+#include "../vr41xx/vr41xx_dcu_impl.h"
 
 #include <cstdint>
 #include "vr4102_id.h"
@@ -8,17 +8,12 @@ namespace cerfcore {
 namespace {
 
 using cerf_vr41xx_reg_window_detail::ReadKind;
-using cerf_vr41xx_reg_window_detail::Vr41xxRegWindowBase;
 using cerf_vr41xx_reg_window_detail::Vr41xxRegWindowModel;
 using cerf_vr41xx_reg_window_detail::WriteKind;
 
 constexpr ReadKind  kRd = ReadKind::kStored;
 constexpr WriteKind kWr = WriteKind::kStored;
 
-/* DCU 0x0B000040-0x0B00005F (VR4102 UM Table 12-2); per-register bits and reset rows
-   (all 0) in VR4102 UM 12.3.1-12.3.6.
-   DMAREQREG 0x48 D3/D2/D0 read the AIU/FIR request lines and CERF posts no DMA
-   request, so it reads 0 ("R" for every bit, UM 12.3.5). */
 constexpr Vr41xxRegWindowModel kModel = {
     /*base=*/0x0B000040u,
     /*size=*/0x20u,
@@ -35,13 +30,13 @@ constexpr Vr41xxRegWindowModel kModel = {
     },
 };
 
-class Vr4102Dcu : public Vr41xxRegWindowBase<SocId::Vr4102, kModel> {
+class Vr4102Dcu : public Vr41xxDcuImpl<SocId::Vr4102, kModel> {
 public:
-    using Vr41xxRegWindowBase::Vr41xxRegWindowBase;
+    using Vr41xxDcuImpl::Vr41xxDcuImpl;
 };
 
 }
 
-REGISTER_SERVICE(Vr4102Dcu);
+REGISTER_SERVICE_AS(Vr4102Dcu, Vr41xxDcu);
 
 }

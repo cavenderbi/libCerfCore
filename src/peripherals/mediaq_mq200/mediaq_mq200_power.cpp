@@ -52,6 +52,8 @@ constexpr uint32_t kDcChipReset   = 1u << 14;
 
 constexpr uint32_t kDeviceId = 0x02004D51u;
 
+constexpr uint32_t kBusModeVr41xx = 0x04u;
+
 /* MQ-200 Data Book Table 5-87 (PMR). */
 constexpr uint32_t kPmrValue = 0x06210001u;
 
@@ -233,6 +235,7 @@ MediaQMq200Power::ClockState MediaQMq200Power::State(uint32_t clock) const {
     switch (clock) {
         case kBusClock: {
             ClockState s;
+            if (bus_mode_ == kBusModeVr41xx) return s;
             s.kind = ClockState::Unmodeled;
             s.why  = "the bus interface clock has no modeled rate";
             return s;
@@ -254,6 +257,11 @@ MediaQMq200Power::ClockState MediaQMq200Power::State(uint32_t clock) const {
         }
     }
     emu_.Get<Fatal>().Die("MediaQMq200Power: clock source %u", clock);
+}
+
+MediaQMq200Power::Clock MediaQMq200Power::MemoryClockSource(bool clock_select) const {
+    if (!clock_select) return kPll1;
+    return bus_mode_ == kBusModeVr41xx ? kPll2 : kBusClock;
 }
 
 const char* MediaQMq200Power::GePowerDown() const {

@@ -1,4 +1,5 @@
 #include "../../socs/vr41xx/vr41xx_piu_panel.h"
+#include "../../socs/vr41xx/vr41xx_piu_regs.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
@@ -14,14 +15,9 @@ namespace cerfcore {
 
 namespace {
 
-/* PIUCMDREG ADCMD(3:0) = 0000 selects the TPX0 port (VR4121 UM 20.3.5 (2/2)). touch.dll
-   sub_13715A0 issues exactly one command scan, with PIUCMDREG = 0xCC0 (TPYEN = 11,
-   TPYD = 11, ADCMD = 0000), and no module in the ROM reads PIUAB0REG. */
-constexpr uint16_t kAdcmdTpx0 = 0;
-
-/* PIUCMDREG/PIUAMSKREG ADCMD index 4 = ADIN0, 5 = ADIN1 (VR4121 UM 20.3.5 (2/2), 20.3.7). */
-constexpr uint16_t kAdcmdAdin0 = 4;
-constexpr uint16_t kAdcmdAdin1 = 5;
+using cerf_vr41xx_piu_detail::kAdcmdAdin0;
+using cerf_vr41xx_piu_detail::kAdcmdAdin1;
+using cerf_vr41xx_piu_detail::kAdcmdTpx0;
 
 /* gwes.exe sub_ABEEC (0xABEEC): the ADIN0 average selects the main-battery level - >= 0x3D5
    full, >= 0x3B9 mid, below low. */
@@ -41,8 +37,7 @@ public:
     using Vr41xxPiuPanel::Vr41xxPiuPanel;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::CasioPocketpostpet;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CasioPocketpostpet;
     }
 
     std::optional<uint16_t> ConvertCommandPort(uint16_t adcmd,

@@ -13,12 +13,16 @@ namespace cerfcore {
 inline constexpr uint16_t kCmuMskPiu = 1u << 0;
 inline constexpr uint16_t kCmuMskKiu = 1u << 3;
 inline constexpr uint16_t kCmuMskShsp = 1u << 9;
+inline constexpr uint16_t kCmuMskAiu  = 1u << 2;
+inline constexpr uint16_t kCmuMskSiu  = 1u << 1;
+inline constexpr uint16_t kCmuMskSsiu = 1u << 8;
 
 class Vr41xxCmu : public Peripheral {
 public:
     using Peripheral::Peripheral;
 
     void RequireClock(uint16_t mask_bit, const char* operation) const;
+    uint16_t SuppliedClocks(uint16_t mask_bits) const;
     void RegisterClockListener(uint16_t mask_bit, std::function<void(bool supplied_after)> fn);
 
 protected:

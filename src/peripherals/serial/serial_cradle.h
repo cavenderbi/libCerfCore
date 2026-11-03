@@ -25,7 +25,6 @@ public:
 
     void SaveCradleState(StateWriter& w);
     void RestoreCradleState(StateReader& r);
-    void PostRestore();
 
     std::string WidgetName() const override { return label_; }
     WidgetGroup Group() const override { return WidgetGroup::Network; }
@@ -43,7 +42,7 @@ private:
     void SwapModem(uint64_t gen);
     void SwapForward(uint64_t gen, std::string host_port);
     void Eject(uint64_t gen);
-    void SetPluggedLocked(Kind kind, std::string host_port);
+    void SetPluggedLocked(Kind kind, std::string host_port, bool power_up);
     std::vector<SlotEntry> AvailableLocked(uint64_t gen);
     const char* IconResourceLocked() const;
 
@@ -56,9 +55,6 @@ private:
     std::string                     host_port_;
     std::unique_ptr<SerialEndpoint> endpoint_;
     uint64_t                        generation_ = 0;
-
-    Kind        restored_kind_ = Kind::None;
-    std::string restored_port_;
 
     std::string ui_last_res_;
 };

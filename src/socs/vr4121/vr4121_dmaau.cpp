@@ -1,4 +1,4 @@
-#include "../vr41xx/vr41xx_reg_window_impl.h"
+#include "../vr41xx/vr41xx_dmaau_impl.h"
 
 #include <cstdint>
 #include "vr4121_id.h"
@@ -8,7 +8,6 @@ namespace cerfcore {
 namespace {
 
 using cerf_vr41xx_reg_window_detail::ReadKind;
-using cerf_vr41xx_reg_window_detail::Vr41xxRegWindowBase;
 using cerf_vr41xx_reg_window_detail::Vr41xxRegWindowModel;
 using cerf_vr41xx_reg_window_detail::WriteKind;
 
@@ -40,13 +39,13 @@ constexpr Vr41xxRegWindowModel kModel = {
     },
 };
 
-class Vr4121Dmaau : public Vr41xxRegWindowBase<SocId::Vr4121, kModel> {
+class Vr4121Dmaau : public Vr41xxDmaauImpl<SocId::Vr4121, kModel> {
 public:
-    using Vr41xxRegWindowBase::Vr41xxRegWindowBase;
+    using Vr41xxDmaauImpl::Vr41xxDmaauImpl;
 };
 
 }
 
-REGISTER_SERVICE(Vr4121Dmaau);
+REGISTER_SERVICE_AS(Vr4121Dmaau, Vr41xxDmaau);
 
 }

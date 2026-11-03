@@ -17,6 +17,7 @@
 
 #include <cstring>
 #include <mutex>
+#include <utility>
 
 namespace cerfcore {
 
@@ -142,6 +143,18 @@ void CasioPocketpostpetAsic::SetSideButton(uint16_t mask, bool pressed) {
     if (pressed) side_buttons_ |= mask;
     else         side_buttons_ &= static_cast<uint16_t>(~mask);
     UpdateSideButtonInterruptLocked();
+}
+
+bool CasioPocketpostpetAsic::SpeakerMuted() const { return (reg_1010_ & 1u) != 0u; }
+
+bool CasioPocketpostpetAsic::MicPowered() const { return (reg_1010_ & 2u) == 0u && (reg_1000_ & 0x100u) != 0u; }
+
+void CasioPocketpostpetAsic::RegisterAudioControlListener(std::function<void()> fn) {
+    audio_control_listeners_.push_back(std::move(fn));
+}
+
+void CasioPocketpostpetAsic::NotifyAudioControl() {
+    for (auto& listener : audio_control_listeners_) listener();
 }
 
 /* nk.exe ISR 0x9F0BA2C4: interrupt asserted (GIU pin 9 low) while a 0xE2 line is
@@ -283,10 +296,16 @@ void CasioPocketpostpetAsic::WriteReg(uint32_t off, uint16_t value) {
         case 0x100C: return;
         case 0x00A:  return;
         /* serial.dll sub_1332BB0 RMW / nk.exe sub_9F0B8720 power-down write 0x1000. */
-        case 0x1000: reg_1000_ = value; return;
+        case 0x1000:
+            reg_1000_ = value;
+            NotifyAudioControl();
+            return;
         /* StartUp 0x9F0B5BCC: 0x1002=0x108, 0x1010=3, 0x1134=0. */
         case 0x1002: reg_1002_ = value; return;
-        case 0x1010: reg_1010_ = value; return;
+        case 0x1010:
+            reg_1010_ = value;
+            NotifyAudioControl();
+            return;
         case 0x1134: reg_1134_ = value; return;
         /* nk.exe IOCTL_HAL_REBOOT sub_9F0DF7AC + StartUp DMSRST branch 0x9F0B5ED0 write
            0x1118=0x0C then 0x111A=0x0A = the deadman software-reset trigger; the armed

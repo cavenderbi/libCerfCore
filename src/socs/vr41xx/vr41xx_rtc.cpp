@@ -58,14 +58,13 @@ void Vr41xxRtc::OnReady() {
 
     emu_.Get<PeripheralDispatcher>().Register(this);
 
-    /* "When the RTCRST# signal is asserted, the PMU resets all peripheral units including
-       the RTC unit"; an RSTSW reset leaves the RTC "Active" (UM 15.1.1, Table 15-1). On a
-       non-RTCRST reset ETIME "Continues counting" (UM 16.2.1) and ECMP / RTCLong1 / RTCLong2
-       hold their values (UM 16.2.2-16.2.6), but the TClock unit takes its Other-resets row:
-       TCLKLREG/TCLKHREG and TCLKCNTLREG/TCLKCNTHREG are 0 (UM 16.2.7-16.2.8, p349-352) and
-       "The TCLK unit is stopped when all zeros are written" (UM 16.2.7 Caution, p350);
-       RTCINTREG clears D3 there while D2:0 are retained (UM 16.2.9, p353). */
+    emu_.Get<GuestDeepSleep>().RegisterSleepEntryListener([this] {
+        std::lock_guard<std::mutex> lk(mtx_);
+        StopTclkLocked();
+        UpdateLocked();
+    });
     emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
+        if (emu_.Get<GuestCpuReset>().DeliveredResetWasResume()) return;
         std::lock_guard<std::mutex> lk(mtx_);
         if (kind == ResetLineKind::Rtc) ApplyRtcResetLocked();
         else                            StopTclkLocked();
@@ -81,11 +80,12 @@ void Vr41xxRtc::OnReady() {
     });
     emu_.Get<GuestDeepSleep>().RegisterParkWakeSource([this] {
         std::lock_guard<std::mutex> lk(mtx_);
-        return (rtcintreg_ & kIntElapsed) != 0u;
+        return (rtcintreg_ & kIntElapsed) != 0u && !emu_.Get<Vr41xxPmu>().PowerHoldsWakeFactors();
     });
     emu_.Get<GuestDeepSleep>().RegisterParkWakeDue([this] {
         std::lock_guard<std::mutex> lk(mtx_);
         UpdateLocked();
+        if (emu_.Get<Vr41xxPmu>().PowerHoldsWakeFactors()) return GuestDeepSleep::kNoParkWake;
         const uint64_t now = RtcTicksLocked();
         const bool latched = (rtcintreg_ & kIntElapsed) != 0u;
         if (!latched && !ecmp_armed_) return GuestDeepSleep::kNoParkWake;

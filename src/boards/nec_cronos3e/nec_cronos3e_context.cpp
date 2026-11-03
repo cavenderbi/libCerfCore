@@ -12,6 +12,8 @@ public:
     using BoardContext::BoardContext;
 
     std::string_view GetBoardFamilyId() const override { return BoardFamilyId::NecCronos3e; }
+
+    uint32_t GuestAdditionsWindowBase() const override { return 0x0D000000u; }
 };
 
 }

@@ -10,6 +10,8 @@ public:
 
     virtual void OnGpioLevel(int pin, bool prev, bool level) = 0;
     virtual void LatchRtcAlarmWake() = 0;
+    virtual void SetPowerSwitch(bool high) = 0;
+    virtual bool PowerHoldsWakeFactors() const = 0;
 };
 
 }

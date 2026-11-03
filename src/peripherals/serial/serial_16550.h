@@ -1,6 +1,7 @@
 #pragma once
 
 #include "serial_line.h"
+#include "serial_line_timer.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -51,7 +52,7 @@ public:
         uint8_t cti_ier_bit = 0x01;
     };
 
-    Serial16550(SerialEndpoint* endpoint, IrqLineFn irq_line, Config cfg);
+    Serial16550(SerialEndpoint* endpoint, IrqLineFn irq_line, Config cfg, SerialLineTimer& timer);
 
     uint8_t ReadReg8 (uint32_t offset);
     void SaveState(StateWriter& w) const;
@@ -82,6 +83,10 @@ public:
 
     void SetEndpoint(SerialEndpoint* endpoint) override;
 
+    void ArmEndpointTimer(int64_t delay_ns) override;
+    void DisarmEndpointTimer() override;
+    void OnLineTimer();
+
     /* Status-bar widget the port's traffic lights up: the owning UART's SerialCradle,
        or a card's PcmciaSlot. Set once by the owner before any traffic flows. */
     void SetActivityWidget(HostWidget* w) { activity_ = w; }
@@ -94,13 +99,15 @@ public:
     void PostRestoreLine();
 
 protected:
-    /* One guest TX byte leaving THR. The default hands it to the attached personality;
-       an on-SoC UART overrides this to reach its debug sink when none is attached.
-       Called off-lock. Returns false when no personality took the byte. */
-    virtual void DeliverTx(uint8_t byte);
+    virtual bool DeliverTx(uint8_t byte);
     bool         DeliverTxToEndpoint(uint8_t byte);
 
+    virtual bool ControlOutputsDriven();
+    void         RefreshControlLines();
+    void         LoadModemInputs(bool cts, bool dsr, bool ri, bool dcd);
+
 private:
+    void       ApplyModemLevelsLocked(uint8_t levels);
     size_t     RxTriggerLocked() const;
     uint8_t    PendingSourceLocked() const;
     bool       ComputeIrqLevelLocked() const;
@@ -109,9 +116,10 @@ private:
     LineConfig GetLineConfigLocked() const;
     void       ClearRegistersLocked();
 
-    IrqLineFn       irq_line_;
-    Config          cfg_;
-    HostWidget*     activity_ = nullptr;
+    IrqLineFn        irq_line_;
+    Config           cfg_;
+    SerialLineTimer& timer_;
+    HostWidget*      activity_ = nullptr;
 
     /* A cradle swaps the personality from the UI thread while the JIT thread is inside
        DeliverTx / OnControlLines, so the pointer and the callbacks it installs are held
@@ -121,6 +129,9 @@ private:
     SerialEndpoint*              endpoint_;
     RxDrainFn                    rx_drain_;
     LineConfigFn                 line_cfg_cb_;
+    bool                         lines_known_ = false;
+    bool                         sent_dtr_    = false;
+    bool                         sent_rts_    = false;
 
     mutable std::mutex mu_;
 
@@ -130,6 +141,7 @@ private:
     uint8_t mcr_ = 0;
     uint8_t lsr_ = 0;        /* error/break bits; THRE/TEMT/DR derived on read */
     uint8_t msr_ = 0;
+    uint8_t inputs_ = 0;
     uint8_t scr_ = 0;
     uint8_t dll_ = 0, dlm_ = 0;
 

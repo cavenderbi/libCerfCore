@@ -152,7 +152,7 @@ bool MediaQMq200::SettleLocked() {
     RefreshGatesLocked();
     if (fp_.ControlUnmodeled() && panel_.FpiActive()) {
         emu_.Get<Fatal>().Die("MediaQMq200: flat panel interface active with FP00R 0x%08X "
-                              "(D-STN, mono, reserved encoding or test mode)", fp_.Control());
+                              "(D-STN, mono or reserved encoding)", fp_.Control());
     }
     return UpdateGc1ScanLocked();
 }

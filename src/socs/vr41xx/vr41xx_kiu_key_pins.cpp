@@ -11,9 +11,7 @@
 namespace cerfcore {
 
 bool Vr41xxKiuKeyPins::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    if (!bd) return false;
-    const std::string_view soc = bd->GetSocId();
+    const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
     return soc == SocId::Vr4102 || soc == SocId::Vr4111 || soc == SocId::Vr4121;
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "pcmcia_card.h"
+#include "../external_device_clock.h"
 
 #include <atomic>
 #include <cstdint>
@@ -64,6 +65,9 @@ public:
     void RaiseIrq();
     void ClearIrq();
 
+    void ArmCardTimer(int64_t delay_ns);
+    void DisarmCardTimer();
+
     /* Insert/eject. Used by the UI menu and by board boot-default
        services. Inserting into an occupied slot is rejected loudly. */
     void InsertCard(std::unique_ptr<PcmciaCard> card);
@@ -106,6 +110,8 @@ private:
 
     void InsertLocked(std::unique_ptr<PcmciaCard> card);
     void EjectLocked();
+    void OnCardTimer();
+    ExternalDeviceClock::Timer& CardTimer();
 
     /* Menu actions; gen guards against stale popup callbacks firing
        after the slot's contents changed. */
@@ -132,6 +138,8 @@ private:
     uint64_t                    generation_ = 0;
     std::atomic<uint8_t>        pins_{0};
     std::atomic<uint8_t>        line_{0};
+
+    ExternalDeviceClock::Timer* card_timer_ = nullptr;
 
     std::string ui_last_res_;
 };

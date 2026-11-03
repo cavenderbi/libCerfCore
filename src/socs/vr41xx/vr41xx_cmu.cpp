@@ -13,6 +13,10 @@ void Vr41xxCmu::RequireClock(uint16_t mask_bit, const char* operation) const {
     }
 }
 
+uint16_t Vr41xxCmu::SuppliedClocks(uint16_t mask_bits) const {
+    return static_cast<uint16_t>(ClockMask() & mask_bits);
+}
+
 void Vr41xxCmu::RegisterClockListener(uint16_t mask_bit, std::function<void(bool)> fn) {
     clock_listeners_.push_back(ClockListener{mask_bit, std::move(fn)});
 }

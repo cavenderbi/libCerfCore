@@ -5,6 +5,9 @@
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
+#include "../../execution/engine_bridge.h"
+#include <cerfcore/host/guest_deep_sleep.h>
+#include <cerfengine/mips/mips_interrupt_channel.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
@@ -12,7 +15,9 @@
 #include "vr41xx_pmu.h"
 
 #include <cstdint>
+#include <functional>
 #include <mutex>
+#include <vector>
 
 namespace cerfcore {
 
@@ -54,6 +59,8 @@ struct Vr41xxGiuModel {
     bool     inten_gates_icu_input;
     bool     podat_l_retained_on_reset;  /* GIUPODATL After-reset / Other-resets column */
     bool     podat_h_retained_on_reset;  /* GIUPODATH After-reset / Other-resets column */
+    uint64_t hibernate_undriven;
+    uint64_t power_down_high;
 };
 
 template <const std::string_view& Soc, const Vr41xxGiuModel& M>
@@ -62,8 +69,7 @@ public:
     using Vr41xxGiu::Vr41xxGiu;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetSocId() == Soc;
+        return emu_.Get<BoardContext>().GetSocId() == Soc;
     }
 
     void OnReady() override {
@@ -71,8 +77,26 @@ public:
         emu_.Get<PeripheralDispatcher>().Register(this);
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
             std::lock_guard<std::mutex> lk(mtx_);
+            hibernating_ = false;
             ApplyResetLocked(kind);
         });
+        emu_.Get<GuestDeepSleep>().RegisterSleepEntryListener([this] {
+            {
+                std::lock_guard<std::mutex> lk(mtx_);
+                hibernating_ = true;
+            }
+            NotifyOutputDriveChanged();
+        });
+        if constexpr (M.power_down_high != 0u) {
+            channel_ = &emu_.Get<EngineBridge>().Engine().Get<cerfengine::MipsInterruptChannel>();
+            channel_->RegisterSuspendListener([this] {
+                {
+                    std::lock_guard<std::mutex> lk(mtx_);
+                    suspended_ = channel_->Suspended();
+                }
+                NotifyOutputDriveChanged();
+            });
+        }
     }
 
     uint32_t MmioBase() const override { return M.base; }
@@ -92,13 +116,60 @@ public:
     }
 
     void WriteHalf(uint32_t addr, uint16_t value) override {
-        std::lock_guard<std::mutex> lk(mtx_);
-        WriteHalfLocked(addr - M.base, value);
+        const uint32_t off = addr - M.base;
+        uint16_t previous = 0;
+        {
+            std::lock_guard<std::mutex> lk(mtx_);
+            previous = podat_l_;
+            WriteHalfLocked(off, value);
+        }
+        if (off == kOffPoDatL) NotifyOutputDataLow(previous);
+        if (SetsOutputDrive(off)) NotifyOutputDriveChanged();
     }
 
-    /* The GIU sits in Internal I/O space 2, 0x0B000000-0x0BFFFFFF (VR4121 UM Table 6-6),
-       which is accessible in 4-byte and 2-byte units and NOT in 1-byte units (VR4121 UM
-       Table 11-7, VR4102 UM Table 10-4). */
+    uint16_t OutputDataLow() override {
+        std::lock_guard<std::mutex> lk(mtx_);
+        return podat_l_;
+    }
+
+    void RegisterOutputDataLowListener(std::function<void(uint16_t previous)> fn) override {
+        podat_l_listeners_.push_back(std::move(fn));
+    }
+
+    void RegisterAlternateFunction(int first_gpio, int last_gpio, AlternateFunction fn) override {
+        alternates_.push_back({first_gpio, last_gpio, std::move(fn)});
+    }
+
+    void RegisterOutputDriveListener(std::function<void()> fn) override {
+        drive_listeners_.push_back(std::move(fn));
+    }
+
+    void NotifyOutputDriveChanged() override {
+        for (auto& fn : drive_listeners_) fn();
+    }
+
+    Vr41xxPinDrive OutputDrive(int gpio) override {
+        for (const auto& a : alternates_) {
+            if (gpio < a.first || gpio > a.last) continue;
+            if (const auto drive = a.fn(gpio)) return *drive;
+        }
+        std::lock_guard<std::mutex> lk(mtx_);
+        const uint64_t pin = uint64_t{1} << gpio;
+        if ((hibernating_ || suspended_) && (M.power_down_high & pin) != 0u)
+            return Vr41xxPinDrive::kHigh;
+        if (hibernating_ && (M.hibernate_undriven & pin) != 0u) return Vr41xxPinDrive::kUndriven;
+        if (gpio >= 48) {
+            const int n = gpio - 48;
+            if (((podat_h_ >> (8 + n)) & 1u) == 0u) return Vr41xxPinDrive::kUndriven;
+            return Level((podat_h_ >> n) & 1u);
+        }
+        if (gpio >= 32) return Level((podat_l_ >> (gpio - 32)) & 1u);
+        const uint32_t sel = (static_cast<uint32_t>(iosel_h_) << 16) | iosel_l_;
+        if (((sel >> gpio) & 1u) == 0u) return Vr41xxPinDrive::kUndriven;
+        const uint32_t out = (static_cast<uint32_t>(piod_out_h_) << 16) | piod_out_l_;
+        return Level((out >> gpio) & 1u);
+    }
+
     uint32_t ReadWord(uint32_t addr) override {
         std::lock_guard<std::mutex> lk(mtx_);
         const uint32_t off = addr - M.base;
@@ -107,10 +178,16 @@ public:
     }
 
     void WriteWord(uint32_t addr, uint32_t value) override {
-        std::lock_guard<std::mutex> lk(mtx_);
         const uint32_t off = addr - M.base;
-        WriteHalfLocked(off,     static_cast<uint16_t>(value & 0xFFFFu));
-        WriteHalfLocked(off + 2, static_cast<uint16_t>(value >> 16));
+        uint16_t previous = 0;
+        {
+            std::lock_guard<std::mutex> lk(mtx_);
+            previous = podat_l_;
+            WriteHalfLocked(off,     static_cast<uint16_t>(value & 0xFFFFu));
+            WriteHalfLocked(off + 2, static_cast<uint16_t>(value >> 16));
+        }
+        if (off == kOffPoDatL || off + 2 == kOffPoDatL) NotifyOutputDataLow(previous);
+        if (SetsOutputDrive(off) || SetsOutputDrive(off + 2)) NotifyOutputDriveChanged();
     }
 
     void SetPinLevel(int pin, bool level) override {
@@ -182,6 +259,7 @@ public:
             w.Write("retained_h", retained_h_);
         }
         w.Write("level", level_);
+        w.Write<uint8_t>("hibernating", hibernating_ ? 1u : 0u);
     }
 
     void RestoreState(StateReader& r) override {
@@ -200,10 +278,14 @@ public:
             r.Read("retained_h", retained_h_);
         }
         r.Read("level", level_);
+        uint8_t hibernating = 0u;
+        r.Read("hibernating", hibernating);
+        hibernating_ = hibernating != 0u;
     }
 
     void PostRestore() override {
         std::lock_guard<std::mutex> lk(mtx_);
+        if constexpr (M.power_down_high != 0u) suspended_ = channel_->Suspended();
         DriveIcuLocked();
     }
 
@@ -343,8 +425,33 @@ private:
         }
     }
 
+    void NotifyOutputDataLow(uint16_t previous) {
+        for (auto& fn : podat_l_listeners_) fn(previous);
+    }
+
+    static Vr41xxPinDrive Level(uint32_t bit) {
+        return bit != 0u ? Vr41xxPinDrive::kHigh : Vr41xxPinDrive::kLow;
+    }
+
+    static bool SetsOutputDrive(uint32_t off) {
+        return off == kOffIoSelL || off == kOffIoSelH || off == kOffPiodL || off == kOffPiodH ||
+               off == kOffPoDatL || off == kOffPoDatH;
+    }
+
+    struct Alternate {
+        int               first;
+        int               last;
+        AlternateFunction fn;
+    };
+
     mutable std::mutex mtx_;
     Vr41xxPmu*         pmu_ = nullptr;
+    cerfengine::MipsInterruptChannel* channel_ = nullptr;
+    bool               hibernating_ = false;
+    bool               suspended_   = false;
+    std::vector<std::function<void(uint16_t)>> podat_l_listeners_;
+    std::vector<Alternate>                     alternates_;
+    std::vector<std::function<void()>>         drive_listeners_;
 
     /* Every GIU register's RTCRST column is 0 except GIUPODATL's (VR4121 UM
        19.2.1-19.2.16, VR4102 UM 18.2.1-18.2.16). */

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cerfcore/peripherals/peripheral_base.h>
+#include "../../peripherals/external_device_clock.h"
 #include "../../peripherals/serial/serial_line.h"
 #include "pr31x00_serial_wiring.h"
 #include "pr31x00_uart_dma.h"
@@ -40,6 +41,8 @@ public:
     LineConfig GetLineConfig() const override;
     void SetLineConfigCallback(LineConfigFn cb) override;
     void SetEndpoint(SerialEndpoint* ep) override;
+    void ArmEndpointTimer(int64_t delay_ns) override;
+    void DisarmEndpointTimer() override;
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
@@ -90,6 +93,7 @@ private:
     void       RaiseRxInts(const Pr31x00UartDma::RxInts& ints);
     void       NotifyControlLines(bool dtr, bool rts);
     void       FireLineConfig();
+    void       OnEndpointTimerDue();
 
     uint32_t    ctl1_ = 0;
     std::string tx_line_;
@@ -100,6 +104,9 @@ private:
 
     std::recursive_mutex endpoint_mu_;
     SerialEndpoint*      endpoint_ = nullptr;
+
+    ExternalDeviceClock*        device_clock_   = nullptr;
+    ExternalDeviceClock::Timer* endpoint_timer_ = nullptr;
 
     Pr31x00UartDma*         dma_         = nullptr;
     uint32_t                dma_port_    = 0;

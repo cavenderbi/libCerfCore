@@ -2,9 +2,11 @@
 
 #include <cerfcore/peripherals/peripheral_base.h>
 #include "../serial/serial_16550.h"
+#include "../serial/serial_line_timer.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../tracing/kernel_debug_sink.h"
+#include "../external_device_clock.h"
 #include "../peripheral_dispatcher.h"
 
 #include <cstdint>
@@ -12,17 +14,13 @@
 
 namespace cerfcore {
 
-/* Memory-mapped 16550: registers sit at reg-index*RegStride (PXA255 =4, VR4102 SIU =1,
-   a 16-bit-bus part =2). */
-class Uart16550 : public Peripheral, public Serial16550 {
+class Uart16550 : public Peripheral, public SerialLineTimer, public Serial16550 {
 public:
     Uart16550(CerfEmulator& emu, Config cfg)
         : Peripheral(emu),
-          Serial16550(nullptr, [this](bool pending) { SetInterruptLine(pending); }, cfg) {}
+          Serial16550(nullptr, [this](bool pending) { SetInterruptLine(pending); }, cfg, *this) {}
 
-    void OnReady() override {
-        emu_.Get<PeripheralDispatcher>().Register(this);
-    }
+    void OnReady() override;
 
     uint32_t MmioSize() const override { return 0x00001000u; }
 
@@ -50,9 +48,12 @@ public:
         WriteWord(addr, value);
     }
 
-    void SaveState(StateWriter& w) override    { Serial16550::SaveState(w); }
-    void RestoreState(StateReader& r) override { Serial16550::RestoreState(r); }
-    void PostRestore() override                { PostRestoreLine(); }
+    void SaveState(StateWriter& w) override;
+    void RestoreState(StateReader& r) override;
+    void PostRestore() override;
+
+    void ArmLineTimer(int64_t delay_ns) override;
+    void DisarmLineTimer() override;
 
 protected:
     virtual uint32_t    RegStride() const = 0;
@@ -71,14 +72,13 @@ protected:
         HaltUnsupportedAccess("WriteWord", MmioBase() + idx * RegStride(), value);
     }
 
-    /* With no personality attached the port is the board's debug console. */
-    void DeliverTx(uint8_t byte) override {
-        if (DeliverTxToEndpoint(byte)) return;
-        emu_.Get<KernelDebugSink>().EmitChar(static_cast<char>(byte), tx_line_, Name());
-    }
+    bool DeliverTx(uint8_t byte) override;
 
 private:
     std::string tx_line_;   /* host-side console accumulator, not guest state */
+
+    ExternalDeviceClock*        device_clock_ = nullptr;
+    ExternalDeviceClock::Timer* line_timer_   = nullptr;
 };
 
 }

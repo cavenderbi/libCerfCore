@@ -55,16 +55,12 @@ protected:
     }
 
     void SaveState(StateWriter& w) override {
-        Uart16550::SaveState(w);
         if (cradle_) cradle_->SaveCradleState(w);
+        Uart16550::SaveState(w);
     }
     void RestoreState(StateReader& r) override {
-        Uart16550::RestoreState(r);
         if (cradle_) cradle_->RestoreCradleState(r);
-    }
-    void PostRestore() override {
-        Uart16550::PostRestore();
-        if (cradle_) cradle_->PostRestore();
+        Uart16550::RestoreState(r);
     }
 
 private:

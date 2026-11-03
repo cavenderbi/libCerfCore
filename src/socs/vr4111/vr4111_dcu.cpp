@@ -1,4 +1,4 @@
-#include "../vr41xx/vr41xx_reg_window_impl.h"
+#include "../vr41xx/vr41xx_dcu_impl.h"
 
 #include <cstdint>
 #include "vr4111_id.h"
@@ -8,7 +8,6 @@ namespace cerfcore {
 namespace {
 
 using cerf_vr41xx_reg_window_detail::ReadKind;
-using cerf_vr41xx_reg_window_detail::Vr41xxRegWindowBase;
 using cerf_vr41xx_reg_window_detail::Vr41xxRegWindowModel;
 using cerf_vr41xx_reg_window_detail::WriteKind;
 
@@ -27,7 +26,7 @@ constexpr Vr41xxRegWindowModel kModel = {
     /*num_regs=*/6u,
     /*word_pairs=*/false,
     {
-        {},                               /* 0x40 DMARSTREG  R/W (Table 13-2 p315) */
+        { kRd, kWr, 0x0001u, 0x0000u },
         {},                               /* 0x42 DMAIDLEREG R   (Table 13-2 p315) */
         { kRd, kWr, 0x0001u, 0x0000u },   /* 0x44 DMASENREG  D0 DMASEN 1=enable 0=prohibit (13.3.3 p318) */
         { kRd, kWr, 0x000Du, 0x0000u },   /* 0x46 DMAMSKREG  D3 DMAMSKAIN D2 DMAMSKAOUT D0 DMAMSKFOUT (13.3.4 p319) */
@@ -36,13 +35,13 @@ constexpr Vr41xxRegWindowModel kModel = {
     },
 };
 
-class Vr4111Dcu : public Vr41xxRegWindowBase<SocId::Vr4111, kModel> {
+class Vr4111Dcu : public Vr41xxDcuImpl<SocId::Vr4111, kModel> {
 public:
-    using Vr41xxRegWindowBase::Vr41xxRegWindowBase;
+    using Vr41xxDcuImpl::Vr41xxDcuImpl;
 };
 
 }
 
-REGISTER_SERVICE(Vr4111Dcu);
+REGISTER_SERVICE_AS(Vr4111Dcu, Vr41xxDcu);
 
 }

@@ -32,6 +32,8 @@ public:
     /* The line cleared its modem-status register on a reset; re-assert the inputs. */
     virtual void ResendModemInputs() {}
 
+    virtual void OnEndpointTimer() {}
+
     virtual void PostRestore() {}
 
 protected:

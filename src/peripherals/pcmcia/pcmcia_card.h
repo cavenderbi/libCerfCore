@@ -88,6 +88,8 @@ public:
        calls through freed memory. */
     virtual void OnShutdown() {}
 
+    virtual void OnSlotTimer() {}
+
     virtual std::vector<WidgetControl> CardControls() { return {}; }
 
     /* Wired by the slot before OnInserted. The id names THIS residency:

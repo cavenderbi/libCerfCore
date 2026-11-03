@@ -25,7 +25,9 @@ public:
     virtual void SetGiuLow(uint16_t bits) = 0;
     virtual void SetGiuHigh(uint16_t bits) = 0;
     virtual void SetPiuSource(uint16_t bits) = 0;
+    virtual void SetAiuSource(uint16_t bits) = 0;
     virtual void SetKiuSource(uint16_t bits) = 0;
+    virtual void SetKiuUndefined(bool undefined) = 0;
     virtual void SetDsiuSource(uint16_t bits) = 0;
 };
 

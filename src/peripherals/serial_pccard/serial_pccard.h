@@ -3,6 +3,7 @@
 #include "../pcmcia/pcmcia_card.h"
 #include "../serial/serial_16550.h"
 #include "../serial/serial_endpoint_kind.h"
+#include "../serial/serial_line_timer.h"
 
 #include <cstdint>
 #include <memory>
@@ -12,7 +13,7 @@ namespace cerfcore {
 
 class SerialEndpoint;
 
-class SerialPcCard : public PcmciaCard {
+class SerialPcCard : public PcmciaCard, public SerialLineTimer {
 public:
     static constexpr const char* kDisplayName        = serial_endpoint_kind::kModemName;
     static constexpr const char* kForwardDisplayName = serial_endpoint_kind::kForwardName;
@@ -44,6 +45,10 @@ public:
     void RestoreState(StateReader& r) override;
     void PostRestore() override;
     void OnShutdown() override;
+    void OnSlotTimer() override;
+
+    void ArmLineTimer(int64_t delay_ns) override;
+    void DisarmLineTimer() override;
 
     void PowerOn () override;
     void PowerOff() override;

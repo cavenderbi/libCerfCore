@@ -11,8 +11,7 @@ namespace cerfcore {
 REGISTER_SERVICE(Vr4122Dsiu);
 
 bool Vr4122Dsiu::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetSocId() == SocId::Vr4122;
+    return emu_.Get<BoardContext>().GetSocId() == SocId::Vr4122;
 }
 
 void Vr4122Dsiu::OnReady() {

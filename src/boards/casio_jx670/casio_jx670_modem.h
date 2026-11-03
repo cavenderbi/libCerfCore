@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cerfcore/core/service.h>
+#include "../../peripherals/external_device_clock.h"
 #include "../../peripherals/serial/serial_16550.h"
+#include "../../peripherals/serial/serial_line_timer.h"
 
 #include <cstdint>
 #include <memory>
@@ -11,15 +13,15 @@ namespace cerfcore {
 class StateWriter;
 class StateReader;
 
-/* EM-500 companion serial/modem port: PC16550D modem UART (serial.dll ser16550
-   PDD; companion 0x8680 stride 4, base GetVMem 0xAA008000 via serial.dll mapper
-   0xF56CEC) + its modem-block/socket control latches + INTR line. */
-class CasioJx670Modem : public Service {
+class CasioJx670Modem : public Service, public SerialLineTimer {
 public:
     using Service::Service;
 
     bool ShouldRegister() override;
     void OnReady() override;
+
+    void ArmLineTimer(int64_t delay_ns) override;
+    void DisarmLineTimer() override;
 
     bool TryReadByte (uint32_t off, uint8_t&  out);
     bool TryWriteByte(uint32_t off, uint8_t   value);
@@ -42,6 +44,8 @@ private:
     }
 
     std::unique_ptr<Serial16550> uart_;
+    ExternalDeviceClock*         device_clock_ = nullptr;
+    ExternalDeviceClock::Timer*  line_timer_   = nullptr;
     uint8_t  ctrl_8600_   = 0;   /* serial.dll dword_F58130[0]=0x600 -> companion 0x8600 */
     uint16_t socket_a1c0_ = 0;
     uint16_t socket_a1c4_ = 0;

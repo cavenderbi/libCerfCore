@@ -884,7 +884,7 @@
   "device_features": [
     {
       "id": "touch",
-      "name": "Touch",
+      "name": "Touch Panel",
       "icon": "stylus"
     },
     {
@@ -894,37 +894,37 @@
     },
     {
       "id": "keyboard",
-      "name": "Keyboard",
+      "name": "Keyboard or keypad",
       "icon": "keyboard"
     },
     {
       "id": "suspend",
-      "name": "Suspend / Resume",
+      "name": "CPU Supend/Resume",
       "icon": "suspend"
     },
     {
       "id": "guest_additions",
-      "name": "Guest Additions",
+      "name": "Emulator's Guest Additions",
       "icon": "ga_autoresize"
     },
     {
       "id": "sound",
-      "name": "Sound",
+      "name": "Built-in/Pluggable Sound",
       "icon": "speaker_active"
     },
     {
       "id": "mic",
-      "name": "Microphone",
+      "name": "Built-in/Pluggable Microphone",
       "icon": "microphone"
     },
     {
       "id": "pcmcia",
-      "name": "PCMCIA",
+      "name": "PC Card Socket",
       "icon": "pcmcia_enabled"
     },
     {
       "id": "network",
-      "name": "Network",
+      "name": "Built-in Network Adapter",
       "icon": "internet"
     },
     {
@@ -1451,12 +1451,50 @@
       "name": "NEC CRONOS3E",
       "soc_id": "vr4121",
       "device_year": 2001,
-      "device_features": [],
+      "device_features": [
+        {
+          "feature_id": "touch",
+          "supported": true
+        },
+        {
+          "feature_id": "keyboard",
+          "supported": true
+        },
+        {
+          "feature_id": "sound",
+          "supported": true
+        },
+        {
+          "feature_id": "mic",
+          "supported": true
+        },
+        {
+          "feature_id": "pcmcia",
+          "supported": true
+        },
+        {
+          "feature_id": "serial",
+          "supported": true
+        },
+        {
+          "feature_id": "battery",
+          "supported": true
+        },
+        {
+          "feature_id": "guest_additions",
+          "supported": true
+        },
+        {
+          "feature_id": "suspend",
+          "supported": true
+        }
+      ],
       "notes": [],
       "lcd_panel_size": {
         "width": 640,
         "height": 240
       },
+      "ga_window_size": 50331648,
       "rom_placing_mode": "flat_container"
     },
     {
@@ -2337,32 +2375,44 @@
       "name": "NEC MobilePro 790",
       "short_name": "MobilePro 790",
       "board_family_id": "nec_cronos3e",
-      "support_level": "no_support"
+      "support_level": "bootable_full"
     },
     {
       "id": "nec_mobilegear2_r550",
       "name": "NEC MobileGear II MC/R550",
       "short_name": "MobileGear II R550",
       "board_family_id": "nec_cronos3e",
-      "support_level": "no_support",
+      "support_level": "unknown_partial",
       "internal__spec_divergences": "Japanese keyboard, phone interface (PDC, cdmaOne, PHS), earphone-mic jack",
-      "device_year": 2000
+      "device_year": 2000,
+      "device_features": [
+        {
+          "feature_id": "keyboard",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "nec_mobilegear2_r450",
       "name": "NEC MobileGear II MC/R450",
       "short_name": "MobileGear II R450",
       "board_family_id": "nec_cronos3e",
-      "support_level": "no_support",
+      "support_level": "unknown_partial",
       "internal__spec_divergences": "Japanese keyboard, phone interface (PDC, cdmaOne, PHS), earphone-mic jack",
-      "device_year": 2000
+      "device_year": 2000,
+      "device_features": [
+        {
+          "feature_id": "keyboard",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "nec_mobilepro_780",
       "name": "NEC MobilePro 780",
       "short_name": "MobilePro 780",
       "board_family_id": "nec_cronos3e",
-      "support_level": "no_support",
+      "support_level": "bootable_partial",
       "internal__spec_divergences": "no flash",
       "device_year": 2000
     },
@@ -2371,18 +2421,30 @@
       "name": "NEC MobileGear II MC/R530",
       "short_name": "MobileGear II R530",
       "board_family_id": "nec_cronos3e",
-      "support_level": "no_support",
+      "support_level": "unknown_partial",
       "internal__spec_divergences": "no flash, Japanese keyboard",
-      "device_year": 1999
+      "device_year": 1999,
+      "device_features": [
+        {
+          "feature_id": "keyboard",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "nec_mobilegear2_r430",
       "name": "NEC MobileGear II MC/R430",
       "short_name": "MobileGear II R430",
       "board_family_id": "nec_cronos3e",
-      "support_level": "no_support",
+      "support_level": "unknown_partial",
       "internal__spec_divergences": "no flash, Japanese keyboard, no modem, no VGA out, no scroll dial",
-      "device_year": 1999
+      "device_year": 1999,
+      "device_features": [
+        {
+          "feature_id": "keyboard",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "casio_cassiopeia_e55",

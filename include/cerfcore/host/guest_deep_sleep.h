@@ -84,6 +84,7 @@ public:
     void RegisterParkClock(std::function<void()> fn);
     void RegisterParkWakeSource(std::function<bool()> fn);
     void RegisterParkWakeDue(std::function<int64_t()> fn);
+    void RefreshParkWakeDue();
     void PollPark();
     void FinishPark();
 
@@ -104,6 +105,7 @@ private:
     void Recover();      /* UI thread: run the prompt and act on the choice. */
     void RequireNoWakeShape(const char* shape) const;
     void ConsumeSleepSpan();
+    int64_t CollectParkWakeDue() const;
     void DeliverWake(ResumeSource src);
     void TearDownPromptForHardwareWake();
 

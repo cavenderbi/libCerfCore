@@ -54,6 +54,7 @@ public:
     bool       Powered(uint32_t module) const;
     bool       StateEnables(uint32_t module) const;
     ClockState State(uint32_t clock) const;
+    Clock      MemoryClockSource(bool clock_select) const;
     bool        GePowered() const;
     const char* GeBlocked() const;
 

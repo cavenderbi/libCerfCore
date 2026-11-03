@@ -65,6 +65,28 @@ void GuestDeepSleep::RegisterParkWakeDue(std::function<int64_t()> fn) {
     park_wake_dues_.push_back(std::move(fn));
 }
 
+int64_t GuestDeepSleep::CollectParkWakeDue() const {
+    int64_t due = kNoParkWake;
+    for (auto& fn : park_wake_dues_) {
+        const int64_t d = fn();
+        if (d < due) due = d;
+    }
+    return due;
+}
+
+void GuestDeepSleep::RefreshParkWakeDue() {
+    {
+        std::lock_guard<std::mutex> lk(span_mtx_);
+        if (sleep_entry_ns_ == 0) return;
+    }
+    const int64_t due = CollectParkWakeDue();
+    std::lock_guard<std::mutex> lk(span_mtx_);
+    if (sleep_entry_ns_ == 0) return;
+    park_due_ns_ = due;
+    LOG(SocReset, "[DEEPSLEEP] RefreshParkWakeDue: park wake due at %lld slept ns\n",
+        static_cast<long long>(due));
+}
+
 void GuestDeepSleep::PollPark() {
     int64_t due  = kNoParkWake;
     int64_t span = 0;
@@ -133,12 +155,8 @@ void GuestDeepSleep::Enter() {
     emu_.Get<GuestPowerNotifier>().NotifyPowerDown();
     emu_.Get<EngineBridge>().Guest().EnterDeepSleep();
     for (auto& fn : sleep_entry_listeners_) fn();
-    int64_t due = kNoParkWake;
-    for (auto& fn : park_wake_dues_) {
-        const int64_t d = fn();
-        if (d < due) due = d;
-    }
-    int64_t due_in = 0;
+    const int64_t due    = CollectParkWakeDue();
+    int64_t       due_in = 0;
     {
         std::lock_guard<std::mutex> lk(span_mtx_);
         sleep_entry_ns_ = HostSteadyNanos();

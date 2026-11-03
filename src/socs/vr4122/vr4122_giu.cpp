@@ -26,6 +26,8 @@ constexpr Vr41xxGiuModel kModel = {
     /* The VR4131 UM documents no GIUPODATH; offset 0x1E is GIUPODATL (14.2.16 p.273),
        which Vr4122Giu::ReadHalf/WriteHalf intercept before the base decodes it. */
     /*podat_h_retained_on_reset=*/false,
+    0u,
+    0u,
 };
 
 /* Table 14-2 (p.256): the VR4122/VR4131 GIU tail is GIUPODATEN (offset 0x1C) then GIUPODATL
@@ -68,6 +70,14 @@ public:
             default: Vr41xxGiuBase::WriteHalf(addr, value); return;
         }
     }
+    uint16_t OutputDataLow() override {
+        emu_.Get<Fatal>().Die("Vr4122Giu::OutputDataLow: the VR4122 GIU has no GIUPODATL at 0x1C");
+    }
+
+    Vr41xxPinDrive OutputDrive(int gpio) override {
+        emu_.Get<Fatal>().Die("Vr4122Giu::OutputDrive: GPIO%d is not modeled", gpio);
+    }
+
     uint32_t ReadWord(uint32_t addr) override {
         if (TouchesTail(addr - MmioBase())) HaltUnsupportedAccess("VR4122 GIU output-data tail", addr, 0);
         return Vr41xxGiuBase::ReadWord(addr);

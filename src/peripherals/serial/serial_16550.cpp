@@ -42,6 +42,16 @@ constexpr uint8_t MSR_DCTS = 0x01, MSR_DDSR = 0x02, MSR_TERI = 0x04,
 constexpr uint8_t MSR_CTS = 0x10, MSR_DSR = 0x20, MSR_RI = 0x40, MSR_DCD = 0x80;
 constexpr uint8_t MSR_DELTAS = MSR_DCTS | MSR_DDSR | MSR_TERI | MSR_DDCD;
 
+uint8_t ModemLevels(bool cts, bool dsr, bool ri, bool dcd) {
+    return static_cast<uint8_t>((cts ? MSR_CTS : 0) | (dsr ? MSR_DSR : 0) | (ri ? MSR_RI : 0) |
+                                (dcd ? MSR_DCD : 0));
+}
+
+uint8_t LoopbackLevels(uint8_t mcr) {
+    return static_cast<uint8_t>(((mcr & MCR_RTS) ? MSR_CTS : 0) | ((mcr & MCR_DTR) ? MSR_DSR : 0) |
+                                ((mcr & MCR_OUT1) ? MSR_RI : 0) | ((mcr & MCR_OUT2) ? MSR_DCD : 0));
+}
+
 /* Backlog cap for a feeder with no flow control: a guest that stops draining otherwise
    grows the queue without limit and is later handed the whole stale burst. */
 constexpr size_t kRxMax = 64u * 1024u;
@@ -53,9 +63,19 @@ size_t Serial16550::RxTriggerLocked() const {
     return cfg_.rx_trigger[(fcr_ >> 6) & 3u];
 }
 
-Serial16550::Serial16550(SerialEndpoint* endpoint, IrqLineFn irq_line, Config cfg)
-    : irq_line_(std::move(irq_line)), cfg_(cfg), endpoint_(endpoint) {
+Serial16550::Serial16550(SerialEndpoint* endpoint, IrqLineFn irq_line, Config cfg,
+                         SerialLineTimer& timer)
+    : irq_line_(std::move(irq_line)), cfg_(cfg), timer_(timer), endpoint_(endpoint) {
     Reset();
+}
+
+void Serial16550::ArmEndpointTimer(int64_t delay_ns) { timer_.ArmLineTimer(delay_ns); }
+
+void Serial16550::DisarmEndpointTimer() { timer_.DisarmLineTimer(); }
+
+void Serial16550::OnLineTimer() {
+    std::lock_guard<std::recursive_mutex> elk(endpoint_mu_);
+    if (endpoint_) endpoint_->OnEndpointTimer();
 }
 
 bool Serial16550::DeliverTxToEndpoint(uint8_t byte) {
@@ -65,20 +85,52 @@ bool Serial16550::DeliverTxToEndpoint(uint8_t byte) {
     return true;
 }
 
-void Serial16550::DeliverTx(uint8_t byte) { DeliverTxToEndpoint(byte); }
+bool Serial16550::DeliverTx(uint8_t byte) { return DeliverTxToEndpoint(byte); }
 
-/* A personality plugged after the guest has already raised DTR/RTS would otherwise start
-   with them believed low and read the next edge as a hang-up. */
+bool Serial16550::ControlOutputsDriven() { return true; }
+
 void Serial16550::SetEndpoint(SerialEndpoint* endpoint) {
-    bool dtr, rts;
+    std::lock_guard<std::recursive_mutex> elk(endpoint_mu_);
+    endpoint_    = endpoint;
+    lines_known_ = false;
+    RefreshControlLines();
+}
+
+void Serial16550::RefreshControlLines() {
+    std::lock_guard<std::recursive_mutex> elk(endpoint_mu_);
+    if (!endpoint_) return;
+    uint8_t mcr = 0;
     {
         std::lock_guard<std::mutex> lk(mu_);
-        dtr = (mcr_ & MCR_DTR) != 0;
-        rts = (mcr_ & MCR_RTS) != 0;
+        mcr = mcr_;
     }
-    std::lock_guard<std::recursive_mutex> elk(endpoint_mu_);
-    endpoint_ = endpoint;
-    if (endpoint) endpoint->OnControlLines(dtr, rts);
+    const bool asserted = (mcr & MCR_LOOP) == 0u && (mcr & (MCR_DTR | MCR_RTS)) != 0u &&
+                          ControlOutputsDriven();
+    const bool dtr = asserted && (mcr & MCR_DTR) != 0u;
+    const bool rts = asserted && (mcr & MCR_RTS) != 0u;
+    if (lines_known_ && dtr == sent_dtr_ && rts == sent_rts_) return;
+    lines_known_ = true;
+    sent_dtr_    = dtr;
+    sent_rts_    = rts;
+    endpoint_->OnControlLines(dtr, rts);
+}
+
+void Serial16550::LoadModemInputs(bool cts, bool dsr, bool ri, bool dcd) {
+    std::lock_guard<std::mutex> lk(mu_);
+    inputs_ = ModemLevels(cts, dsr, ri, dcd);
+    if (mcr_ & MCR_LOOP) return;
+    msr_ = static_cast<uint8_t>((msr_ & MSR_DELTAS) | inputs_);
+}
+
+void Serial16550::ApplyModemLevelsLocked(uint8_t levels) {
+    const uint8_t old  = msr_ & 0xF0u;
+    const uint8_t diff = old ^ levels;
+    uint8_t d = msr_ & MSR_DELTAS;
+    if (diff & MSR_CTS) d |= MSR_DCTS;
+    if (diff & MSR_DSR) d |= MSR_DDSR;
+    if ((old & MSR_RI) && !(levels & MSR_RI)) d |= MSR_TERI;
+    if (diff & MSR_DCD) d |= MSR_DDCD;
+    msr_ = static_cast<uint8_t>(levels | d);
 }
 
 void Serial16550::Reset() {
@@ -87,18 +139,25 @@ void Serial16550::Reset() {
 }
 
 void Serial16550::ResetRegisters() {
-    std::lock_guard<std::mutex> lk(mu_);
-    ClearRegistersLocked();
-    dll_ = dlm_ = 0;
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        ClearRegistersLocked();
+        dll_ = dlm_ = 0;
+    }
+    RefreshControlLines();
 }
 
 void Serial16550::MasterReset() {
-    std::lock_guard<std::mutex> lk(mu_);
-    ClearRegistersLocked();
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        ClearRegistersLocked();
+    }
+    RefreshControlLines();
 }
 
 void Serial16550::ClearRegistersLocked() {
-    ier_ = fcr_ = lcr_ = mcr_ = lsr_ = msr_ = scr_ = 0;
+    ier_ = fcr_ = lcr_ = mcr_ = lsr_ = scr_ = 0;
+    msr_ = inputs_;
     thre_armed_ = false;
     rx_.clear();
     rx_pos_ = 0;
@@ -227,8 +286,7 @@ uint8_t Serial16550::ReadReg8(uint32_t offset) {
 
 void Serial16550::WriteReg8(uint32_t offset, uint8_t value) {
     uint8_t tx_byte = 0;
-    bool do_tx = false, loop_tx = false, notify_lines = false, dtr = false,
-         rts = false, line_changed = false;
+    bool do_tx = false, loop_tx = false, notify_lines = false, line_changed = false;
     LineConfig   line_cfg;
     {
         std::lock_guard<std::mutex> lk(mu_);
@@ -256,25 +314,8 @@ void Serial16550::WriteReg8(uint32_t offset, uint8_t value) {
             case kMcr: {
                 const uint8_t old = mcr_;
                 mcr_ = value & 0x1Fu;
-                if (mcr_ & MCR_LOOP) {
-                    uint8_t lvl = 0;
-                    if (mcr_ & MCR_RTS)  lvl |= MSR_CTS;
-                    if (mcr_ & MCR_DTR)  lvl |= MSR_DSR;
-                    if (mcr_ & MCR_OUT1) lvl |= MSR_RI;
-                    if (mcr_ & MCR_OUT2) lvl |= MSR_DCD;
-                    const uint8_t diff = (uint8_t)((lvl ^ msr_) & 0xF0u);
-                    uint8_t d = msr_ & MSR_DELTAS;
-                    if (diff & MSR_CTS) d |= MSR_DCTS;
-                    if (diff & MSR_DSR) d |= MSR_DDSR;
-                    if (diff & MSR_RI)  d |= MSR_TERI;
-                    if (diff & MSR_DCD) d |= MSR_DDCD;
-                    msr_ = (uint8_t)(lvl | d);
-                }
-                if ((old ^ mcr_) & (MCR_DTR | MCR_RTS)) {
-                    notify_lines = true;
-                    dtr = (mcr_ & MCR_DTR) != 0;
-                    rts = (mcr_ & MCR_RTS) != 0;
-                }
+                ApplyModemLevelsLocked((mcr_ & MCR_LOOP) ? LoopbackLevels(mcr_) : inputs_);
+                notify_lines = ((old ^ mcr_) & (MCR_DTR | MCR_RTS | MCR_LOOP)) != 0u;
                 break;
             }
             case kLsr: case kMsr: break;   /* read-only */
@@ -283,17 +324,13 @@ void Serial16550::WriteReg8(uint32_t offset, uint8_t value) {
         SettleAndFireIrq();
         if (line_changed) line_cfg = GetLineConfigLocked();
     }
-    /* Off-lock: the endpoint may call back into PushRx (re-locks mu_). */
-    if (do_tx) {
-        DeliverTx(tx_byte);
-        if (activity_) activity_->MarkTx();
-    }
-    if (loop_tx) PushRx(&tx_byte, 1);
+    if (do_tx && DeliverTx(tx_byte) && activity_) activity_->MarkTx();
+    if (loop_tx) Serial16550::PushRx(&tx_byte, 1);
+    if (notify_lines) RefreshControlLines();
 
-    if (!notify_lines && !line_changed) return;
+    if (!line_changed) return;
     std::lock_guard<std::recursive_mutex> elk(endpoint_mu_);
-    if (notify_lines && endpoint_) endpoint_->OnControlLines(dtr, rts);
-    if (line_changed && line_cfg_cb_) line_cfg_cb_(line_cfg);
+    if (line_cfg_cb_) line_cfg_cb_(line_cfg);
 }
 
 bool Serial16550::RxEmpty() const {
@@ -327,6 +364,7 @@ void Serial16550::SaveState(StateWriter& w) const {
         w.Write("ier", ier_); w.Write("fcr", fcr_); w.Write("lcr", lcr_); w.Write("mcr", mcr_);
         w.Write("lsr", lsr_); w.Write("msr", msr_); w.Write("scr", scr_);
         w.Write("dll", dll_); w.Write("dlm", dlm_);
+        w.Write("modem_inputs", inputs_);
         w.Write<uint8_t>("thre_armed", thre_armed_ ? 1u : 0u);
         w.Write<uint64_t>("rx_count", rx_.size());
         if (!rx_.empty()) w.WriteBytes("rx", rx_.data(), rx_.size());
@@ -342,6 +380,7 @@ void Serial16550::RestoreState(StateReader& r) {
         r.Read("ier", ier_); r.Read("fcr", fcr_); r.Read("lcr", lcr_); r.Read("mcr", mcr_);
         r.Read("lsr", lsr_); r.Read("msr", msr_); r.Read("scr", scr_);
         r.Read("dll", dll_); r.Read("dlm", dlm_);
+        r.Read("modem_inputs", inputs_);
         uint8_t armed = 0; r.Read("thre_armed", armed); thre_armed_ = (armed != 0);
         uint64_t n = 0; r.Read("rx_count", n);
         rx_.assign(static_cast<size_t>(n), 0u);
@@ -350,6 +389,7 @@ void Serial16550::RestoreState(StateReader& r) {
         rx_pos_ = static_cast<size_t>(pos);
     }
     std::lock_guard<std::recursive_mutex> elk(endpoint_mu_);
+    lines_known_ = false;
     if (endpoint_) endpoint_->RestoreState(r);
 }
 
@@ -361,21 +401,15 @@ void Serial16550::PostRestoreLine() {
     }
     std::lock_guard<std::recursive_mutex> elk(endpoint_mu_);
     if (endpoint_) endpoint_->PostRestore();
+    lines_known_ = false;
+    RefreshControlLines();
 }
 
 void Serial16550::SetModemInputs(bool cts, bool dsr, bool ri, bool dcd) {
     std::lock_guard<std::mutex> lk(mu_);
-    if (mcr_ & MCR_LOOP) return;   /* loopback owns MSR; ignore external inputs */
-    const uint8_t lvl = (uint8_t)((cts ? MSR_CTS : 0) | (dsr ? MSR_DSR : 0) |
-                                  (ri ? MSR_RI : 0) | (dcd ? MSR_DCD : 0));
-    const uint8_t old = msr_ & 0xF0u;
-    const uint8_t diff = old ^ lvl;
-    uint8_t d = msr_ & MSR_DELTAS;
-    if (diff & MSR_CTS) d |= MSR_DCTS;
-    if (diff & MSR_DSR) d |= MSR_DDSR;
-    if ((old & MSR_RI) && !(lvl & MSR_RI)) d |= MSR_TERI;   /* RI trailing edge */
-    if (diff & MSR_DCD) d |= MSR_DDCD;
-    msr_ = (uint8_t)(lvl | d);
+    inputs_ = ModemLevels(cts, dsr, ri, dcd);
+    if (mcr_ & MCR_LOOP) return;
+    ApplyModemLevelsLocked(inputs_);
     SettleAndFireIrq();
 }
 

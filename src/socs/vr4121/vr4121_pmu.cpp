@@ -52,6 +52,7 @@ constexpr Vr41xxPmuModel kModel = {
     /* UM 16.2.1 p410: "When a deadman's switch interrupt request has occurred, the DMSRST
        bit and the RSTSW bit are both set." */
     0x000Cu,
+    true,
 };
 
 constexpr uint32_t kOffDivReg   = 0x0Cu;

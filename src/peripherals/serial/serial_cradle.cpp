@@ -46,21 +46,15 @@ void SerialCradle::RestoreCradleState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
     uint8_t k = 0;
     r.Read("kind", k);
-    restored_kind_ = static_cast<Kind>(k);
 
     uint32_t n = 0;
     r.Read("host_port_count", n);
     std::u16string port(n, u'\0');
     if (n) r.ReadBytes("host_port", port.data(), n * sizeof(char16_t));
-    restored_port_ = Utf16ToUtf8(port);
+    SetPluggedLocked(static_cast<Kind>(k), Utf16ToUtf8(port), false);
 }
 
-void SerialCradle::PostRestore() {
-    std::lock_guard<std::mutex> lk(mtx_);
-    SetPluggedLocked(restored_kind_, restored_port_);
-}
-
-void SerialCradle::SetPluggedLocked(Kind kind, std::string host_port) {
+void SerialCradle::SetPluggedLocked(Kind kind, std::string host_port, bool power_up) {
     if (endpoint_) {
         line_.SetEndpoint(nullptr);
         endpoint_->OnClose();
@@ -83,27 +77,26 @@ void SerialCradle::SetPluggedLocked(Kind kind, std::string host_port) {
     }
 
     endpoint_->BindUart(line_);
-    endpoint_->OnOpen();
+    if (power_up) endpoint_->OnOpen();
     line_.SetEndpoint(endpoint_.get());
 }
-
 
 void SerialCradle::SwapModem(uint64_t gen) {
     std::lock_guard<std::mutex> lk(mtx_);
     if (generation_ != gen) return;
-    SetPluggedLocked(Kind::Modem, {});
+    SetPluggedLocked(Kind::Modem, {}, true);
 }
 
 void SerialCradle::SwapForward(uint64_t gen, std::string host_port) {
     std::lock_guard<std::mutex> lk(mtx_);
     if (generation_ != gen) return;
-    SetPluggedLocked(Kind::Forward, std::move(host_port));
+    SetPluggedLocked(Kind::Forward, std::move(host_port), true);
 }
 
 void SerialCradle::Eject(uint64_t gen) {
     std::lock_guard<std::mutex> lk(mtx_);
     if (generation_ != gen) return;
-    SetPluggedLocked(Kind::None, {});
+    SetPluggedLocked(Kind::None, {}, true);
 }
 
 std::vector<SlotEntry> SerialCradle::AvailableLocked(uint64_t gen) {

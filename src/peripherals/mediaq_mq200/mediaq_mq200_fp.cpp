@@ -23,7 +23,8 @@ constexpr uint32_t kFp0FR = 15u;
 constexpr uint32_t kFp10R = 16u;
 
 /* MQ-200 Data Book Table 5-51 .. Table 5-59. */
-constexpr uint32_t kFp00Unmodeled  = 0xF0000C10u;
+constexpr uint32_t kFp00Unmodeled  = 0x00000C10u;
+constexpr uint32_t kFp00TestModes  = 0xF0000000u;
 constexpr uint32_t kFp01Unmodeled  = 0xF8000801u;
 constexpr uint32_t kFp02Unmodeled  = 0xFFE002AAu;
 constexpr uint32_t kFp03Unmodeled  = 0xF8F8FFFFu;
@@ -31,6 +32,7 @@ constexpr uint32_t kFp03ReadOnly   = 0x07000000u;
 constexpr uint32_t kFp0FMustBeZero = 0x00080008u;
 
 bool Fp00Unmodeled(uint32_t v) {
+    if (v & kFp00TestModes) return false;
     const uint32_t panel_type = (v >> 2) & 3u;
     const uint32_t width      = (v >> 5) & 7u;
     const uint32_t dither     = (v >> 12) & 7u;

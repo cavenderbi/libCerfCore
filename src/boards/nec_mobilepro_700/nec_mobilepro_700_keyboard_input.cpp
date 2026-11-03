@@ -1,37 +1,24 @@
-#include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/host/keyboard_input.h>
-#include <cerfcore/host/keyboard_map.h>
-#include <cerfcore/host/keyboard_router.h>
-#include "../../socs/vr41xx/vr41xx_kiu.h"
-#include <cerfcore/boards/board_context.h>
-#include "nec_mobilepro_700_family_id.h"
+#include "../nec_vr41xx_keyboard_input.h"
 
-#include <cstdint>
+#include <cerfcore/boards/board_context.h>
+#include <cerfcore/core/cerf_emulator.h>
+#include "nec_mobilepro_700_family_id.h"
 
 namespace cerfcore {
 
 namespace {
 
-class NecMobilePro700KeyboardInput : public KeyboardInput {
+class NecMobilepro700KeyboardInput : public NecVr41xxKeyboardInput {
 public:
-    using KeyboardInput::KeyboardInput;
+    using NecVr41xxKeyboardInput::NecVr41xxKeyboardInput;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::NecMobilepro700;
-    }
-
-    void OnReady() override { emu_.Get<KeyboardRouter>().Register(this); }
-
-    void OnHostKey(uint8_t vk, bool key_up) override {
-        uint32_t code;
-        if (!emu_.Get<KeyboardMap>().BaseDeviceCode(vk, code)) return;
-        emu_.Get<Vr41xxKiu>().SetKeyState(static_cast<uint8_t>(code), !key_up);
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecMobilepro700;
     }
 };
 
-}  // namespace
+}
 
-REGISTER_SERVICE(NecMobilePro700KeyboardInput);
+REGISTER_SERVICE(NecMobilepro700KeyboardInput);
 
 }

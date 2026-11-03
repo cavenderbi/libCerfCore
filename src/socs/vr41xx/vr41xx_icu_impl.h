@@ -104,8 +104,7 @@ public:
     using Vr41xxIcu::Vr41xxIcu;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetSocId() == Soc;
+        return emu_.Get<BoardContext>().GetSocId() == Soc;
     }
 
     void OnReady() override {
@@ -125,10 +124,14 @@ public:
     uint16_t ReadHalf(uint32_t addr) override {
         std::lock_guard<std::mutex> lk(mtx_);
         switch (addr - M.base1) {
-            case kOffSysint1:  return ComputeSysint1Locked();
+            case kOffSysint1:
+                if (kiu_undefined_ && mkiu_ != 0u) HaltUndefinedKiu("SYSINT1REG read");
+                return ComputeSysint1Locked();
             case kOffPiuint:   return piuint_;
             case kOffAiuint:   return aiuint_;
-            case kOffKiuint:   return kiuint_;
+            case kOffKiuint:
+                if (kiu_undefined_) HaltUndefinedKiu("KIUINTREG read");
+                return kiuint_;
             case kOffGiuintl:  return giuintl_;
             case kOffDsiuint:  return static_cast<uint16_t>(dsiuint_ | M.dsiu_fixed_read);
             case kOffMsysint1: return msysint1_;
@@ -225,9 +228,19 @@ public:
         piuint_ = bits;
         RecomputeLocked();
     }
+    void SetAiuSource(uint16_t bits) override {
+        std::lock_guard<std::mutex> lk(mtx_);
+        aiuint_ = bits;
+        RecomputeLocked();
+    }
     void SetKiuSource(uint16_t bits) override {
         std::lock_guard<std::mutex> lk(mtx_);
         kiuint_ = bits;
+        RecomputeLocked();
+    }
+    void SetKiuUndefined(bool undefined) override {
+        std::lock_guard<std::mutex> lk(mtx_);
+        kiu_undefined_ = undefined;
         RecomputeLocked();
     }
     void SetDsiuSource(uint16_t bits) override {
@@ -255,6 +268,7 @@ public:
         r.Read("mkiu", mkiu_);    r.Read("mdsiu", mdsiu_);   r.Read("mfir", mfir_);
         r.Read("sysint1_direct", sysint1_direct_); r.Read("sysint2_direct", sysint2_direct_);
         r.Read("msysint1", msysint1_); r.Read("msysint2", msysint2_); r.Read("nmireg", nmireg_); r.Read("softint", softint_);
+        kiu_undefined_ = false;
         RestoreStateExtLocked(r);
     }
 
@@ -308,7 +322,14 @@ private:
         return s;
     }
 
+    [[noreturn]] void HaltUndefinedKiu(const char* operation) {
+        emu_.Get<Fatal>().Die("Vr41xxIcu: %s while the KIU sequencer state is undefined "
+                              "(MKIUINTREG=0x%04X MSYSINT1REG=0x%04X)", operation, mkiu_, msysint1_);
+    }
+
     void RecomputeLocked() {
+        if (kiu_undefined_ && mkiu_ != 0u && (msysint1_ & kS1Kiu) != 0u)
+            HaltUndefinedKiu("KIU interrupt path unmasked");
         const uint16_t m1 = static_cast<uint16_t>(ComputeSysint1Locked() & msysint1_);
         const uint16_t m2 = static_cast<uint16_t>(ComputeSysint2Locked() & msysint2_);
 
@@ -346,6 +367,7 @@ private:
 
     uint16_t sysint1_direct_ = 0, sysint2_direct_ = 0;
     uint16_t msysint1_ = 0, msysint2_ = 0, nmireg_ = 0, softint_ = 0;
+    bool     kiu_undefined_ = false;
 };
 
 }  /* namespace cerf_vr41xx_icu_detail */

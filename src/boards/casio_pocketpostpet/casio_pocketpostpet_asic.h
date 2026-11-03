@@ -5,6 +5,7 @@
 #include "../../lcd/display_size_latch.h"
 
 #include <cstdint>
+#include <functional>
 #include <mutex>
 #include <vector>
 
@@ -39,6 +40,10 @@ public:
        line (0x1004 sub_1361FA0 / sub_1361CD8) drives the ASIC interrupt output. */
     void SetSideButton(uint16_t mask, bool pressed);
 
+    bool SpeakerMuted() const;
+    bool MicPowered() const;
+    void RegisterAudioControlListener(std::function<void()> fn);
+
     /* ddi.dll sub_1380C50/sub_1381C54 enable the panel with 0xA02 |= 1 / 0xA00 &= ~1;
        nk.exe power-down sub_9F0B8720 disables it with 0xA00 = 1. */
     bool IsDisplayEnabled() const { return (reg_0A02_ & 1u) && !(reg_0A00_ & 1u); }
@@ -72,6 +77,7 @@ private:
     void     RunBlit7Locked();
     void     MaybePublishDisplaySize();
     void     UpdateSideButtonInterruptLocked();
+    void     NotifyAudioControl();
 
     /* nk.exe ISR 0x9F0BA2C4 gates the ASIC interrupt on (0x1008 & 0x100A) & 0xE2;
        its output is GIU pin 9 (GIUINTSTATL bit9, cleared by writing 0x200 to
@@ -136,6 +142,7 @@ private:
     uint16_t reg_1002_ = 0;
     uint16_t reg_1010_ = 0;
     uint16_t reg_1134_ = 0;
+    std::vector<std::function<void()>> audio_control_listeners_;
     uint16_t reg_7a0_  = 0;
     uint16_t reg_7a2_  = 0;
     uint16_t reg_7a4_  = 0;
