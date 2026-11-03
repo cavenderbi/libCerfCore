@@ -81,7 +81,7 @@ public:
         sleep.RegisterParkWakeSource([this] {
             return wake_pending_.load(std::memory_order_acquire);
         });
-        host_requests_ = &emu_.Get<EngineBridge>().Engine().Get<cerfengine::HostRequestChannel>();
+        host_requests_ = &emu_.Get<EngineBridge>().Engine().template Get<cerfengine::HostRequestChannel>();
         host_requests_->RegisterListener([this] { ApplyPowerPinInput(); });
         sleep.RegisterParkClock([this] { ApplyPowerPinInput(); });
         if (M.int_power_wake != 0u) {

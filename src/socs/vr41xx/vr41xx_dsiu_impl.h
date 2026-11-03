@@ -106,7 +106,7 @@ public:
             hibernating_ = false;
             ApplyResetLocked(kind);
         });
-        channel_ = &emu_.Get<EngineBridge>().Engine().Get<cerfengine::MipsInterruptChannel>();
+        channel_ = &emu_.Get<EngineBridge>().Engine().template Get<cerfengine::MipsInterruptChannel>();
         channel_->RegisterSuspendListener([this] {
             SetPowerDown([this] { suspended_ = channel_->Suspended(); });
         });

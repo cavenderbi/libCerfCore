@@ -88,7 +88,7 @@ public:
             NotifyOutputDriveChanged();
         });
         if constexpr (M.power_down_high != 0u) {
-            channel_ = &emu_.Get<EngineBridge>().Engine().Get<cerfengine::MipsInterruptChannel>();
+            channel_ = &emu_.Get<EngineBridge>().Engine().template Get<cerfengine::MipsInterruptChannel>();
             channel_->RegisterSuspendListener([this] {
                 {
                     std::lock_guard<std::mutex> lk(mtx_);
