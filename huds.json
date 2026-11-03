@@ -413,7 +413,8 @@
             { "button": { "keys": ["VK_F8"], "label": "P" } },
             { "button": { "keys": ["VK_F9"], "icon": "voicemail" } },
             { "button": { "keys": ["VK_F10"], "icon": "calculate" } },
-            { "button": { "keys": ["VK_DELETE"] } }, "jornada_power"
+            { "button": { "keys": ["VK_DELETE"] } },
+            { "button": { "keys": ["VK_F11"], "icon": "mic" } }, "jornada_power"
           ]
         },
         {

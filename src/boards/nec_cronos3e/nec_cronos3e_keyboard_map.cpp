@@ -43,6 +43,7 @@ const std::vector<KeyBinding> kBindings = {
     { 0x12, 73, "Alt", 0, kAltLayer },
     { 0xA5, 64, "Alt", 0, kAltLayer },
     { 0xDF, kNecVr41xxPowerSwitchCode, "Power", 0, 0 },
+    { 0x7A, kNecVr41xxRecordButtonCode, "Record", 0, 0 },
     { 0x10, 0, "Num Lock",  kFnLayer, 0 },
     { 0x20, 0, "Backlight", kFnLayer, 0 },
     { 0x34, 0, "£",         kFnLayer, 0 },

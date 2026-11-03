@@ -6,7 +6,8 @@
 
 namespace cerfcore {
 
-inline constexpr uint32_t kNecVr41xxPowerSwitchCode = kVr41xxKiuBoardKeyBase;
+inline constexpr uint32_t kNecVr41xxPowerSwitchCode  = kVr41xxKiuBoardKeyBase;
+inline constexpr uint32_t kNecVr41xxRecordButtonCode = kVr41xxKiuBoardKeyBase + 1u;
 
 class NecVr41xxKeyboardInput : public Vr41xxKiuKeyboardInput {
 public:
