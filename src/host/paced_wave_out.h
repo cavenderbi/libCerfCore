@@ -23,8 +23,8 @@ public:
 
     void BeginAudioOut();
     bool QueueOutput(const void* host_bytes, uint32_t length);
-    void QueueOutputInHostBlocks(const void* host_bytes, uint32_t length);
-    uint32_t HostBlockFrames() const;
+    uint32_t QueueOutputInHostBlocks(const void* host_bytes, uint32_t length);
+    void EndStreamBlock();
     void FinishAudioOut();
     void StopAudioOut();
 
@@ -43,6 +43,8 @@ private:
     uint32_t RateMatchLocked(const uint8_t* bytes, uint32_t length);
     DevicePosition DevicePositionLocked() const;
     void RefreshPositionLocked();
+    uint32_t StreamFrameBytes() const;
+    uint32_t StreamBlockBytes() const;
 
     static constexpr uint32_t kCommandSetFormat    = 1;
     static constexpr uint32_t kCommandFlushPending = 2;
@@ -66,6 +68,8 @@ private:
     uint64_t              pending_format_[kPending] = {};
     uint32_t              pending_head_  = 0;
     uint32_t              pending_count_ = 0;
+    uint8_t               stream_[kMaxBlock] = {};
+    uint32_t              stream_bytes_ = 0;
     uint64_t              device_format_ = 0;
     std::mutex            audio_mutex_;
     DynamicRateResampler  rate_match_;

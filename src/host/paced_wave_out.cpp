@@ -32,6 +32,11 @@ void PacedWaveOut::Start(Fatal& fatal, InstanceThreads& threads, const char* log
 void PacedWaveOut::Stop() { sink_.Stop(); }
 
 void PacedWaveOut::SetFormat(uint32_t rate_hz, uint16_t channels, uint16_t bits) {
+    if (rate_hz != fmt_rate_.load(std::memory_order_acquire) ||
+        channels != fmt_channels_.load(std::memory_order_acquire) ||
+        bits != fmt_bits_.load(std::memory_order_acquire)) {
+        EndStreamBlock();
+    }
     {
         std::lock_guard<std::mutex> lk(audio_mutex_);
         fmt_rate_.store(rate_hz, std::memory_order_release);
@@ -149,10 +154,12 @@ void PacedWaveOut::BeginAudioOut() {
     starved_        = 0;
     priming_        = outstanding_ == 0 && pending_count_ == 0;
     finished_       = false;
+    stream_bytes_   = 0;
     output_active_.store(true, std::memory_order_release);
 }
 
 void PacedWaveOut::FinishAudioOut() {
+    EndStreamBlock();
     std::lock_guard<std::mutex> lk(audio_mutex_);
     finished_ = true;
     if (!priming_) return;
@@ -172,6 +179,7 @@ void PacedWaveOut::StopAudioOut() {
     position_valid_ = false;
     pending_head_  = 0;
     pending_count_ = 0;
+    stream_bytes_  = 0;
     sink_.Reset();
     for (uint32_t i = 0; i < kSlots; ++i) {
         if (slot_busy_[i]) ++slot_stale_[i];
@@ -275,29 +283,55 @@ void PacedWaveOut::RefreshPositionLocked() {
     position_valid_  = true;
 }
 
-void PacedWaveOut::QueueOutputInHostBlocks(const void* host_bytes, uint32_t length) {
+uint32_t PacedWaveOut::StreamFrameBytes() const {
+    return PcmFrameBytes(fmt_channels_.load(std::memory_order_acquire), fmt_bits_.load(std::memory_order_acquire));
+}
+
+uint32_t PacedWaveOut::StreamBlockBytes() const {
+    const uint32_t frame  = StreamFrameBytes();
+    const uint64_t rate   = fmt_rate_.load(std::memory_order_acquire);
+    const uint32_t frames = std::max<uint32_t>(1u, static_cast<uint32_t>(rate * kHostBlockFrames / kHostBlockRateHz));
+    return std::min(frames, kMaxBlock / frame) * frame;
+}
+
+uint32_t PacedWaveOut::QueueOutputInHostBlocks(const void* host_bytes, uint32_t length) {
     const uint32_t rate  = fmt_rate_.load(std::memory_order_acquire);
-    const uint32_t frame = PcmFrameBytes(fmt_channels_.load(std::memory_order_acquire),
-                                         fmt_bits_.load(std::memory_order_acquire));
+    const uint32_t frame = StreamFrameBytes();
     if (rate == 0u || frame == 0u || length % frame != 0u) {
         fatal_->Die("[%s] %u bytes queued in host blocks of a %u Hz, %u-byte-frame format",
                     log_tag_, length, rate, frame);
     }
-    const uint32_t block_frames = HostBlockFrames();
-    const uint32_t frames = length / frame;
-    const uint32_t blocks = (frames + block_frames - 1u) / block_frames;
+    const uint32_t block  = StreamBlockBytes();
     const uint8_t* bytes  = static_cast<const uint8_t*>(host_bytes);
-    uint32_t done = 0;
-    for (uint32_t i = 0; i < blocks; ++i) {
-        const uint32_t n = (frames - done) / (blocks - i);
-        QueueOutput(bytes + static_cast<size_t>(done) * frame, n * frame);
-        done += n;
+    uint32_t       queued = 0;
+    while (length != 0u) {
+        if (stream_bytes_ == 0u && length >= block) {
+            QueueOutput(bytes, block);
+            ++queued;
+            bytes  += block;
+            length -= block;
+            continue;
+        }
+        const uint32_t n = std::min(block - stream_bytes_, length);
+        std::memcpy(stream_ + stream_bytes_, bytes, n);
+        stream_bytes_ += n;
+        bytes         += n;
+        length        -= n;
+        if (stream_bytes_ == block) {
+            stream_bytes_ = 0;
+            QueueOutput(stream_, block);
+            ++queued;
+        }
     }
+    return queued;
 }
 
-uint32_t PacedWaveOut::HostBlockFrames() const {
-    const uint64_t rate = fmt_rate_.load(std::memory_order_acquire);
-    return std::max<uint32_t>(1u, static_cast<uint32_t>(rate * kHostBlockFrames / kHostBlockRateHz));
+void PacedWaveOut::EndStreamBlock() {
+    if (stream_bytes_ == 0u) return;
+    const uint32_t block = StreamBlockBytes();
+    std::memset(stream_ + stream_bytes_, 0, block - stream_bytes_);
+    stream_bytes_ = 0;
+    QueueOutput(stream_, block);
 }
 
 bool PacedWaveOut::QueueOutput(const void* host_bytes, uint32_t length) {

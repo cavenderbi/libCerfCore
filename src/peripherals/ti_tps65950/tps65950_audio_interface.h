@@ -73,8 +73,6 @@ private:
     void   StartHost();
 
     void    FinishHistory();
-    size_t  HostBlockBytes() const;
-    void    PushWholeBlocks();
     int64_t WordStart(const Omap3530McBspDxFrame& frame, uint32_t k) const;
     void    Decode(const Omap3530McBspDxFrame& cur, const Omap3530McBspDxFrame* prev,
                    const Omap3530McBspDxFrame* next);
@@ -96,7 +94,6 @@ private:
     std::deque<Omap3530McBspDxFrame> history_;
     PacedWaveOut                     host_;
     bool                             host_active_ = false;
-    std::vector<uint8_t>             block_;
 };
 
 }

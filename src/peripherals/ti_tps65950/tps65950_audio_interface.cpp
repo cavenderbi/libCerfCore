@@ -8,7 +8,6 @@
 #include <cerfcore/core/instance_threads.h>
 #include <cerfcore/core/log.h>
 #include "../../host/audio_activity_widget.h"
-#include "../../platform/wave_pcm_format.h"
 #include <cerfcore/state/state_stream.h>
 #include "tps65950_audio_downlink.h"
 #include "tps65950_audio_uplink.h"
@@ -243,21 +242,7 @@ void Tps65950AudioInterface::FinishHistory() {
 /* SWCU050E Table 14-27 AIF_EN 0: "Off mode DIN/DOUT/SYN/CLK = L". */
 void Tps65950AudioInterface::FlushFrames() {
     FinishHistory();
-    const size_t whole = HostBlockBytes();
-    if (block_.size() % whole != 0u) block_.resize((block_.size() / whole + 1u) * whole, 0u);
-    PushWholeBlocks();
-}
-
-size_t Tps65950AudioInterface::HostBlockBytes() const {
-    return static_cast<size_t>(host_.HostBlockFrames()) * PcmFrameBytes(kChannels, kBits);
-}
-
-void Tps65950AudioInterface::PushWholeBlocks() {
-    const size_t push = block_.size() / HostBlockBytes() * HostBlockBytes();
-    if (push == 0u) return;
-    if (host_active_) host_.QueueOutputInHostBlocks(block_.data(), static_cast<uint32_t>(push));
-    block_.erase(block_.begin(), block_.begin() + static_cast<std::ptrdiff_t>(push));
-    emu_.Get<AudioActivityWidget>().MarkTx();
+    if (host_active_) host_.EndStreamBlock();
 }
 
 int Tps65950AudioInterface::BitAt(const Omap3530McBspDxFrame* frame, int64_t offset) {
@@ -311,9 +296,11 @@ void Tps65950AudioInterface::Decode(const Omap3530McBspDxFrame& cur, const Omap3
     }
     int16_t out_left = 0, out_right = 0;
     downlink_->Mix(sdr, out_left, out_right);
-    cerf::le::Append16(block_, static_cast<uint16_t>(out_left));
-    cerf::le::Append16(block_, static_cast<uint16_t>(out_right));
-    PushWholeBlocks();
+    if (!host_active_) return;
+    uint8_t frame[4];
+    cerf::le::Put16(frame, static_cast<uint16_t>(out_left));
+    cerf::le::Put16(frame + 2, static_cast<uint16_t>(out_right));
+    if (host_.QueueOutputInHostBlocks(frame, sizeof frame) != 0u) emu_.Get<AudioActivityWidget>().MarkTx();
 }
 
 /* TPS65950 TRM SWCU050E Figure 14-27 (page 717): right-justified TX words after the padding zeros; Figure 14-33
@@ -363,7 +350,6 @@ void Tps65950AudioInterface::Restore(StateReader& r) {
     r.Read("tps_audio_phase", pos.phase);
     r.Read("tps_audio_phase_den", pos.phase_den);
     history_.clear();
-    block_.clear();
     host_.StopAudioOut();
     host_active_ = false;
     uplink_->Stop();
