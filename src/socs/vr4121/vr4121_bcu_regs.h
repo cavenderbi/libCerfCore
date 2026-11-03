@@ -14,7 +14,12 @@ constexpr uint16_t kCnt1Dram64 = 0x4000u;
 constexpr uint16_t kCnt1Rd64d  = 0x0004u;
 
 constexpr uint16_t kCnt3ExtDram64 = 0x4000u;
+constexpr uint16_t kCnt3ExtRomcsMask     = 0x3000u;
+constexpr uint16_t kCnt3ExtRomcsBothRom  = 0x3000u;
+constexpr uint16_t kCnt3ExtRomcsBank3Rom = 0x2000u;
+constexpr uint16_t kCnt3ExtRomcsRfu      = 0x1000u;
 constexpr uint16_t kCnt3ExtMem    = 0x0800u;
+constexpr uint16_t kCnt3Dbus32Only = 0xF880u;
 constexpr uint16_t kCnt3ExtFields = 0xF800u;
 
 constexpr uint16_t kRamSizeWmask = 0x7777u;

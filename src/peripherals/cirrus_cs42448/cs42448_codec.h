@@ -4,6 +4,9 @@
 
 namespace cerfcore {
 
+class StateWriter;
+class StateReader;
+
 /* Cirrus Logic CS42448 audio codec I2C slave (7-bit address 0x48); registers
    0x01..0x1B, reg 0x01 (Chip I.D./Rev) and 0x19 (Status) read-only, MAP bit7 =
    address auto-increment. Values per the Cirrus CS42448 register map. */
@@ -14,6 +17,9 @@ public:
     void Reset();
     void WriteReg(uint8_t reg, uint8_t val);
     uint8_t ReadReg(uint8_t reg) const;
+
+    void SaveState(StateWriter& w) const;
+    void RestoreState(StateReader& r);
 
 private:
     static constexpr uint8_t kChipId = 0x01u;  /* read-only */

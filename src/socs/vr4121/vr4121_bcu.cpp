@@ -112,6 +112,7 @@ public:
 
     void WriteHalf(uint32_t addr, uint16_t value) override {
         const uint32_t off = addr - kModel.base;
+        if (off == kOffCnt3) value = SettableCnt3(value);
         if (off == kOffCnt1 &&
             ((value ^ StoredReg(kIdxCnt1)) & (kCnt1Rom64 | kCnt1Rd64d)) != 0u) {
             HaltUnsupportedAccess("BCUCNTREG1 WriteHalf changes ROM64 or RD64D", addr, value);
@@ -154,6 +155,12 @@ protected:
     }
 
 private:
+    uint16_t SettableCnt3(uint16_t value) const {
+        const auto wiring = emu_.Get<Vr4121BcuBoard>().DramWiring();
+        if (!wiring || wiring->dbus32) return value;
+        return static_cast<uint16_t>(value & ~kCnt3Dbus32Only);
+    }
+
     uint16_t RamSizeReset(bool rtc) const {
         auto& board = emu_.Get<Vr4121BcuBoard>();
         const auto wiring = board.DramWiring();

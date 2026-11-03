@@ -9,17 +9,20 @@ namespace cerfcore {
 
 namespace {
 
-class NecCronos3eSerialWiring : public Vr41xxSerialWiring {
+class NecCronos3eSerialWiring : public Vr41xxGpioSuppliedSerialWiring {
 public:
-    using Vr41xxSerialWiring::Vr41xxSerialWiring;
+    using Vr41xxGpioSuppliedSerialWiring::Vr41xxGpioSuppliedSerialWiring;
 
     bool ShouldRegister() override {
         return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecCronos3e;
     }
 
     std::optional<Vr41xxSerialModem> ForSiu() const override {
-        return Vr41xxSerialModem("COM1", Vr41xxGiu::kDcdPin, 46);
+        return Vr41xxSerialModem("COM1", Vr41xxGiu::kDcdPin);
     }
+
+protected:
+    int SupplyGpio() const override { return 46; }
 };
 
 }

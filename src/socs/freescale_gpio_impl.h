@@ -100,6 +100,11 @@ public:
        guest's SCL/SDA edges through a write callback and reads the master-driven
        level via these getters; it drives the line back through SetInputPin. */
     void SetWriteObserver(std::function<void()> cb) { write_obs_ = std::move(cb); }
+    void SetObserverState(std::function<void(StateWriter&)> save,
+                          std::function<void(StateReader&)> restore) {
+        obs_save_    = std::move(save);
+        obs_restore_ = std::move(restore);
+    }
     bool PinIsOutput(uint32_t pin) const { return ((gdir_ & output_mask_) >> pin) & 1u; }
     bool PinOutLevel(uint32_t pin) const { return (dr_ >> pin) & 1u; }
     bool PinInputLevel(uint32_t pin) const { return (input_level_ >> pin) & 1u; }
@@ -176,6 +181,7 @@ public:
         w.Write("input_level", input_level_);
         w.Write("driven_mask", driven_mask_);
         if constexpr (kSoc == SocId::Imx51) w.Write("edge_sel", edge_sel_);
+        if (obs_save_) obs_save_(w);
     }
     void RestoreState(StateReader& r) override {
         r.Read("dr", dr_);   r.Read("gdir", gdir_); r.Read("icr1", icr1_);
@@ -183,6 +189,7 @@ public:
         r.Read("input_level", input_level_);
         r.Read("driven_mask", driven_mask_);
         if constexpr (kSoc == SocId::Imx51) r.Read("edge_sel", edge_sel_);
+        if (obs_restore_) obs_restore_(r);
     }
 
 protected:
@@ -322,6 +329,8 @@ private:
     uint32_t output_mask_ = 0xFFFFFFFFu;
     Imx51Iomuxc* iomuxc_  = nullptr;
     std::function<void()> write_obs_;  /* fired on DR/GDIR write (bit-bang observers) */
+    std::function<void(StateWriter&)> obs_save_;
+    std::function<void(StateReader&)> obs_restore_;
     std::vector<std::function<void(uint32_t, bool)>> input_listeners_;
     std::mutex irq_mu_;
     bool irq_low_asserted_  = false;

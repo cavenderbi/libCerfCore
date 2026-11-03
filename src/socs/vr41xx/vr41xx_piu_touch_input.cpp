@@ -35,8 +35,8 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         if (!bd) return false;
         const std::string_view soc = bd->GetSocId();
-        return soc == SocId::Vr4102 || soc == SocId::Vr4111 ||
-               soc == SocId::Vr4121;
+        return (soc == SocId::Vr4102 || soc == SocId::Vr4111 || soc == SocId::Vr4121) &&
+               emu_.Get<Vr41xxPiuPanel>().HasTouchscreen();
     }
 
     void OnPenDown(int x, int y) override { Drive(true, x, y); }

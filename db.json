@@ -1649,6 +1649,60 @@
       "rom_placing_mode": "flat_container"
     },
     {
+      "id": "ibm_workpad_z50",
+      "name": "IBM WorkPad z50",
+      "soc_id": "vr4121",
+      "device_year": 1999,
+      "device_features": [
+        {
+          "feature_id": "mouse",
+          "supported": false
+        },
+        {
+          "feature_id": "keyboard",
+          "supported": false
+        },
+        {
+          "feature_id": "guest_additions",
+          "supported": false
+        },
+        {
+          "feature_id": "sound",
+          "supported": false
+        },
+        {
+          "feature_id": "mic",
+          "supported": false
+        },
+        {
+          "feature_id": "pcmcia",
+          "supported": false
+        },
+        {
+          "feature_id": "serial",
+          "supported": false
+        },
+        {
+          "feature_id": "network",
+          "supported": false
+        },
+        {
+          "feature_id": "battery",
+          "supported": false
+        },
+        {
+          "feature_id": "suspend",
+          "supported": false
+        }
+      ],
+      "notes": [],
+      "lcd_panel_size": {
+        "width": 640,
+        "height": 480
+      },
+      "rom_placing_mode": "flat_container"
+    },
+    {
       "id": "nec_sg2_vr5500",
       "name": "NEC Solution Gear 2-Vr5500",
       "soc_id": "vr5500",
@@ -2565,6 +2619,53 @@
       "board_family_id": "casio_pocketpostpet",
       "support_level": "bootable_full",
       "internal__spec_divergences": "no camera, keyboard, IrDA, 4096-colour panel, PDC phone interface"
+    },
+    {
+      "id": "ibm_workpad_z50",
+      "name": "IBM WorkPad z50",
+      "short_name": "WorkPad z50",
+      "board_family_id": "ibm_workpad_z50",
+      "support_level": "no_support"
+    },
+    {
+      "id": "ibm_workpad_z50_canada",
+      "name": "IBM WorkPad z50 (Canada)",
+      "short_name": "WorkPad z50",
+      "board_family_id": "ibm_workpad_z50",
+      "support_level": "no_support",
+      "internal__spec_divergences": "Canadian French keyboard"
+    },
+    {
+      "id": "ibm_workpad_z50_uk",
+      "name": "IBM WorkPad z50 (UK)",
+      "short_name": "WorkPad z50",
+      "board_family_id": "ibm_workpad_z50",
+      "support_level": "no_support",
+      "internal__spec_divergences": "EMEA main board, no modem, UK keyboard"
+    },
+    {
+      "id": "ibm_workpad_z50_france",
+      "name": "IBM WorkPad z50 (France)",
+      "short_name": "WorkPad z50",
+      "board_family_id": "ibm_workpad_z50",
+      "support_level": "no_support",
+      "internal__spec_divergences": "EMEA main board, no modem, French keyboard, French ROM"
+    },
+    {
+      "id": "ibm_workpad_z50_germany",
+      "name": "IBM WorkPad z50 (Germany)",
+      "short_name": "WorkPad z50",
+      "board_family_id": "ibm_workpad_z50",
+      "support_level": "no_support",
+      "internal__spec_divergences": "EMEA main board, no modem, German keyboard, German ROM"
+    },
+    {
+      "id": "ibm_workpad_z50_japan",
+      "name": "IBM WorkPad z50 (Japan)",
+      "short_name": "WorkPad z50",
+      "board_family_id": "ibm_workpad_z50",
+      "support_level": "no_support",
+      "internal__spec_divergences": "32 MB ROM, Japanese keyboard, Japanese ROM"
     },
     {
       "id": "nec_rockhopper",

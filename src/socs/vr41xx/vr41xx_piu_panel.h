@@ -31,6 +31,8 @@ public:
     virtual std::optional<uint16_t> AdPortScanSample(uint16_t port) = 0;
 
     virtual uint16_t ScreenRawXMax() const { return 1023u; }
+
+    virtual bool HasTouchscreen() const { return true; }
 };
 
 }

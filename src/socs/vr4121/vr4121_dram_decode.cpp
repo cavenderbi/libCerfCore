@@ -97,10 +97,6 @@ std::string Vr4121DramDecode::Mismatch(uint16_t cnt1, uint16_t cnt3,
         }
         return {};
     }
-    if (cnt3 & kCnt3ExtMem) {
-        return Format("BCUCNTREG3 0x%04X enables expansion memory (EXT_MEM); its decode "
-                      "is not modeled", cnt3);
-    }
     if (cnt1 & kCnt1Rd64d) {
         for (uint32_t bank = 0; bank < kBanks; ++bank) {
             const uint32_t code = RamSizeCode(ramsize, bank);
@@ -114,10 +110,10 @@ std::string Vr4121DramDecode::Mismatch(uint16_t cnt1, uint16_t cnt3,
         std::string why;
         uint32_t base = 0;
         for (uint32_t lower = 0; lower < chip.bank; ++lower) {
-            base += BankCapacity(wiring->dbus32, lower, cnt1, ramsize, why);
+            base += BankCapacity(wiring->dbus32, lower, cnt1, cnt3, ramsize, why);
             if (!why.empty()) return why;
         }
-        const uint32_t span = BankCapacity(wiring->dbus32, chip.bank, cnt1, ramsize, why);
+        const uint32_t span = BankCapacity(wiring->dbus32, chip.bank, cnt1, cnt3, ramsize, why);
         if (!why.empty()) return why;
         if (base != chip.base || span != chip.bytes) {
             return Format("bank %u decodes 0x%08X..0x%08X, not its 0x%X chip at 0x%08X "
@@ -148,15 +144,29 @@ uint32_t Vr4121DramDecode::SizeCodeBytes(bool dbus32, uint32_t code) const {
 }
 
 uint32_t Vr4121DramDecode::BankCapacity(bool dbus32, uint32_t bank, uint16_t cnt1,
-                                        uint16_t ramsize, std::string& why) const {
-    if (dbus32 && bank >= 2u) {
-        why = Format("bank %u is expansion space; its decode is not modeled", bank);
+                                        uint16_t cnt3, uint16_t ramsize,
+                                        std::string& why) const {
+    const bool expansion = dbus32 && bank >= 2u;
+    if (expansion && (cnt3 & kCnt3ExtMem) == 0u) {
+        why = Format("bank %u is expansion space and BCUCNTREG3 0x%04X leaves EXT_MEM clear",
+                     bank, cnt3);
+        return 0u;
+    }
+    const uint16_t romcs = static_cast<uint16_t>(cnt3 & kCnt3ExtRomcsMask);
+    if (expansion && romcs == kCnt3ExtRomcsRfu) {
+        why = Format("BCUCNTREG3 0x%04X sets the reserved EXT_ROMCS(3:2) code 01", cnt3);
+        return 0u;
+    }
+    if (expansion && (romcs == kCnt3ExtRomcsBothRom || (romcs == kCnt3ExtRomcsBank3Rom && bank == 3u))) {
+        why = Format("BCUCNTREG3 0x%04X assigns bank %u to ROM", cnt3, bank);
         return 0u;
     }
     if (cnt1 & kCnt1Rd64d) return SizeCodeBytes(dbus32, RamSizeCode(ramsize, bank));
-    const bool dram64 = (cnt1 & kCnt1Dram64) != 0u;
+    const bool dram64 = expansion ? (cnt3 & kCnt3ExtDram64) != 0u : (cnt1 & kCnt1Dram64) != 0u;
     if (!dram64 && emu_.Get<Vr4121BcuBoard>().Sdram()) {
-        why = Format("BCUCNTREG1 0x%04X selects 16-Mbit DRAM on an SDRAM board", cnt1);
+        why = expansion
+            ? Format("BCUCNTREG3 0x%04X selects 16-Mbit expansion DRAM on an SDRAM board", cnt3)
+            : Format("BCUCNTREG1 0x%04X selects 16-Mbit DRAM on an SDRAM board", cnt1);
         return 0u;
     }
     return dram64 ? (dbus32 ? kMb16 : kMb8) : (dbus32 ? kMb4 : kMb2);

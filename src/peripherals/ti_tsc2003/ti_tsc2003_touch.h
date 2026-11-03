@@ -9,6 +9,9 @@
 
 namespace cerfcore {
 
+class StateWriter;
+class StateReader;
+
 /* TI TSC2003 I2C touch-screen controller (datasheet SBAS162G). Ford SYNC2 APIM:
    I2C slave 0x49 (Fig.10 addr = 10010.A1.A0, strapped A1=0/A0=1) on the GPIO4
    software-I2C "HIC1:" bus, driven by the ROM's touch_tsc2003.dll (sub_C1471EA0). */
@@ -17,6 +20,7 @@ public:
     using Service::Service;
 
     bool ShouldRegister() override;
+    void OnReady() override;
 
     void SetState(uint16_t adc_x, uint16_t adc_y, bool pen_down);
 
@@ -35,12 +39,16 @@ public:
     void    WriteCommand(uint8_t cmd);   /* command byte, datasheet Fig.11 */
     uint8_t ReadResultByte();            /* next of 2 result bytes */
 
+    void SaveState(StateWriter& w);
+    void RestoreState(StateReader& r);
+
     uint16_t AdcX()    const { return adc_x_.load(std::memory_order_acquire); }
     uint16_t AdcY()    const { return adc_y_.load(std::memory_order_acquire); }
     bool     PenDown() const { return pen_down_.load(std::memory_order_acquire); }
 
 private:
     void UpdatePenIrq();
+    void DrivePenIrq();
 
     std::atomic<uint16_t> adc_x_     {0};
     std::atomic<uint16_t> adc_y_     {0};

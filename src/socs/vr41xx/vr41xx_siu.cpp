@@ -25,9 +25,9 @@ void Vr41xxSiu::OnReady() {
     TrackClock(kCmuMskSsiu);
     RefreshClocks();
 
-    auto* wiring = emu_.TryGet<Vr41xxSerialWiring>();
-    if (!wiring) return;
-    modem_ = wiring->ForSiu();
+    wiring_ = emu_.TryGet<Vr41xxSerialWiring>();
+    if (!wiring_) return;
+    modem_ = wiring_->ForSiu();
     if (!modem_) return;
 
     {
@@ -36,7 +36,7 @@ void Vr41xxSiu::OnReady() {
         LoadModemInputs(false, false, false, DcdLevel());
     }
     reset.RegisterResetReleaseListener([this] { ApplyModemInputs(); });
-    emu_.Get<Vr41xxGiu>().RegisterOutputDriveListener([this] {
+    wiring_->RegisterSupplyListener([this] {
         ApplyModemInputs();
         RefreshControlLines();
     });
@@ -68,7 +68,14 @@ void Vr41xxSiu::PushRx(const uint8_t* data, size_t n) {
 }
 
 bool Vr41xxSiu::DeliverTx(uint8_t byte) {
-    return Rs232Selected() && Uart16550::DeliverTx(byte);
+    if (Rs232Selected()) return Uart16550::DeliverTx(byte);
+    if (TransmitsOnTxd()) EmitDebugTx(byte);
+    return false;
+}
+
+bool Vr41xxSiu::TransmitsOnTxd() {
+    return (irsel_.load(std::memory_order_acquire) & kIrselSirsel) == 0u &&
+           clocks_.load(std::memory_order_acquire) == kSiuClocks;
 }
 
 bool Vr41xxSiu::ControlOutputsDriven() { return Rs232PinsLive(); }
@@ -135,9 +142,7 @@ bool Vr41xxSiu::DcdLevel() {
     return !emu_.Get<Vr41xxGiu>().GetPinLevel(Vr41xxGiu::kDcdPin);
 }
 
-bool Vr41xxSiu::SupplyOn() {
-    return emu_.Get<Vr41xxGiu>().OutputDrive(modem_->supply_gpio) == Vr41xxPinDrive::kHigh;
-}
+bool Vr41xxSiu::SupplyOn() { return wiring_->SupplyOn(); }
 
 bool Vr41xxSiu::Rs232PinsLive() {
     if (!modem_) return true;
@@ -145,11 +150,7 @@ bool Vr41xxSiu::Rs232PinsLive() {
            !suspended_.load(std::memory_order_acquire);
 }
 
-bool Vr41xxSiu::Rs232Selected() {
-    if (irsel_.load(std::memory_order_acquire) & kIrselSirsel) return false;
-    if (clocks_.load(std::memory_order_acquire) != kSiuClocks) return false;
-    return Rs232PinsLive();
-}
+bool Vr41xxSiu::Rs232Selected() { return TransmitsOnTxd() && Rs232PinsLive(); }
 
 void Vr41xxSiu::ApplyModemInputs() {
     std::lock_guard<std::mutex> lk(modem_mtx_);

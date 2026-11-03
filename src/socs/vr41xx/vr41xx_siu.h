@@ -90,6 +90,7 @@ private:
     bool SupplyOn();
     bool Rs232PinsLive();
     bool Rs232Selected();
+    bool TransmitsOnTxd();
     void ApplyModemInputs();
     void ApplyModemInputsLocked();
 
@@ -103,6 +104,7 @@ private:
     bool       connector_dsr_ = false;
 
     cerfengine::MipsInterruptChannel* channel_ = nullptr;
+    Vr41xxSerialWiring*               wiring_  = nullptr;
     std::optional<Vr41xxSerialModem>  modem_;
     std::unique_ptr<SerialCradle>     cradle_;
 };

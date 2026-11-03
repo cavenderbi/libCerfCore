@@ -8,17 +8,20 @@ namespace cerfcore {
 
 namespace {
 
-class NecMobilepro700SerialWiring : public Vr41xxSerialWiring {
+class NecMobilepro700SerialWiring : public Vr41xxGpioSuppliedSerialWiring {
 public:
-    using Vr41xxSerialWiring::Vr41xxSerialWiring;
+    using Vr41xxGpioSuppliedSerialWiring::Vr41xxGpioSuppliedSerialWiring;
 
     bool ShouldRegister() override {
         return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecMobilepro700;
     }
 
     std::optional<Vr41xxSerialModem> ForSiu() const override {
-        return Vr41xxSerialModem("COM1", 5, 14);
+        return Vr41xxSerialModem("COM1", 5);
     }
+
+protected:
+    int SupplyGpio() const override { return 14; }
 };
 
 }

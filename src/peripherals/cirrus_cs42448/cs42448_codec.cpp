@@ -1,5 +1,7 @@
 #include "cs42448_codec.h"
 
+#include <cerfcore/state/state_stream.h>
+
 namespace cerfcore {
 
 void Cs42448Codec::Reset() {
@@ -21,6 +23,14 @@ void Cs42448Codec::WriteReg(uint8_t reg, uint8_t val) {
 uint8_t Cs42448Codec::ReadReg(uint8_t reg) const {
     if (reg < kFirstReg || reg > kLastReg) return 0u;
     return reg_[reg];
+}
+
+void Cs42448Codec::SaveState(StateWriter& w) const {
+    w.WriteBytes("cs42448_reg", reg_, sizeof(reg_));
+}
+
+void Cs42448Codec::RestoreState(StateReader& r) {
+    r.ReadBytes("cs42448_reg", reg_, sizeof(reg_));
 }
 
 }

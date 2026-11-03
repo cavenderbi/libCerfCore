@@ -5,6 +5,8 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
+#include <cerfcore/state/hibernation.h>
+#include <cerfcore/state/state_stream.h>
 
 #include <utility>
 
@@ -15,6 +17,10 @@ REGISTER_SERVICE(Tsc2003Touch);
 bool Tsc2003Touch::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
     return bd && bd->GetBoardFamilyId() == BoardFamilyId::FordSyncGen2;
+}
+
+void Tsc2003Touch::OnReady() {
+    emu_.Get<Hibernation>().RegisterPostRestoreListener([this] { DrivePenIrq(); });
 }
 
 void Tsc2003Touch::SetState(uint16_t adc_x, uint16_t adc_y, bool pen_down) {
@@ -84,6 +90,30 @@ uint8_t Tsc2003Touch::ReadResultByte() {
     }
     ++read_idx_;
     return out;
+}
+
+void Tsc2003Touch::SaveState(StateWriter& w) {
+    w.Write("tsc2003_penirq_en", static_cast<uint8_t>(penirq_en_.load(std::memory_order_acquire)));
+    w.Write("tsc2003_result", result_);
+    w.Write("tsc2003_read_idx", read_idx_);
+    w.Write("tsc2003_result_valid", static_cast<uint8_t>(result_valid_));
+}
+
+void Tsc2003Touch::RestoreState(StateReader& r) {
+    uint8_t v = 0;
+    r.Read("tsc2003_penirq_en", v);
+    penirq_en_.store(v != 0u, std::memory_order_release);
+    r.Read("tsc2003_result", result_);
+    r.Read("tsc2003_read_idx", read_idx_);
+    r.Read("tsc2003_result_valid", v);
+    result_valid_ = v != 0u;
+    pen_down_.store(false, std::memory_order_release);
+}
+
+void Tsc2003Touch::DrivePenIrq() {
+    std::lock_guard<std::mutex> lk(penirq_mu_);
+    last_penirq_ = PenIrqAsserted();
+    if (penirq_obs_) penirq_obs_(last_penirq_);
 }
 
 }

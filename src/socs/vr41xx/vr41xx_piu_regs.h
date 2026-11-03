@@ -48,7 +48,9 @@ constexpr uint16_t CntReadValue(bool penstp, bool penstc, uint16_t state, uint16
                                  (static_cast<uint32_t>(state) << 10) | (cnt_cfg & kCntStored));
 }
 
-enum : uint16_t { kAdcmdTpx0 = 0x0u, kAdcmdAdin0 = 0x4u, kAdcmdAdin1 = 0x5u, kAdcmdAdin2 = 0x6u };
+enum : uint16_t {
+    kAdcmdTpx0 = 0x0u, kAdcmdAdin0 = 0x4u, kAdcmdAdin1 = 0x5u, kAdcmdAdin2 = 0x6u, kAdcmdAudioIn = 0x7u,
+};
 
 /* PIUASCNREG D1 TPPSCAN "0: ADIN(2:0)/AUDIOIN as A/D port", D0 ADPSSTART "1: Start ADPortScan"
    (VR4121 UM 20.3.6, VR4102 UM 19.3.6). */

@@ -73,6 +73,7 @@ protected:
     }
 
     bool DeliverTx(uint8_t byte) override;
+    void EmitDebugTx(uint8_t byte);
 
 private:
     std::string tx_line_;   /* host-side console accumulator, not guest state */

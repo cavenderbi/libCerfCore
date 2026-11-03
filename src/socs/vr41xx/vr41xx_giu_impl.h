@@ -148,6 +148,11 @@ public:
         for (auto& fn : drive_listeners_) fn();
     }
 
+    void RegisterPinDeviceState(std::function<void(StateWriter&)> save,
+                                std::function<void(StateReader&)> restore) override {
+        pin_device_states_.push_back({std::move(save), std::move(restore)});
+    }
+
     Vr41xxPinDrive OutputDrive(int gpio) override {
         for (const auto& a : alternates_) {
             if (gpio < a.first || gpio > a.last) continue;
@@ -244,6 +249,23 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
+        SaveRegisters(w);
+        for (const auto& d : pin_device_states_) d.save(w);
+    }
+
+    void RestoreState(StateReader& r) override {
+        RestoreRegisters(r);
+        for (const auto& d : pin_device_states_) d.restore(r);
+    }
+
+    void PostRestore() override {
+        std::lock_guard<std::mutex> lk(mtx_);
+        if constexpr (M.power_down_high != 0u) suspended_ = channel_->Suspended();
+        DriveIcuLocked();
+    }
+
+private:
+    void SaveRegisters(StateWriter& w) {
         std::lock_guard<std::mutex> lk(mtx_);
         w.Write("iosel_l", iosel_l_);    w.Write("iosel_h", iosel_h_);
         w.Write("piod_out_l", piod_out_l_); w.Write("piod_out_h", piod_out_h_);
@@ -262,7 +284,7 @@ public:
         w.Write<uint8_t>("hibernating", hibernating_ ? 1u : 0u);
     }
 
-    void RestoreState(StateReader& r) override {
+    void RestoreRegisters(StateReader& r) {
         std::lock_guard<std::mutex> lk(mtx_);
         r.Read("iosel_l", iosel_l_);    r.Read("iosel_h", iosel_h_);
         r.Read("piod_out_l", piod_out_l_); r.Read("piod_out_h", piod_out_h_);
@@ -283,13 +305,6 @@ public:
         hibernating_ = hibernating != 0u;
     }
 
-    void PostRestore() override {
-        std::lock_guard<std::mutex> lk(mtx_);
-        if constexpr (M.power_down_high != 0u) suspended_ = channel_->Suspended();
-        DriveIcuLocked();
-    }
-
-private:
     /* IOS = 0 reads the pin (VR4111 UM 19.2.3 p401 / 19.2.4 p402, VR4102 UM 18.2.4 p366,
        VR4121 UM 19.2.4 p450); IOS = 1 reads the driven data (casio_cassiopeia_e55 nk.exe
        @0x9E816BB8 lhu / ori 0x200 / sh on 0xAB000106). */
@@ -443,6 +458,12 @@ private:
         int               last;
         AlternateFunction fn;
     };
+
+    struct PinDeviceState {
+        std::function<void(StateWriter&)> save;
+        std::function<void(StateReader&)> restore;
+    };
+    std::vector<PinDeviceState> pin_device_states_;
 
     mutable std::mutex mtx_;
     Vr41xxPmu*         pmu_ = nullptr;

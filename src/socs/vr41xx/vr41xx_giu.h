@@ -8,6 +8,9 @@
 
 namespace cerfcore {
 
+class StateWriter;
+class StateReader;
+
 enum class Vr41xxPinDrive : uint8_t { kLow, kHigh, kUndriven };
 
 /* NEC VR41xx GIU (General Purpose I/O Unit): the GPIO direction/data registers plus
@@ -32,6 +35,9 @@ public:
     virtual Vr41xxPinDrive OutputDrive(int gpio) = 0;
     virtual void RegisterOutputDriveListener(std::function<void()> fn) = 0;
     virtual void NotifyOutputDriveChanged() = 0;
+
+    virtual void RegisterPinDeviceState(std::function<void(StateWriter&)> save,
+                                        std::function<void(StateReader&)> restore) = 0;
 };
 
 }

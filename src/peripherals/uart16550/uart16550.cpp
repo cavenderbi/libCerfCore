@@ -29,8 +29,12 @@ void Uart16550::DisarmLineTimer() { device_clock_->Disarm(*line_timer_); }
 
 bool Uart16550::DeliverTx(uint8_t byte) {
     if (DeliverTxToEndpoint(byte)) return true;
-    emu_.Get<KernelDebugSink>().EmitChar(static_cast<char>(byte), tx_line_, Name());
+    EmitDebugTx(byte);
     return true;
+}
+
+void Uart16550::EmitDebugTx(uint8_t byte) {
+    emu_.Get<KernelDebugSink>().EmitChar(static_cast<char>(byte), tx_line_, Name());
 }
 
 }
