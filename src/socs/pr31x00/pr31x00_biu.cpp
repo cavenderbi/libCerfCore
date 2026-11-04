@@ -5,8 +5,8 @@
 #include "pr31700_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../peripherals/peripheral_dispatcher.h"
-#include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
+#include "pr31x00_reset_line.h"
 
 #include <cstdint>
 
@@ -81,9 +81,7 @@ constexpr CsWindow kCsWindowMap[] = {
 }  /* namespace */
 
 bool Pr31x00Biu::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    if (!bd) return false;
-    const std::string_view soc = bd->GetSocId();
+    const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
     return soc == SocId::Pr31500 || soc == SocId::Pr31700;
 }
 
@@ -97,7 +95,7 @@ void Pr31x00Biu::OnReady() {
         const CsWindow& w = kCsWindowMap[i];
         cs_ports_[i] = dispatcher.InstallHalfwordPort(w.base, w.end, (reg_[0] & (1u << w.cs)) == 0u);
     }
-    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+    emu_.Get<Pr31x00ResetLine>().RegisterResetListener([this] {
         reg_ = kResetRegs;
         ApplyCsPortSizes();
     });

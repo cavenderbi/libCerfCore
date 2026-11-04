@@ -18,8 +18,7 @@ public:
     using KeyboardInput::KeyboardInput;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
     }
 
     void OnReady() override { emu_.Get<KeyboardRouter>().Register(this); }

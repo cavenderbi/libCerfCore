@@ -9,9 +9,6 @@ namespace cerfcore {
 
 namespace {
 
-/* The IT8368E INT pin reaches multi-function I/O pin 2: the nk.exe OAL interrupt
-   dispatch table at unk_91002338 maps Interrupt Status 3 bit 2 to SYSINTR $10,
-   which pcmcia.dll sub_1492478 registers through InterruptInitialize. */
 constexpr uint32_t kIt8368IntMfioPin = 2;
 
 class SharpMobilonHcPcmcia : public IteIt8368SocketHost {
@@ -20,8 +17,7 @@ public:
         : IteIt8368SocketHost(emu, "PC Card slot") {}
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
     }
 
     void OnIt8368IntLevel(bool asserted) override {

@@ -7,7 +7,7 @@
 #include <cerfcore/core/fatal.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
-#include <cerfcore/socs/guest_cpu_reset.h>
+#include "pr31x00_reset_line.h"
 #include "pr31x00_clock.h"
 #include "pr31x00_intc.h"
 #include "pr31x00_sib_audio.h"
@@ -119,9 +119,7 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        if (!bd) return false;
-        const std::string_view soc = bd->GetSocId();
+        const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
         return soc == SocId::Pr31500 || soc == SocId::Pr31700;
     }
 
@@ -134,7 +132,7 @@ public:
         emu_.Get<Pr31x00Clock>().RegisterModuleClockListener([this] { UpdateDma(); });
         /* TMPR3911 §13.6.6 p13-21 SIB Control RESET: ENCNTTEST, ENDMATEST and ENTEL..ENSIB 0,
            SNDMONO..SELSNDSF1 X; §13.6.15 p13-27 SIB DMA Control: every R/W bit 0. */
-        emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+        emu_.Get<Pr31x00ResetLine>().RegisterResetListener([this] {
             ctl_    &= kCtlResetKept;
             dma_ctl_ = 0;
             UpdateDma();
@@ -145,19 +143,12 @@ public:
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return 0x34u; }   /* $060-$093 */
 
-    /* OEMIdle polls ENSIB<0> here before stopping the CPU (nino_300 nk.exe
-       sub_9F411310 tests MEMORY[0xB0C00074] & 1 ahead of POWER_CTL STOPCPU), so
-       this read must answer. SIBIRQ<31> reports the codec IRQ input pin, active-high
-       (§13.6.6): reflect the modelled codec's pending interrupt. */
     uint32_t ReadWord(uint32_t addr) override {
         if (addr - kBase == kOffCtl) {
             uint32_t v = ctl_;
             if (codec_->IrqAsserted()) v |= kCtlSibIrq;
             return v;
         }
-        /* SF0AUX holds the subframe-0 control word and is R/W (§13.6.11); serial.dll's
-           UCB register handler sub_1EBACE8 reads it to save and restore it around a
-           transaction. */
         if (addr - kBase == kOffSf0Aux) return sf0_aux_;
         if (addr - kBase == kOffSf0Stat) return sf0_stat_;
         if (addr - kBase == kOffDmaCtl) {

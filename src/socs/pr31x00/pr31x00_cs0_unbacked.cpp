@@ -25,9 +25,7 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        if (!bd) return false;
-        const std::string_view soc = bd->GetSocId();
+        const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
         if (soc != SocId::Pr31500 && soc != SocId::Pr31700) return false;
         for (const BackedRegion& r : emu_.Get<PageTableBuilder>().BackedMemoryRegions()) {
             if (kWindowBase - r.pa_base < r.size) return false;

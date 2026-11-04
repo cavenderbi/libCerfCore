@@ -107,6 +107,7 @@ private:
     void ConsumeSleepSpan();
     int64_t CollectParkWakeDue() const;
     void DeliverWake(ResumeSource src);
+    void PowerUpClockStop();
     void TearDownPromptForHardwareWake();
 
     std::vector<std::function<void()>> power_up_listeners_;

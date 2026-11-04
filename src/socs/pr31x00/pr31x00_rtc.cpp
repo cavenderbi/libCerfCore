@@ -11,7 +11,7 @@
 #include <cerfcore/host/guest_deep_sleep.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
-#include <cerfcore/socs/guest_cpu_reset.h>
+#include "pr31x00_reset_line.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -57,9 +57,7 @@ constexpr uint32_t kPervalMask = 0xFFFFu;
 }  /* namespace */
 
 bool Pr31x00Rtc::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    if (!bd) return false;
-    const std::string_view soc = bd->GetSocId();
+    const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
     return soc == SocId::Pr31500 || soc == SocId::Pr31700;
 }
 
@@ -79,7 +77,7 @@ void Pr31x00Rtc::OnReady() {
         PerArmLocked();
     });
     /* Timer Control RESET column: every bit 0 (§15.4.3 p15-6). */
-    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+    emu_.Get<Pr31x00ResetLine>().RegisterResetListener([this] {
         bool moved;
         {
             std::lock_guard<std::mutex> lk(mtx_);

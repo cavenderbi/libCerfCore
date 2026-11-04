@@ -9,7 +9,7 @@
 #include <cerfengine/mips/mips_jit.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
-#include <cerfcore/socs/guest_cpu_reset.h>
+#include "pr31x00_reset_line.h"
 
 #include <array>
 #include <cstdint>
@@ -84,34 +84,46 @@ constexpr HighPrioTerm kHighPrio[16][2] = {
 }  /* namespace */
 
 bool Pr31x00Intc::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    if (!bd) return false;
-    const std::string_view soc = bd->GetSocId();
+    const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
     return soc == SocId::Pr31500 || soc == SocId::Pr31700;
 }
 
 void Pr31x00Intc::OnReady() {
-    jit_ = &emu_.Get<EngineBridge>().Engine().Get<cerfengine::MipsJit>();
+    jit_   = &emu_.Get<EngineBridge>().Engine().Get<cerfengine::MipsJit>();
+    reset_line_ = &emu_.Get<Pr31x00ResetLine>();
     emu_.Get<PeripheralDispatcher>().Register(this);
 
     /* Enable Interrupt 1-5 (§8.3.13-§8.3.16): "This register is not cleared upon reset;
        however, the GLOBALEN global interrupt enable bit is cleared upon reset, therefore
        disabling all interrupts." */
-    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+    reset_line_->RegisterResetListener([this] {
         std::lock_guard<std::mutex> lk(mtx_);
         enable6_ &= ~kGlobalEn;
         RecomputeLocked();
     });
     /* §8.2.2 (p.8-4): "all Clear Interrupts will be set for the duration of reset
        (thus interrupts cleared)." */
-    emu_.Get<GuestCpuReset>().RegisterResetReleaseListener([this] {
-        std::lock_guard<std::mutex> lk(mtx_);
-        for (uint32_t i = 0; i < kSets; ++i) {
-            status_[i] = free_running_[i];
-            ClearTimedLocked(i, ~0u);
-        }
-        RecomputeLocked();
-    });
+    reset_line_->RegisterReleaseListener([this] { ClearAllPending(); });
+}
+
+void Pr31x00Intc::ClearAllPending() {
+    std::lock_guard<std::mutex> lk(mtx_);
+    for (uint32_t i = 0; i < kSets; ++i) {
+        status_[i] = free_running_[i];
+        ClearTimedLocked(i, ~0u);
+    }
+    RecomputeLocked();
+}
+
+void Pr31x00Intc::DisableAllSources() {
+    std::lock_guard<std::mutex> lk(mtx_);
+    for (uint32_t i = 0; i < kSets; ++i) StoreEnableLocked(i, 0u);
+}
+
+void Pr31x00Intc::StoreEnableLocked(uint32_t set, uint32_t value) {
+    enable_[set] = value;
+    UpdateTimedPathsLocked(false);
+    RecomputeLocked();
 }
 
 /* PRIORITYMASK[15:0] enables the high priority interrupt of each level (TMPR3911 §8.3.17,
@@ -271,6 +283,7 @@ void Pr31x00Intc::SetPending(uint32_t set, uint32_t bits) {
     if (set >= kSets) {
         HaltUnsupportedAccess("PR31x00 INTC SetPending set index", set, bits);
     }
+    if (reset_line_->Resetting()) return;
     status_[set] |= bits;
     RecomputeLocked();
 }
@@ -345,9 +358,7 @@ void Pr31x00Intc::WriteWord(uint32_t addr, uint32_t value) {
         if (value & kEnableReserved[set]) {
             HaltUnsupportedAccess("PR31x00 INTC Enable reserved bits", addr, value);
         }
-        enable_[set] = value;
-        UpdateTimedPathsLocked(false);
-        RecomputeLocked();
+        StoreEnableLocked(set, value);
         std::vector<std::function<void()>> fire;
         for (const EnableListener& l : enable_listeners_) {
             if (l.set == set && (value & l.bits) != 0u) fire.push_back(l.cb);

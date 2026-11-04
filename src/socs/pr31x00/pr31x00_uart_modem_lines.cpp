@@ -13,9 +13,7 @@
 namespace cerfcore {
 
 bool Pr31x00UartModemLines::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    if (!bd) return false;
-    const std::string_view soc = bd->GetSocId();
+    const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
     return soc == SocId::Pr31500 || soc == SocId::Pr31700;
 }
 
@@ -28,8 +26,8 @@ uint32_t Pr31x00UartModemLines::Attach(const Pr31x00SerialModem* modem, ControlF
     if (!modem) return port;
     ch_[port]->modem = *modem;
     auto& io = emu_.Get<Pr31x00Io>();
-    io.RegisterMfioOutObserver([this, port](uint32_t v, uint32_t m) { OnOut(port, true, v, m); });
-    io.RegisterIoOutObserver([this, port](uint32_t v, uint32_t m) { OnOut(port, false, v, m); });
+    io.RegisterMfioOutObserver([this, port](const Pr31x00Pins& p) { OnOut(port, true, p.Low()); });
+    io.RegisterIoOutObserver([this, port](const Pr31x00Pins& p) { OnOut(port, false, p.Low()); });
     return port;
 }
 
@@ -66,21 +64,16 @@ void Pr31x00UartModemLines::Control(uint32_t port, bool& dtr, bool& rts) const {
 
 bool Pr31x00UartModemLines::AssertedLocked(const Channel& c, const Pr31x00SerialPin& p) {
     if (!p.Wired()) return false;
-    const bool     mfio = p.bank == Pr31x00SerialPin::Bank::Mfio;
-    const uint32_t dout = mfio ? c.mfio_dout : c.io_dout;
-    const uint32_t mask = mfio ? c.mfio_out_mask : c.io_out_mask;
-    const uint32_t bit  = 1u << p.pin;
-    if ((mask & bit) == 0u) return false;
-    return (dout & bit) == 0u;
+    const uint32_t low = p.bank == Pr31x00SerialPin::Bank::Mfio ? c.mfio_low : c.io_low;
+    return (low & (1u << p.pin)) != 0u;
 }
 
-void Pr31x00UartModemLines::OnOut(uint32_t port, bool mfio, uint32_t dout, uint32_t out_mask) {
+void Pr31x00UartModemLines::OnOut(uint32_t port, bool mfio, uint32_t low) {
     Channel& c = Ch(port);
     bool     dtr, rts;
     {
         std::lock_guard<std::mutex> lk(c.mu);
-        (mfio ? c.mfio_dout : c.io_dout)         = dout;
-        (mfio ? c.mfio_out_mask : c.io_out_mask) = out_mask;
+        (mfio ? c.mfio_low : c.io_low) = low;
         dtr = AssertedLocked(c, c.modem.dtr);
         rts = AssertedLocked(c, c.modem.rts);
         if (dtr == c.dtr && rts == c.rts) return;
@@ -92,21 +85,17 @@ void Pr31x00UartModemLines::OnOut(uint32_t port, bool mfio, uint32_t dout, uint3
 
 void Pr31x00UartModemLines::SaveState(uint32_t port, StateWriter& w) {
     const Channel& c = Ch(port);
-    uint32_t mfio_dout, mfio_mask, io_dout, io_mask;
+    uint32_t mfio_low, io_low;
     uint8_t  dtr, rts;
     {
         std::lock_guard<std::mutex> lk(c.mu);
-        mfio_dout = c.mfio_dout;
-        mfio_mask = c.mfio_out_mask;
-        io_dout   = c.io_dout;
-        io_mask   = c.io_out_mask;
-        dtr       = c.dtr ? 1u : 0u;
-        rts       = c.rts ? 1u : 0u;
+        mfio_low = c.mfio_low;
+        io_low   = c.io_low;
+        dtr      = c.dtr ? 1u : 0u;
+        rts      = c.rts ? 1u : 0u;
     }
-    w.Write("mfio_dout", mfio_dout);
-    w.Write("mfio_mask", mfio_mask);
-    w.Write("io_dout", io_dout);
-    w.Write("io_mask", io_mask);
+    w.Write("mfio_low", mfio_low);
+    w.Write("io_low", io_low);
     w.Write("dtr", dtr);
     w.Write("rts", rts);
 }
@@ -114,10 +103,8 @@ void Pr31x00UartModemLines::SaveState(uint32_t port, StateWriter& w) {
 void Pr31x00UartModemLines::RestoreState(uint32_t port, StateReader& r) {
     Channel& c = Ch(port);
     std::lock_guard<std::mutex> lk(c.mu);
-    r.Read("mfio_dout", c.mfio_dout);
-    r.Read("mfio_mask", c.mfio_out_mask);
-    r.Read("io_dout", c.io_dout);
-    r.Read("io_mask", c.io_out_mask);
+    r.Read("mfio_low", c.mfio_low);
+    r.Read("io_low", c.io_low);
     uint8_t b = 0;
     r.Read("dtr", b); c.dtr = b != 0;
     r.Read("rts", b); c.rts = b != 0;

@@ -11,9 +11,6 @@ namespace cerfcore {
 
 namespace {
 
-/* Win32 VK -> matrix cell (device_code = col*16+row), inverted from
-   keybddr.dll's (col,row)->VK table dword_14B1058 (sub_14B195C indexes by
-   rawcode, sub_14B2C0C default case: VK == table byte). */
 constexpr std::array<uint8_t, 256> MakeVkToCell() {
     std::array<uint8_t, 256> m{};
     for (auto& e : m) e = 0xFFu;
@@ -60,8 +57,7 @@ public:
     using KeyboardMap::KeyboardMap;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
     }
 
     void OnReady() override {

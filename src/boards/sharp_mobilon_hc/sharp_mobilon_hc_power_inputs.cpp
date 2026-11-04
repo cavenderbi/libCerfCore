@@ -14,8 +14,7 @@ public:
     using Pr31x00PowerInputs::Pr31x00PowerInputs;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
     }
 
     bool PwrIntAsserted() const override {

@@ -9,6 +9,7 @@
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
+#include "pr31x00_reset_line.h"
 #include "pr31x00_clock_crystal.h"
 
 #include <cstdint>
@@ -68,12 +69,11 @@ void Pr31x00Clock::OnReady() {
     emu_.Get<MipsEngineBridge>().RegisterRestoreListener([this] {
         SetCoreRate(config_->ReducedFrequency());
     });
-    auto& reset = emu_.Get<GuestCpuReset>();
-    reset.RegisterResetListener([this](ResetLineKind) {
+    emu_.Get<Pr31x00ResetLine>().RegisterResetListener([this] {
         ctl_   = kCserSel;
         power_ = 0;
     });
-    reset.RegisterResetReleaseListener([this] {
+    emu_.Get<GuestCpuReset>().RegisterResetReleaseListener([this] {
         SetCoreRate(0u);
         for (auto& fn : video_listeners_) fn();
         NotifyModuleClocks();

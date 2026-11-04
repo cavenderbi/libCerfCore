@@ -8,7 +8,7 @@
 #include <cerfcore/host/host_presentation.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
-#include <cerfcore/socs/guest_cpu_reset.h>
+#include "pr31x00_reset_line.h"
 #include "pr31x00_clock.h"
 #include "pr31x00_intc.h"
 
@@ -113,7 +113,7 @@ void Pr31x00Lcd::OnReady() {
         OnScanSourceClockChange();
         RearmLoad();
     });
-    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+    emu_.Get<Pr31x00ResetLine>().RegisterResetListener([this] {
         std::lock_guard<std::mutex> lk(state_mtx_);
         StopScanLocked();
         reg_[kCtl1]         &= kCtl1ResetKept;
@@ -320,8 +320,6 @@ uint32_t Pr31x00Lcd::ReadWord(uint32_t addr) {
             if (edged) ScanEdgesRan();
             return value;
         }
-        /* $034 is write-only (§17.4.4) but latches: nk.exe sub_91002514
-           read-modify-writes it (v0[13] &= 0xFF0FFFFF). */
         case kCtl4: return reg_[kCtl4];
         default:
             /* Video Control 2 and 3 are write-only (§17.4.2, §17.4.3). */
@@ -368,9 +366,6 @@ void Pr31x00Lcd::WriteRegLocked(uint32_t addr, uint32_t value, uint64_t now) {
             SyncScanLocked(now);
             ScheduleFreezeLocked(now);
             if (was_live && ScanLiveLocked() && cp_changed) cp_rate_changed_ = true;
-            /* Fire only on the ENVID 0->1 edge: the OAL programs VIDEO_CTL2's
-               HORZVAL/LINEVAL before it sets ENVID (nk.exe sub_9F434078), so an
-               earlier or per-write call would size the window from a stale CTL2. */
             if (!was_enabled && (reg_[kCtl1] & kEnVid)) enabled_edge_ = true;
             return;
         }

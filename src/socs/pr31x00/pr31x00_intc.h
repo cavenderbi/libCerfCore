@@ -11,6 +11,8 @@ namespace cerfengine { class MipsJit; }
 
 namespace cerfcore {
 
+class Pr31x00ResetLine;
+
 class Pr31x00IntcTimedSource {
 public:
     virtual void Settle()                = 0;
@@ -50,6 +52,8 @@ public:
     /* Deassert a source's request: a device that resets or loses power drops its
        interrupt line along with the data behind it. */
     void ClearPending(uint32_t set, uint32_t bits);
+    void ClearAllPending();
+    void DisableAllSources();
 
     void SetSourceFreeRunning(uint32_t set, uint32_t bits, bool active);
 
@@ -88,7 +92,8 @@ private:
     struct TimedSource { uint32_t set; uint32_t bit; Pr31x00IntcTimedSource* src; bool open; };
     std::vector<TimedSource> timed_sources_;
 
-    cerfengine::MipsJit* jit_ = nullptr;
+    cerfengine::MipsJit* jit_   = nullptr;
+    Pr31x00ResetLine*    reset_line_ = nullptr;
 
     bool     IrqLowFor(const uint32_t* status) const;
     bool     IrqHighFor(const uint32_t* status) const;
@@ -98,6 +103,7 @@ private:
     void     LatchTimedLocked();
     void     ClearTimedLocked(uint32_t set, uint32_t bits);
     void     UpdateTimedPathsLocked(bool force);
+    void     StoreEnableLocked(uint32_t set, uint32_t value);
     void RecomputeLocked();
 };
 

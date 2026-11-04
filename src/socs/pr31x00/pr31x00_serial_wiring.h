@@ -20,9 +20,6 @@ struct Pr31x00SerialPin {
     static Pr31x00SerialPin OnIo(int p)   { return {Bank::Io, p}; }
 };
 
-/* Every line is active low: an asserted line reads its pin LOW, so a wiring that
-   drops the inversion leaves the guest seeing carrier and CTS permanently asserted
-   (Velo SET_DTR sub_1EB2E30 clears IODOUT<3>, CLR_DTR sub_1EB2DC0 sets it). */
 struct Pr31x00SerialModem {
     std::string      label;
     Pr31x00SerialPin cts, dcd, dsr, ri;   /* inputs: an endpoint drives these */

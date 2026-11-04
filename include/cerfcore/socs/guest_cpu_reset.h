@@ -60,6 +60,8 @@ public:
 
     bool DeliveredResetWasResume() const { return delivered_is_resume_; }
     bool LineHeld() const { return line_held_; }
+    bool Delivering() const { return delivering_.load(std::memory_order_acquire); }
+    ResetLineKind DeliveringKind() const { return delivering_kind_.load(std::memory_order_acquire); }
 
     void SaveState(StateWriter& w) const;
     void RestoreState(StateReader& r);
@@ -72,6 +74,8 @@ private:
     std::atomic<bool>                               pending_is_resume_{false};
     bool                                            delivered_is_resume_ = false;
     bool                                            line_held_           = false;
+    std::atomic<bool>                               delivering_{false};
+    std::atomic<ResetLineKind>                      delivering_kind_{ResetLineKind::Other};
 };
 
 }

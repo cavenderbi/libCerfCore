@@ -38,10 +38,8 @@ private:
 
         mutable std::mutex mu;
 
-        uint32_t mfio_dout     = 0;
-        uint32_t mfio_out_mask = 0;
-        uint32_t io_dout       = 0;
-        uint32_t io_out_mask   = 0;
+        uint32_t mfio_low = 0;
+        uint32_t io_low   = 0;
 
         bool dtr = false;
         bool rts = false;
@@ -49,7 +47,7 @@ private:
 
     Channel&       Ch(uint32_t port);
     const Channel& Ch(uint32_t port) const;
-    void           OnOut(uint32_t port, bool mfio, uint32_t dout, uint32_t out_mask);
+    void           OnOut(uint32_t port, bool mfio, uint32_t low);
     void           DriveInput(const Pr31x00SerialPin& p, bool asserted);
     static bool    AssertedLocked(const Channel& c, const Pr31x00SerialPin& p);
 

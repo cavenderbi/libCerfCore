@@ -48,10 +48,6 @@ private:
 
     uint32_t cs_ports_[kCsWindows] = {};
 
-    /* Non-zero resets: MEM_CONFIG2 CS0ACCVAL1<7:4>/CS0ACCVAL2<3:0> = $F (§4.7.3);
-       MEM_CONFIG4 MEMPOWERDOWN<16> = 1 (§4.7.5). CS0SIZE<0> follows the TESTAIU
-       strap (§4.7.1), strapped high here: CS0 is a 32-bit port of two 16-bit ROMs,
-       so nk.exe's flash-ID stub sees one JEDEC id replicated across both halves. */
     static constexpr std::array<uint32_t, kRegs> kResetRegs = {1u, 0u, 0xFFu, 0u, 1u << 16};
 
     std::array<uint32_t, kRegs> reg_ = kResetRegs;

@@ -6,6 +6,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
+#include "pr31x00_reset_line.h"
 
 #include <cstdint>
 
@@ -18,22 +19,24 @@ constexpr uint32_t kBase = 0x10C000E0u;
 
 /* §11.4.1: EMPTY<30> read-only, reset 1 (TX holding + shift empty). */
 constexpr uint32_t kEmpty = 1u << 30;
-/* §11.4.1: ENMBUS<1> module enable; with it clear the module is idle. */
-constexpr uint32_t kEnMbus = 1u << 1;
+constexpr uint32_t kEnMbus = 1u << 0;
 /* §11.4.1: ENDMARX<16>..bit0 are R/W; 28-17 reserved, 31-29 read-only. */
 constexpr uint32_t kWritable = 0x0001FFFFu;
+
+constexpr uint32_t kCtlReset = 0u;
 
 class Pr31x00Magicbus : public Peripheral {
 public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        if (!bd) return false;
-        const std::string_view soc = bd->GetSocId();
+        const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
         return soc == SocId::Pr31500 || soc == SocId::Pr31700;
     }
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        emu_.Get<PeripheralDispatcher>().Register(this);
+        emu_.Get<Pr31x00ResetLine>().RegisterResetListener([this] { ctl_ = kCtlReset; });
+    }
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return 0x4u; }
@@ -60,7 +63,7 @@ public:
     void RestoreState(StateReader& r) override { r.Read("ctl", ctl_); }
 
 private:
-    uint32_t ctl_ = 0;
+    uint32_t ctl_ = kCtlReset;
 };
 
 }  /* namespace */

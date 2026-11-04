@@ -14,6 +14,7 @@
 #include "pr31x00_clock.h"
 #include "pr31x00_intc.h"
 #include "pr31x00_power_inputs.h"
+#include "pr31x00_reset_line.h"
 #include "pr31x00_rtc.h"
 
 #include <atomic>
@@ -52,18 +53,15 @@ constexpr uint32_t kStpIntStatusSet = 4u;
 constexpr uint32_t kStpTimerInt     = 1u << 28;
 constexpr uint32_t kStpCounterMask  = 0xFu;
 
-constexpr uint32_t kCauseNone = 0;
-constexpr uint32_t kCauseWarm = 1;
-constexpr uint32_t kCauseCold = 2;
+constexpr uint32_t kPowerUp   = kPwrCs | kVccOn | kForceShutDwn;
+constexpr uint32_t kAfterPon  = kColdStart | kPowerUp;
 
 class Pr31x00Power : public Peripheral, public ResetCauseLatch, public DeepSleepClockStop {
 public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        if (!bd) return false;
-        const std::string_view soc = bd->GetSocId();
+        const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
         return soc == SocId::Pr31500 || soc == SocId::Pr31700;
     }
     void OnReady() override {
@@ -74,14 +72,10 @@ public:
         stp_event_ = clock_->Add([this] { OnStopTimerMatch(); });
         rtc_->RegisterCountListener([this] { ArmStopTimerEvent(); });
         emu_.Get<PeripheralDispatcher>().Register(this);
-        auto& reset = emu_.Get<GuestCpuReset>();
-        reset.SetCauseLatch(this);
-        /* TMPR3911 §12.3.1 printed 12-12 RESET column: every writable field 0 except
-           STPTIMERVAL (X) and COLDSTART. */
-        reset.RegisterResetListener([this](ResetLineKind) {
-            ctl_.fetch_and(kStpTimerVal, std::memory_order_acq_rel);
+        emu_.Get<GuestCpuReset>().SetCauseLatch(this);
+        emu_.Get<Pr31x00ResetLine>().RegisterResetListener([this] {
+            ctl_.store((Ctl() & kStpTimerVal) | kAfterPon, std::memory_order_release);
             DisarmStopTimer();
-            ApplyResetCause();
         });
         auto& sleep = emu_.Get<GuestDeepSleep>();
         sleep.RegisterClockStopWaker(this);
@@ -107,16 +101,12 @@ public:
     }
 
     void OnPowerUp() override {
-        ctl_.fetch_or(kPwrCs | kVccOn | kForceShutDwn, std::memory_order_acq_rel);
+        ctl_.fetch_or(kPowerUp, std::memory_order_acq_rel);
     }
 
-    /* "COLDSTART: This bit is set by RESET" (§12.3.1, p.12-14). */
-    void LatchColdReset() override { pending_cause_.store(kCauseCold, std::memory_order_release); }
-    void LatchWarmReset() override { pending_cause_.store(kCauseWarm, std::memory_order_release); }
-
-    void LatchWatchdogReset() override {
-        HaltUnsupportedAccess("PR31x00 Power watchdog reset cause", kBase, Ctl());
-    }
+    void LatchColdReset() override {}
+    void LatchWarmReset() override {}
+    void LatchWatchdogReset() override {}
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return kSize; }
@@ -156,8 +146,13 @@ public:
 
         /* TMPR3911 §12.3.1 p.12-14: "When powering down the system, [VCCON] must be
            cleared simultaneously with the PWRCS bit." */
+        const uint32_t power_pair = next & (kVccOn | kPwrCs);
+        if (power_pair != 0u && power_pair != (kVccOn | kPwrCs)) {
+            emu_.Get<Fatal>().Die("Pr31x00Power: write 0x%08X leaves only one of VCCON and PWRCS set",
+                                  value);
+        }
         const bool was_on = (prev & (kVccOn | kPwrCs)) != 0u;
-        const bool now_off = (next & (kVccOn | kPwrCs)) == 0u;
+        const bool now_off = power_pair == 0u;
         const bool stop_cpu = (next & kStopCpu) != 0u;
         if (was_on && now_off) {
             if (stop_cpu) {
@@ -182,7 +177,6 @@ public:
 
     void SaveState(StateWriter& w) override {
         w.Write("ctl", Ctl()); w.Write("signals", signals_);
-        w.Write("pending_cause", pending_cause_.load(std::memory_order_acquire));
         w.Write<uint8_t>("stp_armed", stp_armed_ ? 1u : 0u);
         w.Write<uint32_t>("stp_count", stp_armed_ ? StopTimerCount() : 0u);
     }
@@ -191,9 +185,6 @@ public:
         r.Read("ctl", ctl);
         ctl_.store(ctl, std::memory_order_release);
         r.Read("signals", signals_);
-        uint32_t cause = kCauseNone;
-        r.Read("pending_cause", cause);
-        pending_cause_.store(cause, std::memory_order_release);
         uint8_t armed = 0;
         r.Read("stp_armed", armed);
         uint32_t count = 0;
@@ -209,16 +200,6 @@ public:
 
 private:
     uint32_t Ctl() const { return ctl_.load(std::memory_order_acquire); }
-
-    void ApplyResetCause() {
-        switch (pending_cause_.exchange(kCauseNone, std::memory_order_acq_rel)) {
-            case kCauseCold: ctl_.fetch_or(kColdStart, std::memory_order_acq_rel);   return;
-            case kCauseWarm: ctl_.fetch_and(~kColdStart, std::memory_order_acq_rel); return;
-            default:
-                HaltUnsupportedAccess("PR31x00 Power reset delivered with no cause latched",
-                                      kBase, Ctl());
-        }
-    }
 
     uint32_t StopTimerValue() const { return (Ctl() & kStpTimerVal) >> kStpTimerValShift; }
 
@@ -273,12 +254,10 @@ private:
         return (signals_ & kPwrOk) != 0u && intc_->EnabledInterruptPending();
     }
 
-    std::atomic<uint32_t> ctl_{kColdStart};
+    std::atomic<uint32_t> ctl_{kAfterPon};
 
     uint32_t signals_ = kPwrOk;
     bool     wake_at_entry_ = false;
-
-    std::atomic<uint32_t> pending_cause_{kCauseNone};
 
     Pr31x00Intc* intc_ = nullptr;
     Pr31x00PowerInputs* power_inputs_ = nullptr;

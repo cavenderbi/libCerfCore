@@ -10,10 +10,6 @@ namespace cerfcore {
 
 namespace {
 
-/* UART A ($0B0) is the built-in serial port (serial.dll HWInit sub_14755F0,
-   config index 0). CTS=IODIN<6> DCD=IODIN<4> (GetModemStatus sub_1474830:
-   bit6->EV_CTS, bit4->EV_DSR|EV_RLSD); SET_DTR sub_1474EAC clears MFIODOUT<12>,
-   SET_RTS sub_1474F48 clears IODOUT<5> (IO_CTL bit 0x2000). */
 constexpr uint32_t kUartA = 0x10C000B0u;
 
 class SharpMobilonHcSerialWiring : public Pr31x00SerialWiring {
@@ -21,8 +17,7 @@ public:
     using Pr31x00SerialWiring::Pr31x00SerialWiring;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
     }
 
     std::optional<Pr31x00SerialModem> ForUart(uint32_t mmio_base) const override {

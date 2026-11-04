@@ -8,8 +8,7 @@
 namespace cerfcore {
 
 bool SharpMobilonHcBattery::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
+    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
 }
 
 void SharpMobilonHcBattery::OnReady() {

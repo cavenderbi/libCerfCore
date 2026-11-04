@@ -207,8 +207,7 @@ void GuestDeepSleep::DeliverWake(ResumeSource src) {
         for (auto& fn : user_wake_inputs_) fn();
     }
     if (clock_stop_) {
-        clock_stop_->OnPowerUp();
-        for (auto& fn : power_up_listeners_) fn();
+        PowerUpClockStop();
         emu_.Get<GuestPowerNotifier>().NotifyResume(src);
         emu_.Get<EngineBridge>().Guest().ExitDeepSleep();
         return;
@@ -257,7 +256,13 @@ void GuestDeepSleep::Recover() {
             static_cast<int>(c));
         return;
     }
+    if (c == ShutdownChoice::SoftReset && clock_stop_) PowerUpClockStop();
     emu_.Get<ShutdownAction>().Perform(c);
+}
+
+void GuestDeepSleep::PowerUpClockStop() {
+    clock_stop_->OnPowerUp();
+    for (auto& fn : power_up_listeners_) fn();
 }
 
 }

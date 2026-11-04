@@ -41,8 +41,7 @@ public:
     using Ucb1x00SibBoard::Ucb1x00SibBoard;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
     }
 
     uint16_t AuxAdc(uint8_t channel) override {

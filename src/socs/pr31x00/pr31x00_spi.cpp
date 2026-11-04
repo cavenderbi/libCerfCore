@@ -6,6 +6,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
+#include "pr31x00_reset_line.h"
 #include "pr31x00_intc.h"
 #include "pr31x00_spi_slave.h"
 
@@ -28,11 +29,8 @@ constexpr uint32_t kCtlRsvdOrRo = 0xFFFF00C8u;
 constexpr uint32_t kCtlSpion    = 0x00020000u;
 constexpr uint32_t kCtlEmpty    = 0x00010000u;
 constexpr uint32_t kCtlEnSpi    = 0x00000001u;
+constexpr uint32_t kCtlReset    = 0x00000000u;
 
-/* SPIBUFAVAILINT = Interrupt Status 5 bit 21 (R3912.H:424; Status 5 = INTC set 4):
-   the transmit-buffer-available LEVEL the guest busy-polls before loading TXDATA
-   (§14.3.2). Free-running while ENSPI, NOT a per-byte event - a per-byte SetPending
-   leaves each later byte's poll (sub_1EBD700) unasserted and hangs. */
 constexpr uint32_t kStatus5Set     = 4u;
 constexpr uint32_t kSpiBufAvailInt = 1u << 21;
 
@@ -41,12 +39,17 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        if (!bd) return false;
-        const std::string_view soc = bd->GetSocId();
+        const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
         return soc == SocId::Pr31500 || soc == SocId::Pr31700;
     }
-    void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
+    void OnReady() override {
+        intc_ = &emu_.Get<Pr31x00Intc>();
+        emu_.Get<PeripheralDispatcher>().Register(this);
+        emu_.Get<Pr31x00ResetLine>().RegisterResetListener([this] {
+            ctl_ = kCtlReset;
+            PublishBufAvail();
+        });
+    }
 
     uint32_t MmioBase() const override { return kBase; }
     uint32_t MmioSize() const override { return 0x8u; }
@@ -75,16 +78,12 @@ public:
     void WriteWord(uint32_t addr, uint32_t value) override {
         switch (addr - kBase) {
             case kOffCtl:
-                /* SPION and EMPTY are read-only status; serial.dll sub_1EBD514 clears
-                   ENSPI with a read-modify-write of CTL that reads them back, and a
-                   write to a read-only bit is ignored (§14.3.1). */
                 value &= ~(kCtlSpion | kCtlEmpty);
                 if (value & kCtlRsvdOrRo) {
                     HaltUnsupportedAccess("PR31x00 SPI CTL reserved bit", addr, value);
                 }
                 ctl_ = value & kCtlWritable;
-                emu_.Get<Pr31x00Intc>().SetSourceFreeRunning(
-                    kStatus5Set, kSpiBufAvailInt, (ctl_ & kCtlEnSpi) != 0u);
+                PublishBufAvail();
                 return;
 
             /* A TXDATA write loads the Transmitter Holding Register and clocks the
@@ -119,9 +118,12 @@ public:
     }
 
 private:
-    /* Every writable field resets to 0 (§14.3.1); DELAYVAL and BAUDRATE reset
-       undefined and are taken as 0. */
-    uint32_t ctl_ = 0x00000000u;
+    void PublishBufAvail() {
+        intc_->SetSourceFreeRunning(kStatus5Set, kSpiBufAvailInt, (ctl_ & kCtlEnSpi) != 0u);
+    }
+
+    Pr31x00Intc* intc_ = nullptr;
+    uint32_t     ctl_  = kCtlReset;
 };
 
 }  /* namespace */

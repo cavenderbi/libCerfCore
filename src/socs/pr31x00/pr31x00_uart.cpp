@@ -9,7 +9,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
 #include "../../peripherals/peripheral_dispatcher.h"
-#include <cerfcore/socs/guest_cpu_reset.h>
+#include "pr31x00_reset_line.h"
 #include <cerfcore/host/host_widget_registry.h>
 #include "../../peripherals/serial/serial_cradle.h"
 #include "../../peripherals/serial/serial_endpoint.h"
@@ -30,15 +30,9 @@ constexpr uint32_t kOffDmaCtl2  = 0x0Cu;   /* write-only */
 constexpr uint32_t kOffDmaCount = 0x10u;   /* read-only */
 constexpr uint32_t kOffData     = 0x14u;   /* write TXHOLD, read RXHOLD */
 
-/* UART Control 2 (§16.5.2), write-only: Baud Rate = f_UARTCLK / ((BAUDRATE + 1) * 16).
-   The field is BAUDRATE[10:0] on the TMPR3912 parts and [9:0] on the TMPR3911, and the
-   PR31700 carries the TMPR3912 internal function register map (R3912.H). */
-constexpr uint32_t kCtl2BaudMask = 0x000007FFu;
+constexpr uint32_t kCtl2BaudMask = 0x000003FFu;
 constexpr uint64_t kClocksPerBaud = 16u;
 
-/* UART DMA Control 1 (§16.5.3): DMASTARTVAL[31:2] is the DMA buffer's physical
-   address; bits 1-0 reserved. DMA Control 2 (§16.5.4): DMALENGTH[15:0], which carries
-   the buffer length MINUS ONE (§16.2.4), so serial.dll's 511 is a 512-byte buffer. */
 constexpr uint32_t kDmaCtl1Reserved = 0x00000003u;
 constexpr uint32_t kDmaCtl2Reserved = 0xFFFF0000u;
 constexpr uint32_t kDmaLenMask      = 0x0000FFFFu;
@@ -49,10 +43,6 @@ constexpr uint32_t kTxBreak        = 1u << 8;
 constexpr uint32_t kTxDataMask     = 0x000000FFu;
 constexpr uint32_t kTxHoldReserved = 0xFFFFFE00u;
 
-/* UART Control 1 (§16.5.1): UARTON<31> EMPTY<30> PRXHOLDFULL<29> RXHOLDFULL<28>
-   are read-only; ENUART<0> and the frame-format bits are R/W. EMPTY and DISTXD<6>
-   are the only two bits that reset to 1, and UARTON reads 0 while the module is
-   off - nk.exe sub_9F411310 stops the CPU only when it is. */
 constexpr uint32_t kCtl1Reset = (1u << 30) | (1u << 6);
 
 constexpr uint32_t kCtl1Uarton      = 1u << 31;
@@ -81,9 +71,7 @@ constexpr uint32_t kCtl1TwoStop    = 1u << 5;
 }  /* namespace */
 
 bool Pr31x00Uart::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    if (!bd) return false;
-    const std::string_view soc = bd->GetSocId();
+    const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
     return soc == SocId::Pr31500 || soc == SocId::Pr31700;
 }
 
@@ -114,13 +102,13 @@ void Pr31x00Uart::OnReady() {
     emu_.Get<PeripheralDispatcher>().Register(this);
     /* Control 2, DMA Control 1 / 2 and DMA Count RESET X (TMPR3911 §16.5.2-16.5.5 p16-14,
        p16-15). */
-    auto& reset = emu_.Get<GuestCpuReset>();
-    reset.RegisterResetListener([this](ResetLineKind) {
+    auto& reset_line = emu_.Get<Pr31x00ResetLine>();
+    reset_line.RegisterResetListener([this] {
         { std::lock_guard<std::mutex> lk(mu_); ctl1_ = kCtl1Reset & kCtl1Writable; }
         dma_->ResetLine(dma_port_);
         tx_->ResetLine(tx_port_);
     });
-    reset.RegisterResetReleaseListener([this] { FireLineConfig(); });
+    reset_line.RegisterReleaseListener([this] { FireLineConfig(); });
 
     if (auto* wiring = emu_.TryGet<Pr31x00SerialWiring>()) modem_ = wiring->ForUart(MmioBase());
     modem_lines_ = &emu_.Get<Pr31x00UartModemLines>();
@@ -128,9 +116,6 @@ void Pr31x00Uart::OnReady() {
                                         [this](bool dtr, bool rts) { NotifyControlLines(dtr, rts); });
     if (!modem_) return;
 
-    /* No endpoint is attached yet. The lines are active low, so leaving their pins
-       at the 0 they reset to reads as CTS and carrier already asserted - on the Velo
-       that also fires the driver's carrier-detect system event (sub_1EB2750). */
     SetModemInputs(false, false, false, false);
 
     cradle_ = std::make_unique<SerialCradle>(emu_, *this, modem_->label);
@@ -166,9 +151,6 @@ uint32_t Pr31x00Uart::ReadWord(uint32_t addr) {
             return v;
         }
 
-        /* DMA_COUNT (§16.5.5), read-only: the receive DMA's own address counter. The
-           driver adds it to the buffer base to find the write offset and copies up to
-           there (serial.dll sub_1EB2620), keeping its read cursor privately. */
         case kOffDmaCount: return dma_->Count(dma_port_);
 
         default: HaltUnsupportedAccess("PR31x00 UART ReadWord", addr, 0);

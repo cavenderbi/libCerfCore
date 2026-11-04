@@ -20,16 +20,15 @@ public:
     using Service::Service;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::PhilipsNino;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::PhilipsNino;
     }
 
     void OnReady() override {
-        emu_.Get<Pr31x00Io>().RegisterMfioOutObserver([this](uint32_t dout, uint32_t out_mask) {
+        emu_.Get<Pr31x00Io>().RegisterMfioOutObserver([this](const Pr31x00Pins& pins) {
             using Pin = Ucb1x00Codec::ResetPin;
-            const Pin level = (out_mask & kMfioCodecReset) == 0u ? Pin::Floating
-                              : (dout & kMfioCodecReset) != 0u   ? Pin::High
-                                                                 : Pin::Low;
+            const Pin level = (pins.Low() & kMfioCodecReset) != 0u    ? Pin::Low
+                              : (pins.driven & kMfioCodecReset) != 0u ? Pin::High
+                                                                      : Pin::Floating;
             emu_.Get<Ucb1x00Codec>().DriveResetPin(level);
         });
     }

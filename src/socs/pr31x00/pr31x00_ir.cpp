@@ -5,8 +5,10 @@
 #include "pr31700_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../peripherals/peripheral_dispatcher.h"
+#include <cerfcore/host/guest_deep_sleep.h>
 #include <cerfcore/state/state_stream.h>
 #include "pr31x00_intc.h"
+#include "pr31x00_reset_line.h"
 
 #include <cstdint>
 
@@ -43,14 +45,39 @@ constexpr uint32_t kNegCarInt     = 1u << 14;
 }  /* namespace */
 
 bool Pr31x00Ir::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    if (!bd) return false;
-    const std::string_view soc = bd->GetSocId();
+    const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
     return soc == SocId::Pr31500 || soc == SocId::Pr31700;
 }
 
 void Pr31x00Ir::OnReady() {
+    intc_ = &emu_.Get<Pr31x00Intc>();
     emu_.Get<PeripheralDispatcher>().Register(this);
+    auto& reset_line = emu_.Get<Pr31x00ResetLine>();
+    reset_line.RegisterResetListener([this] {
+        rxpwr_at_reset_ = RxPwr();
+        ctl1_           = kCtl1Reset;
+        powered_down_   = false;
+    });
+    reset_line.RegisterReleaseListener([this] { NotifyRxPwrIfChanged(rxpwr_at_reset_); });
+    auto& sleep = emu_.Get<GuestDeepSleep>();
+    sleep.RegisterSleepEntryListener([this] { SetPoweredDown(true); });
+    sleep.RegisterPowerUpListener([this] { SetPoweredDown(false); });
+}
+
+bool Pr31x00Ir::RxPwr() const { return !powered_down_ && (ctl1_ & kCtl1RxPwr) != 0u; }
+
+void Pr31x00Ir::NotifyRxPwr() {
+    for (auto& cb : rxpwr_observers_) cb(RxPwr());
+}
+
+void Pr31x00Ir::NotifyRxPwrIfChanged(bool was) {
+    if (RxPwr() != was) NotifyRxPwr();
+}
+
+void Pr31x00Ir::SetPoweredDown(bool powered_down) {
+    const bool was = RxPwr();
+    powered_down_  = powered_down;
+    NotifyRxPwrIfChanged(was);
 }
 
 uint32_t Pr31x00Ir::ReadWord(uint32_t addr) {
@@ -70,31 +97,31 @@ void Pr31x00Ir::WriteWord(uint32_t addr, uint32_t value) {
     if (value & kCtl1Unmodeled) {
         HaltUnsupportedAccess("PR31x00 IR_CTL1 arms the IR state machines", addr, value);
     }
-    const uint32_t old = ctl1_;
-    ctl1_ = value & kCtl1Writable;   /* CARDET is read-only */
-    if (((old ^ ctl1_) & kCtl1RxPwr) != 0u) {
-        for (auto& cb : rxpwr_observers_) cb((ctl1_ & kCtl1RxPwr) != 0u);
-    }
+    const bool was = RxPwr();
+    ctl1_ = value & kCtl1Writable;
+    NotifyRxPwrIfChanged(was);
 }
 
 void Pr31x00Ir::RegisterRxPwrObserver(RxPwrObserver cb) {
-    cb((ctl1_ & kCtl1RxPwr) != 0u);
+    cb(RxPwr());
     rxpwr_observers_.push_back(std::move(cb));
 }
 
 void Pr31x00Ir::DriveCarDetInput(bool level) {
     const bool old = cardet_.exchange(level, std::memory_order_acq_rel);
     if (old == level) return;
-    emu_.Get<Pr31x00Intc>().SetPending(kStatus5Set, level ? kPosCarInt : kNegCarInt);
+    intc_->SetPending(kStatus5Set, level ? kPosCarInt : kNegCarInt);
 }
 
 void Pr31x00Ir::SaveState(StateWriter& w) {
     w.Write("ctl1", ctl1_);
+    w.Write("powered_down", powered_down_);
     w.Write<uint8_t>("cardet", cardet_.load(std::memory_order_acquire) ? 1u : 0u);
 }
 
 void Pr31x00Ir::RestoreState(StateReader& r) {
     r.Read("ctl1", ctl1_);
+    r.Read("powered_down", powered_down_);
     uint8_t cardet = 0;
     r.Read("cardet", cardet);
     cardet_.store(cardet != 0u, std::memory_order_release);

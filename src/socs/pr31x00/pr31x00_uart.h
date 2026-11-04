@@ -51,23 +51,13 @@ public:
 protected:
     virtual const char* TxSource() const = 0;
 
-    /* Interrupt Status 2 UARTRXINT bit, verified from serial.dll sub_1861B3C
-       (UART A RX-int mask 0x80000000, UART B 0x200000) + nk.exe OAL table
-       0x9F433AD4 (Status2 bit 31 -> SYSINTR 12). */
     virtual uint32_t RxIntBit() const = 0;
 
     /* TMPR3911 §8.3.2 (page 8-8): Interrupt Status 2 UARTARXOVERRUNINT<30> / UARTBRXOVERRUNINT<20>. */
     virtual uint32_t RxOverrunIntBit() const = 0;
 
-    /* Interrupt Status 2 UARTAEMPTYINT/UARTBEMPTYINT bit (TMPR3911 §8.3.2: THR
-       and Transmit Shift Register both empty). serial.dll paces byte-by-byte
-       PIO TX on it (sub_1862158 checks Status2 & this bit), so it must fire per
-       drained TX byte or interrupt-driven TX stalls after byte 1. */
     virtual uint32_t TxEmptyIntBit() const = 0;
 
-    /* Interrupt Status 2 UARTATXINT<26>/UARTBTXINT<16> (TMPR3911 §8.3.2);
-       serial.dll PutBytes TX-pace mask [HWObj+0x94]=0x04000000/0x00010000
-       (sub_1861B3C). */
     virtual uint32_t TxAvailIntBit() const = 0;
 
     /* Interrupt Status 2 UARTADMAFULLINT<23>/UARTBDMAFULLINT<13> and

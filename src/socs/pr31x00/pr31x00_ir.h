@@ -9,6 +9,8 @@
 
 namespace cerfcore {
 
+class Pr31x00Intc;
+
 /* Philips PR31x00 IR Module, TMPR3911/3912 ch.10. */
 class Pr31x00Ir : public Peripheral {
 public:
@@ -41,7 +43,17 @@ public:
     void RestoreState(StateReader& r) override;
 
 private:
-    uint32_t          ctl1_ = 0;
+    static constexpr uint32_t kCtl1Reset = 0u;
+
+    bool RxPwr() const;
+    void NotifyRxPwr();
+    void NotifyRxPwrIfChanged(bool was);
+    void SetPoweredDown(bool powered_down);
+
+    Pr31x00Intc*      intc_            = nullptr;
+    uint32_t          ctl1_            = kCtl1Reset;
+    bool              powered_down_    = false;
+    bool              rxpwr_at_reset_  = false;
     std::atomic<bool> cardet_{false};
 
     std::vector<RxPwrObserver> rxpwr_observers_;

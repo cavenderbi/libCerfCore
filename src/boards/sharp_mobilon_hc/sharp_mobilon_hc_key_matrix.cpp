@@ -9,16 +9,11 @@
 namespace cerfcore {
 
 namespace {
-/* Matrix interrupt line = MFIO pin 13 (SPINPOSINT, Interrupt Status 3 bit 13,
-   tx39icureg.h:247) -> SYSINTR 8. Its EOI handler (nk.exe 0x91024244) delivers to
-   keybddr only while MFIODIN ($18C) bit 13 reads high; a Status 3 bit set with the
-   pin low is dropped (v0=0). */
 constexpr uint32_t kSpinMfioPin = 13;
 }  /* namespace */
 
 bool SharpMobilonHcKeyMatrix::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
+    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
 }
 
 void SharpMobilonHcKeyMatrix::OnReady() {

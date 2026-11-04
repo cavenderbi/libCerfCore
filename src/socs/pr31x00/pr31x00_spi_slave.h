@@ -9,10 +9,6 @@ namespace cerfcore {
 class StateWriter;
 class StateReader;
 
-/* A device on the PR31x00 SPI bus (TMPR3911/3912 ch.14). The SPI module serves a
-   RXDATA read from the attached slave; the slave raises SPIRCVINT through the INTC
-   while it has a character ready, which is how serial.dll's SPI IST (SYSINTR on
-   SPIRCVINT) knows to read RXDATA. */
 class Pr31x00SpiSlave : public Service {
 public:
     using Service::Service;

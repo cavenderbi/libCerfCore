@@ -20,14 +20,18 @@ constexpr uint32_t kSdaPin = 20;
 constexpr uint32_t kScl    = 1u << kSclPin;
 constexpr uint32_t kSda    = 1u << kSdaPin;
 
+bool Line(const Pr31x00Pins& pins, uint32_t bit) {
+    return (pins.Low() & bit) == 0u;
+}
+
 class PhilipsVelo1DramCard : public Pr31x00MfioSlave {
 public:
     using Pr31x00MfioSlave::Pr31x00MfioSlave;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::PhilipsVelo1 &&
-               FindPhilipsVelo1DramCard(bd->GetBoardId()) != nullptr;
+        auto& bd = emu_.Get<BoardContext>();
+        return bd.GetBoardFamilyId() == BoardFamilyId::PhilipsVelo1 &&
+               FindPhilipsVelo1DramCard(bd.GetBoardId()) != nullptr;
     }
 
     void OnReady() override {
@@ -37,10 +41,8 @@ public:
         DriveSda(true);
     }
 
-    void OnMfioOut(uint32_t mfio_dout, uint32_t out_mask) override {
-        const bool scl = (out_mask & kScl) == 0u || (mfio_dout & kScl) != 0u;
-        const bool sda = (out_mask & kSda) == 0u || (mfio_dout & kSda) != 0u;
-        target_->OnLines(scl, sda);
+    void OnMfioOut(const Pr31x00Pins& pins) override {
+        target_->OnLines(Line(pins, kScl), Line(pins, kSda));
     }
 
     void SaveState(StateWriter& w) override {
