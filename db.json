@@ -1774,7 +1774,7 @@
         },
         {
           "feature_id": "sound",
-          "supported": false
+          "supported": true
         },
         {
           "feature_id": "network",
@@ -1786,7 +1786,7 @@
         },
         {
           "feature_id": "mic",
-          "supported": false
+          "supported": true
         }
       ],
       "notes": [
