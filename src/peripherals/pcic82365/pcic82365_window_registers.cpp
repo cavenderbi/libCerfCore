@@ -26,6 +26,7 @@ constexpr uint8_t kWinIoMap1Enable  = 0x80u;
 constexpr uint8_t kMohRegActive    = 0x40u;
 constexpr uint8_t kMohWriteProtect = 0x80u;
 constexpr uint8_t kMshDataSize16   = 0x80u;
+constexpr uint8_t kMemStartHighSlot = 1u;
 constexpr uint8_t kMemEndHighSlot  = 3u;
 
 constexpr uint8_t kIoCtlDataSize     = 0x01u;
@@ -47,7 +48,8 @@ bool IsIoOffsetReg(uint8_t index) {
 
 bool Pcic82365WindowRegisters::Owns(uint8_t index) const {
     if (index == kRegWindowEnable || index == kRegIoWindowControl) return true;
-    if (IsIoMapReg(index) || IsMemMapReg(index) || IsIoOffsetReg(index)) return true;
+    if (IsIoMapReg(index) || IsMemMapReg(index)) return true;
+    if (IsIoOffsetReg(index)) return rules_.io_offset_registers;
     return rules_.window_page_registers && index >= kRegMemPageFirst && index <= kRegMemPageLast;
 }
 
@@ -82,10 +84,15 @@ bool Pcic82365WindowRegisters::Read(uint8_t index, uint8_t* value) const {
 bool Pcic82365WindowRegisters::Store(uint8_t index, uint8_t value) {
     if (!Owns(index)) return false;
     if (index == kRegWindowEnable) {
+        if (rules_.reserved_bits_halt && (value & rules_.window_enable_reserved) != 0u) return false;
         reg_window_enable_ = static_cast<uint8_t>(value & ~rules_.window_enable_reserved);
     } else if (index == kRegIoWindowControl) {
+        if (rules_.reserved_bits_halt && (value & rules_.io_control_reserved) != 0u) return false;
         reg_io_window_control_ = value;
     } else if (IsMemMapReg(index)) {
+        if (rules_.reserved_bits_halt && (index & 7u) == kMemStartHighSlot &&
+            (value & rules_.memory_start_high_reserved) != 0u)
+            return false;
         if ((index & 7u) == kMemEndHighSlot)
             value = static_cast<uint8_t>(value & ~rules_.memory_end_high_reserved);
         mem_reg_[(index - kRegMemMapFirst) >> 3][index & 7u] = value;
@@ -197,8 +204,9 @@ bool Pcic82365WindowRegisters::SixteenBitWindowDecodes(uint32_t bus_off, unsigne
 void Pcic82365WindowRegisters::WindowPages(int win, uint32_t* start, uint32_t* end) const {
     const uint8_t* r = mem_reg_[win];
     const uint32_t pg = static_cast<uint32_t>(mem_page_[win]) << 12;
-    *start = pg | static_cast<uint32_t>(r[0]) | (static_cast<uint32_t>(r[1] & 0x0Fu) << 8);
-    *end   = pg | static_cast<uint32_t>(r[2]) | (static_cast<uint32_t>(r[3] & 0x0Fu) << 8);
+    const uint8_t high = rules_.memory_address_high_mask;
+    *start = pg | static_cast<uint32_t>(r[0]) | (static_cast<uint32_t>(r[1] & high) << 8);
+    *end   = pg | static_cast<uint32_t>(r[2]) | (static_cast<uint32_t>(r[3] & high) << 8);
 }
 
 void Pcic82365WindowRegisters::SaveState(StateWriter& w) const {

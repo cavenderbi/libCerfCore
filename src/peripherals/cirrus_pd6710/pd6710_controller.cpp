@@ -87,6 +87,8 @@ constexpr ExcaPartRules kExcaRules = [] {
     rules.outputs_require_card = true;
     rules.ring_indicate_masks_status_change = false;
     rules.irq_select_reserved = 0x2146u;
+    rules.io_offset_registers = true;
+    rules.memory_address_high_mask = 0x0Fu;
     return rules;
 }();
 

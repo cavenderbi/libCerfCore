@@ -14,6 +14,11 @@ struct ExcaWindowRules {
     uint8_t memory_end_high_reserved;
     uint8_t io_offset_low_reserved;
     bool    window_page_registers;
+    bool    io_offset_registers;
+    uint8_t memory_address_high_mask;
+    uint8_t io_control_reserved;
+    bool    reserved_bits_halt;
+    uint8_t memory_start_high_reserved;
 };
 
 class Pcic82365WindowRegisters {
@@ -28,6 +33,7 @@ public:
     void ResetConfiguration();
 
     uint8_t WindowEnable() const { return reg_window_enable_; }
+    void    DisableWindows() { reg_window_enable_ = 0u; }
 
     bool MapIo(uint32_t bus_io, uint32_t* card_io, PcmciaIoWidth* width) const;
     bool MapMem(uint32_t bus_off, uint32_t* card_addr,

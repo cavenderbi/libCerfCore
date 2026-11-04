@@ -60,6 +60,18 @@ struct ExcaPartRules {
     bool card_inputs_high_without_vcc;
     bool ring_indicate_masks_status_change;
     uint16_t irq_select_reserved;
+    bool io_offset_registers;
+    uint8_t memory_address_high_mask;
+    uint8_t interrupt_control_reserved;
+    uint8_t interrupt_control_reset;
+    uint8_t removal_resets_interrupt_control;
+    bool removal_resets_power_control;
+    bool removal_resets_window_enable;
+    bool vcc_requires_card;
+    uint8_t io_control_reserved;
+    bool reserved_bits_halt;
+    uint8_t memory_start_high_reserved;
+    uint8_t status_change_reserved;
 };
 
 class Pcic82365 {
@@ -67,7 +79,10 @@ public:
     explicit Pcic82365(ExcaPartRules rules)
         : rules_(rules),
           windows_({rules.window_enable_reserved, rules.memory_end_high_reserved,
-                    rules.io_offset_low_reserved, rules.window_page_registers}) {}
+                    rules.io_offset_low_reserved, rules.window_page_registers,
+                    rules.io_offset_registers, rules.memory_address_high_mask,
+                    rules.io_control_reserved, rules.reserved_bits_halt,
+                    rules.memory_start_high_reserved}) {}
 
     void CardDetectChanged(bool present, ExcaWriteEffect* effect);
     void RequestVccFromSocketControl(bool vcc_on, ExcaWriteEffect* effect);

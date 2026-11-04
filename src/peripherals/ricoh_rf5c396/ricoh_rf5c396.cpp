@@ -5,22 +5,12 @@
 #include "../../boards/nec_mobilepro_700/nec_mobilepro_700_family_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
-#include <cerfcore/host/host_widget_registry.h>
-#include <cerfcore/state/state_stream.h>
-#include "../pcmcia/pcmcia_host_cycles.h"
 
 namespace cerfcore {
 
 namespace {
 
-constexpr uint32_t kPortIndex = 0x0u;
-constexpr int      kSockets   = 2;
-
-constexpr unsigned kIndexBankShift = 6u;
-constexpr uint8_t  kIndexSubMask   = 0x3Fu;
-
-constexpr uint8_t kRegInterfaceStatus = 0x01u;
-constexpr uint8_t kIfsGpiInverted     = 0x80u;
+constexpr uint8_t kIfsGpiInverted = 0x80u;
 
 constexpr uint8_t kIntrCscToIntr    = 0x10u;
 constexpr uint8_t kNoIrqSelect      = 0x00u;
@@ -52,6 +42,8 @@ constexpr ExcaPartRules kExcaRules = [] {
     rules.outputs_require_card = false;
     rules.ring_indicate_masks_status_change = true;
     rules.irq_select_reserved = 0x2146u;
+    rules.io_offset_registers = true;
+    rules.memory_address_high_mask = 0x0Fu;
     return rules;
 }();
 
@@ -62,11 +54,7 @@ constexpr unsigned kMemcs16FullDecode    = 12u;
 }
 
 RicohRf5c396::RicohRf5c396(CerfEmulator& emu)
-    : Service(emu),
-      slot0_(emu, *this, "PCMCIA #1"),
-      slot1_(emu, *this, "PCMCIA #2"),
-      exca0_(kExcaRules),
-      exca1_(kExcaRules) {}
+    : IsaExcaSocketPair(emu, kExcaRules, "PCMCIA #1", "PCMCIA #2") {}
 
 bool RicohRf5c396::FittedOnFamily(std::string_view family) {
     return family == BoardFamilyId::NecMobilepro700 || family == BoardFamilyId::NecCronos3e;
@@ -78,34 +66,14 @@ bool RicohRf5c396::ShouldRegister() {
 
 void RicohRf5c396::OnReady() {
     board_ = &emu_.Get<RicohRf5c396Board>();
-    auto& reg = emu_.Get<HostWidgetRegistry>();
-    reg.Register(&slot0_);
-    reg.Register(&slot1_);
-    sequencer_.Run([this] {
-        return ExcaSocketUpdates{{ {&slot0_, ExcaWriteEffect::SocketOff()},
-                                   {&slot1_, ExcaWriteEffect::SocketOff()} }};
-    });
-    auto& reset = emu_.Get<GuestCpuReset>();
-    reset.RegisterResetListener([this](ResetLineKind) { ResetController(); });
-    reset.RegisterResetReleaseListener([this] {
-        std::lock_guard<std::mutex> lk(state_mutex_);
-        UpdateIrqLineLocked();
-    });
+    StartSockets();
 }
 
-void RicohRf5c396::ResetController() {
-    sequencer_.Run([this] {
-        std::lock_guard<std::mutex> lk(state_mutex_);
-        index_ = 0u;
-        exca0_.Reset();
-        exca1_.Reset();
-        chip_.Reset();
-        ApplyChipModesLocked();
-        TrackGpiLocked(0);
-        TrackGpiLocked(1);
-        return ExcaSocketUpdates{{ {&slot0_, ExcaWriteEffect::SocketOff()},
-                                   {&slot1_, ExcaWriteEffect::SocketOff()} }};
-    });
+void RicohRf5c396::ResetChipLocked() {
+    chip_.Reset();
+    ApplyChipModesLocked();
+    TrackGpiLocked(0);
+    TrackGpiLocked(1);
 }
 
 void RicohRf5c396::ApplyChipModesLocked() {
@@ -113,37 +81,6 @@ void RicohRf5c396::ApplyChipModesLocked() {
         Exca(b).SetExplicitStatusClear(chip_.ExplicitStatusClear());
         Exca(b).SetConfigurationResetOnRemoval(chip_.ConfigurationResetOnRemoval(b));
     }
-}
-
-uint8_t RicohRf5c396::ReadPcicByte(uint32_t port) {
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    if (port == kPortIndex) {
-        if ((index_ >> kIndexBankShift) >= kSockets)
-            return floating_.Read8("RF5C396 index register", port);
-        return index_;
-    }
-    const uint8_t result = ReadDataLocked(port);
-    UpdateIrqLineLocked();
-    return result;
-}
-
-void RicohRf5c396::WritePcicByte(uint32_t port, uint8_t value) {
-    if (port == kPortIndex) {
-        std::lock_guard<std::mutex> lk(state_mutex_);
-        index_ = value;
-        return;
-    }
-    sequencer_.Run([&] {
-        ExcaSocketUpdates updates{};
-        std::lock_guard<std::mutex> lk(state_mutex_);
-        const int bank = index_ >> kIndexBankShift;
-        if (bank >= kSockets)
-            return updates;
-        WriteDataLocked(bank, value, &updates[0].effect);
-        updates[0].slot = &Slot(bank);
-        UpdateIrqLineLocked();
-        return updates;
-    });
 }
 
 bool RicohRf5c396::GpiLowLocked(int bank) {
@@ -158,39 +95,28 @@ void RicohRf5c396::TrackGpiLocked(int bank) {
         Exca(bank).LatchGpiChange();
 }
 
-uint8_t RicohRf5c396::ReadDataLocked(uint32_t port) {
-    const int bank = index_ >> kIndexBankShift;
-    if (bank >= kSockets)
-        return floating_.Read8("RF5C396 data register", port);
-    const uint8_t sub = index_ & kIndexSubMask;
-    uint8_t v = 0u;
-    if (chip_.Read(bank, sub, &v))
-        return v;
-    if (!Exca(bank).ReadReg(sub, &v))
-        emu_.Get<Fatal>().Die("[RF5C396] read of INDEX 0x%02X, a register the RF5C396 does not document", index_);
-    if (sub == kRegInterfaceStatus && GpiLowLocked(bank))
-        v |= kIfsGpiInverted;
-    return v;
+uint8_t RicohRf5c396::IndexReadLocked(uint32_t port) {
+    if ((IndexLocked() >> 6) >= kSockets)
+        return Floating().Read8("RF5C396 index register", port);
+    return IndexLocked();
 }
 
-void RicohRf5c396::WriteDataLocked(int bank, uint8_t value, ExcaWriteEffect* effect) {
-    const uint8_t sub = index_ & kIndexSubMask;
-    if (RicohRf5c396ChipRegisters::Owns(sub)) {
-        WriteChipRegisterLocked(bank, sub, value, effect);
-        return;
-    }
-    if (!Exca(bank).Owns(sub))
-        emu_.Get<Fatal>().Die("[RF5C396] write 0x%02X to INDEX 0x%02X, a register the RF5C396 does not document",
-                              value, index_);
-    if (!Exca(bank).WriteReg(sub, value, effect))
-        emu_.Get<Fatal>().Die("[RF5C396] INDEX 0x%02X value 0x%02X selects a reserved power or IRQ code",
-                              index_, value);
+uint8_t RicohRf5c396::UnbankedDataReadLocked(uint32_t port) {
+    return Floating().Read8("RF5C396 data register", port);
 }
 
-void RicohRf5c396::WriteChipRegisterLocked(int bank, uint8_t sub, uint8_t value, ExcaWriteEffect* effect) {
+bool RicohRf5c396::ChipReadLocked(int bank, uint8_t sub, uint8_t* value) {
+    return chip_.Read(bank, sub, value);
+}
+
+uint8_t RicohRf5c396::InterfaceStatusLocked(int bank, uint8_t exca_status) {
+    return GpiLowLocked(bank) ? static_cast<uint8_t>(exca_status | kIfsGpiInverted) : exca_status;
+}
+
+void RicohRf5c396::ChipWriteLocked(int bank, uint8_t sub, uint8_t value, ExcaWriteEffect* effect) {
     using Regs = RicohRf5c396ChipRegisters;
     if (const char* refused = chip_.Write(bank, sub, value))
-        emu_.Get<Fatal>().Die("[RF5C396] INDEX 0x%02X value 0x%02X %s", index_, value, refused);
+        emu_.Get<Fatal>().Die("[RF5C396] INDEX 0x%02X value 0x%02X %s", IndexLocked(), value, refused);
     if (sub == Regs::kRegCardDetectControl) {
         if ((value & Regs::kCdcSoftwareCardDetect) != 0u) Exca(bank).SoftwareCardDetect();
         if (!chip_.GpiEnabled(bank)) Exca(bank).ClearGpiChange();
@@ -200,34 +126,11 @@ void RicohRf5c396::WriteChipRegisterLocked(int bank, uint8_t sub, uint8_t value,
         Exca(bank).SetInterfaceIsolated(chip_.InterfaceDisabled(bank), effect);
 }
 
-bool RicohRf5c396::DecodeMem(uint32_t off, CardMemHit* hit) {
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    for (int b = 0; b < kSockets; ++b) {
-        if (Exca(b).MapMem(off, &hit->addr, &hit->attribute, &hit->writable, &hit->sixteen_bit)) {
-            hit->bank = b;
-            hit->addr = chip_.CardAddressHighLines(b, hit->addr);
-            hit->isolated = chip_.InterfaceDisabled(b);
-            return true;
-        }
-    }
-    return false;
+uint32_t RicohRf5c396::CardAddressLocked(int bank, uint32_t card_addr) const {
+    return chip_.CardAddressHighLines(bank, card_addr);
 }
 
-bool RicohRf5c396::DecodeIo(uint32_t off, CardIoHit* hit) {
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    for (int b = 0; b < kSockets; ++b) {
-        if (Exca(b).MapIo(off, &hit->io, &hit->width)) {
-            hit->bank = b;
-            hit->isolated = chip_.InterfaceDisabled(b);
-            hit->inpack_gated = chip_.InpackEnabled(b);
-            return true;
-        }
-    }
-    return false;
-}
-
-bool RicohRf5c396::Memcs16Asserted(uint32_t off) {
-    std::lock_guard<std::mutex> lk(state_mutex_);
+bool RicohRf5c396::Memcs16AssertedLocked(uint32_t off) {
     for (int b = 0; b < kSockets; ++b) {
         const unsigned shift = (Exca(b).WindowEnable() & kWinMemcs16FullDecode) != 0u
             ? kMemcs16FullDecode : kMemcs16UpperDecode;
@@ -236,111 +139,14 @@ bool RicohRf5c396::Memcs16Asserted(uint32_t off) {
     return false;
 }
 
-uint8_t RicohRf5c396::ReadCardMem8(uint32_t off) {
-    CardMemHit hit;
-    if (!DecodeMem(off, &hit) || hit.isolated)
-        return floating_.Read8("RF5C396 ISA memory", off);
-    const uint8_t card = static_cast<uint8_t>(
-        ReadCardMemory(Slot(hit.bank), hit.addr, hit.attribute, hit.sixteen_bit, 1u));
-    if (!hit.sixteen_bit && (off & 1u) != 0u && Memcs16Asserted(off))
-        return floating_.Read8("RF5C396 high lane of an 8-bit window cycle", off);
-    return card;
-}
-
-uint16_t RicohRf5c396::ReadCardMem16(uint32_t off) {
-    CardMemHit hit;
-    if (!DecodeMem(off, &hit) || hit.isolated)
-        return floating_.Read16("RF5C396 ISA memory", off);
-    if (hit.sixteen_bit)
-        return static_cast<uint16_t>(ReadCardMemory(Slot(hit.bank), hit.addr, hit.attribute, true, 2u));
-    if (!Memcs16Asserted(off))
-        return static_cast<uint16_t>(ReadCardMemory(Slot(hit.bank), hit.addr, hit.attribute, false, 2u));
-    const uint32_t low = ReadCardMemory(Slot(hit.bank), hit.addr, hit.attribute, false, 1u);
-    const uint32_t high = floating_.Read8("RF5C396 high byte of an 8-bit window cycle", off + 1u);
-    return static_cast<uint16_t>(low | (high << 8));
-}
-
-void RicohRf5c396::WriteCardMem8(uint32_t off, uint8_t value) {
-    CardMemHit hit;
-    if (!DecodeMem(off, &hit)) {
-        floating_.Write("RF5C396 ISA memory", 8u, off);
-        return;
-    }
-    if (!hit.writable || hit.isolated)
-        return;
-    WriteCardMemory(Slot(hit.bank), hit.addr, hit.attribute, hit.sixteen_bit, 1u, value);
-}
-
-void RicohRf5c396::WriteCardMem16(uint32_t off, uint16_t value) {
-    CardMemHit hit;
-    if (!DecodeMem(off, &hit)) {
-        floating_.Write("RF5C396 ISA memory", 16u, off);
-        return;
-    }
-    if (!hit.writable || hit.isolated)
-        return;
-    if (hit.sixteen_bit) {
-        WriteCardMemory(Slot(hit.bank), hit.addr, hit.attribute, true, 2u, value);
-        return;
-    }
-    if (!Memcs16Asserted(off)) {
-        WriteCardMemory(Slot(hit.bank), hit.addr, hit.attribute, false, 2u, value);
-        return;
-    }
-    WriteCardMemory(Slot(hit.bank), hit.addr, hit.attribute, false, 1u, value & 0xFFu);
-}
-
-uint32_t RicohRf5c396::MaskFloppyStatusBit7(int bank, uint32_t off, uint32_t value, unsigned bytes) {
-    std::lock_guard<std::mutex> lk(state_mutex_);
+uint32_t RicohRf5c396::MaskIoReadLocked(int bank, uint32_t off, uint32_t value, unsigned bytes) {
     for (unsigned lane = 0; lane < bytes; ++lane) {
         if (!chip_.DisablesDataBit7(bank, off + lane)) continue;
         const uint32_t bit = static_cast<uint32_t>(kDataBit7) << (8u * lane);
-        const uint32_t floating = static_cast<uint32_t>(floating_.Read8("RF5C396 data bit 7", off + lane)) << (8u * lane);
+        const uint32_t floating = static_cast<uint32_t>(Floating().Read8("RF5C396 data bit 7", off + lane)) << (8u * lane);
         value = (value & ~bit) | (floating & bit);
     }
     return value;
-}
-
-uint8_t RicohRf5c396::ReadCardIo8(uint32_t off) {
-    CardIoHit hit;
-    if (!DecodeIo(off, &hit) || hit.isolated)
-        return floating_.Read8("RF5C396 ISA I/O", off);
-    const uint32_t v = ReadCardIo(Slot(hit.bank), hit.io, hit.width, 1u);
-    if (hit.inpack_gated && !Slot(hit.bank).InputAcknowledge(hit.io))
-        return floating_.Read8("RF5C396 I/O read without INPACK#", off);
-    return static_cast<uint8_t>(MaskFloppyStatusBit7(hit.bank, off, v, 1u));
-}
-
-uint16_t RicohRf5c396::ReadCardIo16(uint32_t off) {
-    CardIoHit hit;
-    if (!DecodeIo(off, &hit) || hit.isolated)
-        return floating_.Read16("RF5C396 ISA I/O", off);
-    const uint32_t v = ReadCardIo(Slot(hit.bank), hit.io, hit.width, 2u);
-    if (hit.inpack_gated && !Slot(hit.bank).InputAcknowledge(hit.io))
-        return floating_.Read16("RF5C396 I/O read without INPACK#", off);
-    return static_cast<uint16_t>(MaskFloppyStatusBit7(hit.bank, off, v, 2u));
-}
-
-void RicohRf5c396::WriteCardIo8(uint32_t off, uint8_t value) {
-    CardIoHit hit;
-    if (!DecodeIo(off, &hit)) {
-        floating_.Write("RF5C396 ISA I/O", 8u, off);
-        return;
-    }
-    if (hit.isolated)
-        return;
-    WriteCardIo(Slot(hit.bank), hit.io, hit.width, 1u, value);
-}
-
-void RicohRf5c396::WriteCardIo16(uint32_t off, uint16_t value) {
-    CardIoHit hit;
-    if (!DecodeIo(off, &hit)) {
-        floating_.Write("RF5C396 ISA I/O", 16u, off);
-        return;
-    }
-    if (hit.isolated)
-        return;
-    WriteCardIo(Slot(hit.bank), hit.io, hit.width, 2u, value);
 }
 
 bool RicohRf5c396::CardInterruptLocked(int bank) {
@@ -387,83 +193,10 @@ void RicohRf5c396::UpdateIrqLineLocked() {
     board_->SetIrqLevel(pending || !steered);
 }
 
-void RicohRf5c396::OnCardDetectChanged(PcmciaSlot& slot) {
-    sequencer_.Run([&] {
-        ExcaSocketUpdates updates{};
-        std::lock_guard<std::mutex> lk(state_mutex_);
-        const int bank = BankOf(slot);
-        Exca(bank).CardDetectChanged(slot.HasCard(), &updates[0].effect);
-        TrackGpiLocked(bank);
-        updates[0].slot = &slot;
-        UpdateIrqLineLocked();
-        return updates;
-    });
-}
-
-void RicohRf5c396::OnReadyIreqLow(PcmciaSlot& slot) {
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    Exca(BankOf(slot)).SetReadyIreqLow(true);
-    UpdateIrqLineLocked();
-}
-
-void RicohRf5c396::OnReadyIreqHigh(PcmciaSlot& slot) {
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    Exca(BankOf(slot)).SetReadyIreqLow(false);
-    UpdateIrqLineLocked();
-}
-
-void RicohRf5c396::SaveState(StateWriter& w) {
-    {
-        std::lock_guard<std::mutex> lk(state_mutex_);
-        w.Write("index", index_);
-        chip_.SaveGlobal(w);
-    }
-    for (int bank = 0; bank < kSockets; ++bank) {
-        w.BeginFrame(static_cast<uint32_t>(bank));
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            chip_.SaveBank(w, bank);
-            Exca(bank).SaveState(w);
-        }
-        Slot(bank).SaveSlotState(w);
-        w.EndFrame();
-    }
-}
-
-void RicohRf5c396::RestoreState(StateReader& r) {
-    {
-        std::lock_guard<std::mutex> lk(state_mutex_);
-        r.Read("index", index_);
-        chip_.RestoreGlobal(r);
-    }
-    for (int bank = 0; bank < kSockets; ++bank) {
-        if (const uint32_t frame = r.EnterFrame(); frame != static_cast<uint32_t>(bank))
-            r.Reject("RF5C396 socket frame 0x%X where this build writes socket %d", frame, bank);
-        {
-            std::lock_guard<std::mutex> lk(state_mutex_);
-            chip_.RestoreBank(r, bank);
-            Exca(bank).RestoreState(r);
-        }
-        Slot(bank).RestoreSlotState(r);
-        r.LeaveFrame();
-    }
-    std::lock_guard<std::mutex> lk(state_mutex_);
+void RicohRf5c396::AfterRestoreLocked() {
     ApplyChipModesLocked();
     gpi_low_[0] = GpiLowLocked(0);
     gpi_low_[1] = GpiLowLocked(1);
-}
-
-void RicohRf5c396::PostRestore() {
-    sequencer_.Run([this] {
-        std::lock_guard<std::mutex> lk(state_mutex_);
-        return ExcaSocketUpdates{{
-            {&slot0_, ExcaWriteEffect::Outputs(exca0_.OutputsEnabled())},
-            {&slot1_, ExcaWriteEffect::Outputs(exca1_.OutputsEnabled())} }};
-    });
-    slot0_.PostRestoreSlot();
-    slot1_.PostRestoreSlot();
-    std::lock_guard<std::mutex> lk(state_mutex_);
-    UpdateIrqLineLocked();
 }
 
 REGISTER_SERVICE(RicohRf5c396);

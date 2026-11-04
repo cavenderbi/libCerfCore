@@ -53,7 +53,8 @@ Pcic82365::SocketDrive Pcic82365::Drive() const {
     const bool auto_power = rules_.auto_power && (reg_power_control_ & kPwrAutoPower) != 0u;
     d.vcc = rules_.socket_control_power
         ? vcc_request_
-        : (reg_power_control_ & kPwrVccPower) != 0u && (!auto_power || card_present_);
+        : (reg_power_control_ & kPwrVccPower) != 0u && (!auto_power || card_present_) &&
+              (!rules_.vcc_requires_card || card_present_);
     d.outputs = (reg_power_control_ & kPwrOutputEnable) != 0u &&
                 (!rules_.outputs_require_card || card_present_) && !isolated_;
     d.reset_released = d.outputs && (reg_interrupt_and_gen_ctrl_ & kIntrCardReset) != 0u;
@@ -146,7 +147,14 @@ void Pcic82365::CardDetectChanged(bool present, ExcaWriteEffect* effect) {
 
 void Pcic82365::ApplyCardDetect(bool present) {
     card_present_ = present;
-    if (!present && configuration_reset_on_removal_) ResetConfiguration();
+    if (!present) {
+        if (rules_.removal_resets_power_control) reg_power_control_ = 0u;
+        const uint8_t fields = rules_.removal_resets_interrupt_control;
+        reg_interrupt_and_gen_ctrl_ = static_cast<uint8_t>((reg_interrupt_and_gen_ctrl_ & ~fields) |
+                                                           (rules_.interrupt_control_reset & fields));
+        if (rules_.removal_resets_window_enable) windows_.DisableWindows();
+        if (configuration_reset_on_removal_) ResetConfiguration();
+    }
     LatchIfEnabled(kCscDetectChange);
 }
 
@@ -164,7 +172,8 @@ void Pcic82365::SetInterfaceIsolated(bool on, ExcaWriteEffect* effect) {
 }
 
 void Pcic82365::ResetConfiguration() {
-    reg_interrupt_and_gen_ctrl_ = static_cast<uint8_t>(reg_interrupt_and_gen_ctrl_ & kIntrCscToIntr);
+    reg_interrupt_and_gen_ctrl_ = static_cast<uint8_t>((reg_interrupt_and_gen_ctrl_ & kIntrCscToIntr) |
+                                                       rules_.interrupt_control_reset);
     windows_.ResetConfiguration();
 }
 
@@ -222,7 +231,7 @@ uint8_t Pcic82365::ActiveStatusChangeBits() const {
 void Pcic82365::Reset() {
     vcc_request_                = false;
     reg_power_control_          = 0u;
-    reg_interrupt_and_gen_ctrl_ = 0u;
+    reg_interrupt_and_gen_ctrl_ = rules_.interrupt_control_reset;
     reg_card_status_change_     = 0u;
     reg_status_change_int_cfg_  = 0u;
     windows_.Reset();
@@ -298,18 +307,21 @@ bool Pcic82365::StoreReg(uint8_t index, uint8_t value) {
             return true;
         case kRegPowerControl:
             if (ReservedPowerCode(value)) return false;
+            if (rules_.reserved_bits_halt && (value & rules_.power_control_reserved) != 0u) return false;
             reg_power_control_ = static_cast<uint8_t>(value & ~rules_.power_control_reserved);
             if (rules_.socket_control_power) vcc_request_ = (reg_power_control_ & kPwrVccPower) != 0u;
             return true;
         case kRegInterruptAndGeneral:
             if (ReservedIrqSelect(static_cast<uint8_t>(value & kCardIrqSelectMask))) return false;
-            reg_interrupt_and_gen_ctrl_ = value;
+            if (rules_.reserved_bits_halt && (value & rules_.interrupt_control_reserved) != 0u) return false;
+            reg_interrupt_and_gen_ctrl_ = static_cast<uint8_t>(value & ~rules_.interrupt_control_reserved);
             return true;
         case kRegStatusChangeIntConfig:
             if (ReservedIrqSelect(static_cast<uint8_t>(value >> kCscIrqSelectShift))) return false;
             reg_status_change_int_cfg_ = value;
             return true;
         case kRegCardStatusChange:
+            if (rules_.reserved_bits_halt && (value & rules_.status_change_reserved) != 0u) return false;
             if (explicit_status_clear_)
                 reg_card_status_change_ = static_cast<uint8_t>(reg_card_status_change_ & ~(value & kCscStatusMask));
             return true;
