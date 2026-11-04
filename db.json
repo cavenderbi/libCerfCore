@@ -2021,7 +2021,7 @@
         },
         {
           "feature_id": "suspend",
-          "supported": false
+          "supported": true
         },
         {
           "feature_id": "guest_additions",
@@ -2943,7 +2943,7 @@
       "name": "Sharp Mobilon HC-4500",
       "short_name": "Mobilon HC-4500",
       "board_family_id": "sharp_mobilon_hc",
-      "support_level": "no_support",
+      "support_level": "bootable_full",
       "internal__spec_divergences": "256-colour STN panel, NiMH battery, 16 MB RAM"
     },
     {
@@ -2951,7 +2951,7 @@
       "name": "Sharp Mobilon HC-4500 (8 MB)",
       "short_name": "Mobilon HC-4500",
       "board_family_id": "sharp_mobilon_hc",
-      "support_level": "no_support",
+      "support_level": "bootable_full",
       "internal__spec_divergences": "256-colour STN panel, NiMH battery, 8 MB RAM"
     },
     {
@@ -2959,7 +2959,7 @@
       "name": "Sharp Mobilon HC-4600",
       "short_name": "Mobilon HC-4600",
       "board_family_id": "sharp_mobilon_hc",
-      "support_level": "no_support",
+      "support_level": "bootable_full",
       "internal__spec_divergences": "256-colour panel, 16 MB RAM",
       "device_year": 1998
     },
