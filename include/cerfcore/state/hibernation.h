@@ -3,6 +3,7 @@
 #include "../core/service.h"
 #include "state_image_format.h"
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <string>
@@ -36,22 +37,36 @@ public:
     void OnShutdown() override;
 
 private:
+    enum class RestoreOutcome { Refused, Resumed, MemoryOnly, MemoryAfterRefusal };
+
+    struct ImageMatch {
+        bool same_rom;
+        bool same_peripherals;
+    };
+
     std::string      DeviceDirFile(const char* name) const;
     StateImageHeader LiveHeader() const;
     bool             WriteImage(const std::string& path, std::string& error);
     void             SaveSection(StateWriter& w, StateSection section);
     void             RestoreSection(StateReader& r, StateSection section);
-    void             ReadHeader(StateReader& r);
-    void             ApplyImage(StateReader& r, bool ram_only);
-    bool             ApplyStateFile(StateReader& r, bool ram_only, std::string& reason);
+    ImageMatch       ReadHeader(StateReader& r);
+    void             ApplyImage(StateReader& r);
+    void             ApplyMemory(const std::string& path, bool write, bool with_flash);
+    void             FillMemory(const std::string& path, bool with_flash);
+    bool             ApplyOrRollBack(const std::string& rollback_path,
+                                     const std::function<void()>& apply, std::string& refusal);
+    RestoreOutcome   ApplyStateFile(const std::string& path, bool ram_only, std::string& reason);
+    void             FinishRestore(RestoreOutcome outcome, const std::string& reason);
     void             RollBack(const std::string& rollback_path);
     void             RestorePeripherals(StateReader& r);
     void             RestorePresentation(StateReader& r);
     uint32_t         PeripheralLayoutSig() const;
     void     Progress(const char* fmt, ...);
     void     JoinWorker();
+    bool     ClaimWorker();
 
-    std::thread worker_;
+    std::thread       worker_;
+    std::atomic<bool> busy_{false};
 
     std::vector<std::function<void()>> pre_save_listeners_;
     std::vector<std::function<void()>> post_restore_listeners_;

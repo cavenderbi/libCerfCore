@@ -3,6 +3,8 @@
 #include "../../core/service.h"
 #include "../../state/state_stream.h"
 
+#include <atomic>
+
 namespace cerfcore {
 
 class CerfVirtCustomizationsReset : public Service {
@@ -19,7 +21,7 @@ public:
     void RestoreState(StateReader& r);
 
 private:
-    bool applied_ = false;
+    std::atomic<bool> applied_{false};
 };
 
 }

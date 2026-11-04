@@ -2,7 +2,12 @@
 
 #include "../core/service.h"
 
+#include <atomic>
+#include <functional>
+#include <mutex>
 #include <shared_mutex>
+#include <thread>
+#include <vector>
 
 namespace cerfcore {
 
@@ -32,8 +37,18 @@ public:
         return std::unique_lock<std::shared_mutex>(mtx_);
     }
 
+    void RunOrQueue(std::function<void()> fn);
+    void HoldQueue();
+    void ReleaseQueue();
+
 private:
-    std::shared_mutex mtx_;
+    void RunAsOwner(const std::function<void()>& fn);
+
+    std::shared_mutex                  mtx_;
+    std::mutex                         queue_mtx_;
+    std::vector<std::function<void()>> queue_;
+    bool                               holding_ = false;
+    std::atomic<std::thread::id>       running_thread_{};
 };
 
 }

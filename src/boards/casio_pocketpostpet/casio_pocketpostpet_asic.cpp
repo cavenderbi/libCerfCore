@@ -138,11 +138,12 @@ void CasioPocketpostpetAsic::MaybePublishDisplaySize() {
 }
 
 void CasioPocketpostpetAsic::SetSideButton(uint16_t mask, bool pressed) {
-    auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
-    std::lock_guard<std::mutex> lk(int_mtx_);
-    if (pressed) side_buttons_ |= mask;
-    else         side_buttons_ &= static_cast<uint16_t>(~mask);
-    UpdateSideButtonInterruptLocked();
+    emu_.Get<EmulationFreeze>().RunOrQueue([this, mask, pressed] {
+        std::lock_guard<std::mutex> lk(int_mtx_);
+        if (pressed) side_buttons_ |= mask;
+        else         side_buttons_ &= static_cast<uint16_t>(~mask);
+        UpdateSideButtonInterruptLocked();
+    });
 }
 
 bool CasioPocketpostpetAsic::SpeakerMuted() const { return (reg_1010_ & 1u) != 0u; }

@@ -12,6 +12,7 @@
 #include <cerfcore/core/instance_threads.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/cpu/emulated_memory.h>
+#include <cerfcore/execution/jit_runner.h>
 #include <cerfcore/host/emulation_pause.h>
 #include <cerfcore/host/host_presentation.h>
 #include <cerfcore/host/notification_stack.h>
@@ -52,17 +53,33 @@ void Hibernation::RegisterPostRestoreListener(std::function<void()> fn) {
     post_restore_listeners_.push_back(std::move(fn));
 }
 
-void Hibernation::SaveAsync(const std::string& path, std::function<void(bool)> on_done) {
+bool Hibernation::ClaimWorker() {
+    if (busy_.exchange(true, std::memory_order_acq_rel)) {
+        emu_.Get<NotificationStack>().PostError("A save or a load is already running");
+        return false;
+    }
     JoinWorker();
+    return true;
+}
+
+void Hibernation::SaveAsync(const std::string& path, std::function<void(bool)> on_done) {
+    if (!ClaimWorker()) {
+        if (on_done) on_done(false);
+        return;
+    }
     worker_ = emu_.Get<InstanceThreads>().Start([this, path, on_done = std::move(on_done)] {
         const bool saved = Save(path);
         if (on_done) on_done(saved);
+        busy_.store(false, std::memory_order_release);
     });
 }
 
 void Hibernation::RestoreAsync(const std::string& path, bool ram_only) {
-    JoinWorker();
-    worker_ = emu_.Get<InstanceThreads>().Start([this, path, ram_only] { Restore(path, ram_only); });
+    if (!ClaimWorker()) return;
+    worker_ = emu_.Get<InstanceThreads>().Start([this, path, ram_only] {
+        Restore(path, ram_only);
+        busy_.store(false, std::memory_order_release);
+    });
 }
 
 void Hibernation::OnShutdown() {
@@ -178,14 +195,18 @@ bool Hibernation::Save(const std::string& path_in) {
     Progress("Saving RAM (%llu MB)...", static_cast<unsigned long long>(
         emu_.Get<EmulatedMemory>().VolatileByteCount() >> 20));
 
-    pause.BeginStateOperation();
     bool ok = false;
     std::string error;
-    {
-        auto snap = emu_.Get<EmulationFreeze>().SnapshotSection();
-        ok = WriteImage(path, error);
+    if (!emu_.Get<JitRunner>().Started()) {
+        error = "the guest has not started yet";
+    } else {
+        pause.BeginStateOperation();
+        {
+            auto snap = emu_.Get<EmulationFreeze>().SnapshotSection();
+            ok = WriteImage(path, error);
+        }
+        pause.EndStateOperation(false);
     }
-    pause.EndStateOperation(false);
 
     stack.Close(NotificationId::SavingState);
     if (ok) {
@@ -201,7 +222,7 @@ bool Hibernation::Save(const std::string& path_in) {
     return ok;
 }
 
-void Hibernation::ReadHeader(StateReader& r) {
+Hibernation::ImageMatch Hibernation::ReadHeader(StateReader& r) {
     char magic[sizeof(kStateMagic)] = {};
     r.ReadRaw(magic, sizeof(magic));
     if (std::memcmp(magic, kStateMagic, sizeof(magic)) != 0) {
@@ -215,14 +236,13 @@ void Hibernation::ReadHeader(StateReader& r) {
     r.Read("rom_total_bytes", saved.rom_total_bytes);
     r.Read("guest_additions", saved.guest_additions);
     const StateImageHeader live = LiveHeader();
-    if (saved.rom_entry_va != live.rom_entry_va || saved.rom_total_bytes != live.rom_total_bytes)
-        throw StateImageRejected("the image is for a different ROM");
-    if (saved.periph_layout_sig != live.periph_layout_sig)
-        throw StateImageRejected("the image has a different peripheral set");
     if (saved.guest_additions != live.guest_additions)
         throw StateImageRejected(saved.guest_additions
                                      ? "the image was saved with guest additions"
                                      : "the image was saved without guest additions");
+    return ImageMatch{
+        saved.rom_entry_va == live.rom_entry_va && saved.rom_total_bytes == live.rom_total_bytes,
+        saved.periph_layout_sig == live.periph_layout_sig};
 }
 
 void Hibernation::RestorePeripherals(StateReader& r) {
@@ -251,7 +271,7 @@ void Hibernation::RestorePresentation(StateReader& r) {
     emu_.Get<HostPresentation>().RestoreSurfaceSize(w, h);
 }
 
-void Hibernation::ApplyImage(StateReader& r, bool ram_only) {
+void Hibernation::ApplyImage(StateReader& r) {
     for (const StateSection section : kStateSectionOrder) {
         if (r.Remaining() == 0)
             r.Reject("section %u is missing from the image", static_cast<uint32_t>(section));
@@ -259,16 +279,37 @@ void Hibernation::ApplyImage(StateReader& r, bool ram_only) {
         if (id != static_cast<uint32_t>(section))
             r.Reject("section %u where this build reads section %u", id,
                      static_cast<uint32_t>(section));
-        if (ram_only && section != StateSection::Ram && section != StateSection::Flash) {
-            r.SkipFrame();
-            continue;
-        }
         RestoreSection(r, section);
         r.LeaveFrame();
     }
     if (r.Remaining() != 0)
         r.Reject("the image carries %llu bytes past its last section",
                  static_cast<unsigned long long>(r.Remaining()));
+}
+
+void Hibernation::FillMemory(const std::string& path, bool with_flash) {
+    auto snap = emu_.Get<EmulationFreeze>().SnapshotSection();
+    try {
+        ApplyMemory(path, true, with_flash);
+    } catch (const StateImageRejected& e) {
+        emu_.Get<Fatal>().UserError("Hibernation: the image %s became unreadable while it "
+                                    "filled guest memory: %s", path.c_str(), e.what());
+    }
+}
+
+void Hibernation::ApplyMemory(const std::string& path, bool write, bool with_flash) {
+    StateReader r(emu_, path);
+    ReadHeader(r);
+    auto& memory = emu_.Get<EmulatedMemory>();
+    while (r.Remaining() != 0) {
+        const auto section = static_cast<StateSection>(r.EnterFrame());
+        if (section != StateSection::Ram && (section != StateSection::Flash || !with_flash)) {
+            r.SkipFrame();
+            continue;
+        }
+        memory.RestoreRegions(r, section == StateSection::Flash, write);
+        r.LeaveFrame();
+    }
 }
 
 void Hibernation::RestoreSection(StateReader& r, StateSection section) {
@@ -294,7 +335,7 @@ void Hibernation::RollBack(const std::string& rollback_path) {
     try {
         if (!r.Ok()) throw StateImageRejected("the rollback image cannot be opened: " + r.Error());
         ReadHeader(r);
-        ApplyImage(r, false);
+        ApplyImage(r);
     } catch (const StateImageRejected& e) {
         emu_.Get<Fatal>().Die("Hibernation: the rollback image this build just wrote "
                               "was refused: %s", e.what());
@@ -309,58 +350,95 @@ bool Hibernation::Restore(const std::string& path_in, bool ram_only) {
                "Loading the machine state…");
     Progress(ram_only ? "Warm boot: restoring RAM..." : "Restoring state...");
 
-    bool ok = false;
     std::string reason;
-    StateReader r(emu_, path);
-    if (r.Ok()) {
-        ok = ApplyStateFile(r, ram_only, reason);
-    } else {
-        reason = r.Error();
-        Progress("Cannot open state image: %s", reason.c_str());
-    }
+    const RestoreOutcome outcome = ApplyStateFile(path, ram_only, reason);
 
     stack.Close(NotificationId::LoadingState);
-    if (!ok)
+    if (outcome == RestoreOutcome::Refused)
         stack.PostError("Failed to load the save state\n" + reason);
-    return ok;
+    if (outcome == RestoreOutcome::MemoryAfterRefusal)
+        stack.PostError("Unable to resume\n"
+                        "Attempting to restore your RAM only. Perform a cold reset if guest is broken.");
+    return outcome != RestoreOutcome::Refused;
 }
 
-bool Hibernation::ApplyStateFile(StateReader& r, bool ram_only, std::string& reason) {
+bool Hibernation::ApplyOrRollBack(const std::string& rollback_path,
+                                  const std::function<void()>& apply, std::string& refusal) {
+    try {
+        apply();
+        return true;
+    } catch (const StateImageRejected& e) {
+        refusal = e.what();
+        RollBack(rollback_path);
+        return false;
+    }
+}
+
+Hibernation::RestoreOutcome Hibernation::ApplyStateFile(const std::string& path, bool ram_only,
+                                                         std::string& reason) {
+    StateReader r(emu_, path);
+    if (!r.Ok()) {
+        reason = r.Error();
+        Progress("Cannot open state image: %s", reason.c_str());
+        return RestoreOutcome::Refused;
+    }
+
     auto& pause = emu_.Get<EmulationPause>();
     pause.BeginStateOperation();
+    emu_.Get<JitRunner>().DeliverHeldReset();
     auto snap = emu_.Get<EmulationFreeze>().SnapshotSection();
-    bool ok = false;
+    const std::string rollback = DeviceDirFile(kRollbackStateFile);
+    RestoreOutcome outcome = RestoreOutcome::Refused;
     try {
-        ReadHeader(r);
-        const std::string rollback = DeviceDirFile(kRollbackStateFile);
-        std::string write_error;
-        if (!WriteImage(rollback, write_error))
-            throw StateImageRejected("the rollback image cannot be written: " + write_error);
-        uint32_t ignored = 0;
-        try {
-            ApplyImage(r, ram_only);
-            ok = true;
-        } catch (const StateImageRejected&) {
-            RollBack(rollback);
-            host_platform::DeleteHostFile(rollback, ignored);
-            throw;
+        const ImageMatch match = ReadHeader(r);
+        if (!match.same_rom)              reason = "the image is for a different ROM";
+        else if (!match.same_peripherals) reason = "the image has a different peripheral set";
+        if (!ram_only && reason.empty()) {
+            std::string write_error;
+            if (!WriteImage(rollback, write_error))
+                reason = "the rollback image cannot be written: " + write_error;
+            else if (ApplyOrRollBack(rollback, [&] { ApplyImage(r); }, reason))
+                outcome = RestoreOutcome::Resumed;
         }
-        host_platform::DeleteHostFile(rollback, ignored);
-        emu_.Get<EngineBridge>().Guest().FlushTranslationCache();
+        if (outcome != RestoreOutcome::Resumed) {
+            const bool with_flash = match.same_rom;
+            ApplyMemory(path, false, with_flash);
+            emu_.Get<GuestColdBoot>().RequestResetFillingRam(
+                [this, path, with_flash] { FillMemory(path, with_flash); });
+            outcome = ram_only ? RestoreOutcome::MemoryOnly : RestoreOutcome::MemoryAfterRefusal;
+        }
     } catch (const StateImageRejected& e) {
-        reason = e.what();
-        emu_.Get<EngineBridge>().Guest().FlushTranslationCache();
+        reason  = e.what();
+        outcome = RestoreOutcome::Refused;
     }
+    uint32_t ignored = 0;
+    host_platform::DeleteHostFile(rollback, ignored);
+    emu_.Get<EngineBridge>().Guest().FlushTranslationCache();
     snap.unlock();
 
-    if (ok) {
-        Progress("State restored.");
-        if (!ram_only) emu_.Get<GuestDeepSleep>().OnFullRestore();
-    } else {
-        Progress("Restore refused: %s", reason.c_str());
+    if (outcome == RestoreOutcome::MemoryOnly || outcome == RestoreOutcome::MemoryAfterRefusal)
+        emu_.Get<JitRunner>().DeliverHeldReset();
+    FinishRestore(outcome, reason);
+    pause.EndStateOperation(outcome != RestoreOutcome::Refused);
+    return outcome;
+}
+
+void Hibernation::FinishRestore(RestoreOutcome outcome, const std::string& reason) {
+    switch (outcome) {
+        case RestoreOutcome::Refused:
+            Progress("Restore refused: %s", reason.c_str());
+            return;
+        case RestoreOutcome::Resumed:
+            Progress("State restored.");
+            emu_.Get<GuestDeepSleep>().OnFullRestore();
+            return;
+        case RestoreOutcome::MemoryAfterRefusal:
+            Progress("Resume refused: %s", reason.c_str());
+            [[fallthrough]];
+        case RestoreOutcome::MemoryOnly:
+            Progress("Restarting as after a power loss, with the memory of the image.");
+            return;
     }
-    pause.EndStateOperation(ok);
-    return ok;
 }
 
 }

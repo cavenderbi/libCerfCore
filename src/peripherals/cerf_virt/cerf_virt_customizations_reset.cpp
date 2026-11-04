@@ -15,8 +15,7 @@ bool CerfVirtCustomizationsReset::ShouldRegister() {
 }
 
 void CerfVirtCustomizationsReset::OnCustomizationsApplied() {
-    if (applied_) return;
-    applied_ = true;
+    if (applied_.exchange(true, std::memory_order_acq_rel)) return;
     LOG(GuestAdditions,
         "registry customizations committed - soft-resetting the guest so GWES "
         "re-reads them\n");
@@ -25,19 +24,18 @@ void CerfVirtCustomizationsReset::OnCustomizationsApplied() {
 }
 
 void CerfVirtCustomizationsReset::Invalidate() {
-    if (!applied_) return;
-    applied_ = false;
+    if (!applied_.exchange(false, std::memory_order_acq_rel)) return;
     LOG(GuestAdditions, "customizations changed - the next boot re-applies them\n");
 }
 
 void CerfVirtCustomizationsReset::SaveState(StateWriter& w) const {
-    w.Write<uint32_t>("applied", applied_ ? 1u : 0u);
+    w.Write<uint32_t>("applied", applied_.load(std::memory_order_acquire) ? 1u : 0u);
 }
 
 void CerfVirtCustomizationsReset::RestoreState(StateReader& r) {
     uint32_t v = 0;
     r.Read("applied", v);
-    applied_ = (v != 0u);
+    applied_.store(v != 0u, std::memory_order_release);
 }
 
 }

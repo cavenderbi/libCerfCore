@@ -32,9 +32,10 @@ void PangolinCompanionMpu::SendTouch(bool contact, uint16_t x14, uint16_t y14) {
 /* smartbook_g138_ce4_2 kbdmouse.dll sub_1B526BC: low byte 0xFA make / 0xF0 break,
    high byte the scancode. */
 void PangolinCompanionMpu::SendKey(uint8_t scancode, bool down) {
-    const uint8_t pkt[2] = { static_cast<uint8_t>(down ? 0xFAu : 0xF0u), scancode };
-    auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
-    emu_.Get<Sa11xxSp3Uart>().PushRxBurst(pkt, sizeof(pkt));
+    emu_.Get<EmulationFreeze>().RunOrQueue([this, scancode, down] {
+        const uint8_t pkt[2] = { static_cast<uint8_t>(down ? 0xFAu : 0xF0u), scancode };
+        emu_.Get<Sa11xxSp3Uart>().PushRxBurst(pkt, sizeof(pkt));
+    });
 }
 
 namespace {

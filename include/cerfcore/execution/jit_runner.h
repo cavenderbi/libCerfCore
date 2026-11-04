@@ -34,6 +34,8 @@ public:
 
     void Pause();
     void Resume();
+    void HoldResets(bool hold);
+    void DeliverHeldReset();
 
 private:
     void PublishHostChainExit(const std::unique_lock<std::mutex>&);
@@ -47,7 +49,8 @@ private:
     std::atomic<bool>       started_{false};
 
     std::atomic<bool>       pause_requested_{false};
-    bool                    paused_ = false;
+    bool                    paused_      = false;
+    bool                    hold_resets_ = false;
     std::mutex              pause_mutex_;
     std::condition_variable pause_cv_;
 

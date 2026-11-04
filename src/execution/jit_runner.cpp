@@ -83,6 +83,26 @@ void JitRunner::Resume() {
     pause_cv_.notify_all();
 }
 
+void JitRunner::HoldResets(bool hold) {
+    {
+        std::lock_guard<std::mutex> lk(pause_mutex_);
+        hold_resets_ = hold;
+    }
+    pause_cv_.notify_all();
+}
+
+void JitRunner::DeliverHeldReset() {
+    if (!started_) return;
+    auto& engine = emu_.Get<EngineBridge>().Guest();
+    std::unique_lock<std::mutex> lk(pause_mutex_);
+    hold_resets_ = false;
+    pause_cv_.notify_all();
+    pause_cv_.wait(lk, [this, &engine] {
+        return (paused_ && !engine.ResetPending()) || stopped_.load(std::memory_order_acquire);
+    });
+    hold_resets_ = true;
+}
+
 void JitRunner::FinishRun(Fatal& fatal) {
     fatal.SetLiveEngine(nullptr);
     LOG(Boot, "JitRunner: stop requested; thread exiting\n");
@@ -144,7 +164,7 @@ void JitRunner::RunGuest(Fatal& fatal) {
                 engine.Pc());
             const bool sleep_park = engine.DeepSleep();
             while (!stop_requested_.load(std::memory_order_acquire) &&
-                   !engine.ResetPending() &&
+                   (hold_resets_ || !engine.ResetPending()) &&
                    (pause_requested_.load(std::memory_order_acquire) || engine.DeepSleep())) {
                 int64_t wait_ns = 20000000;
                 if (!pause_requested_.load(std::memory_order_acquire) && engine.DeepSleep()) {

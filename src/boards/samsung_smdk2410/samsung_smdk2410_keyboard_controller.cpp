@@ -59,10 +59,11 @@ void SamsungSmdk2410KeyboardController::OnReady() {
 }
 
 void SamsungSmdk2410KeyboardController::QueueScancode(uint8_t scancode) {
-    auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
-    std::lock_guard<std::mutex> lk(mutex_);
-    queue_.push_back(scancode);
-    if (!awaiting_ack_) { PresentLocked(); }
+    emu_.Get<EmulationFreeze>().RunOrQueue([this, scancode] {
+        std::lock_guard<std::mutex> lk(mutex_);
+        queue_.push_back(scancode);
+        if (!awaiting_ack_) { PresentLocked(); }
+    });
 }
 
 /* devemu_wm5 kbdmouse.dll: the IST sub_14D5DF4 takes one byte per interrupt

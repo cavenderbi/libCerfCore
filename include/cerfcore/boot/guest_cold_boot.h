@@ -10,10 +10,6 @@
 
 namespace cerfcore {
 
-/* Hard-reset orchestrator: wipes volatile guest RAM and replays the
-   registered boot-time RAM writes at reset delivery. Registration is
-   OnReady-time only - registering after JitRunner starts races the
-   JIT thread's lock-free walk of replays_. */
 class GuestColdBoot : public Service {
 public:
     using Service::Service;
@@ -32,10 +28,9 @@ public:
     /* Any thread. Arms the cold boot and triggers reset delivery. */
     void RequestHardReset();
 
-    /* JIT thread, reset-delivery branch only: guest CPU is parked there,
-       so the wipe + replay cannot race guest stores. No-op when only a
-       soft reset is pending. */
     void ExecuteIfPending();
+
+    void RequestResetFillingRam(std::function<void()> fill);
 
     void SaveState(StateWriter& w) const;
     void RestoreState(StateReader& r);
@@ -43,6 +38,8 @@ public:
 private:
     std::vector<std::function<void()>> replays_;
     std::atomic<bool>                  pending_{false};
+    std::function<void()>              fill_;
+    std::atomic<bool>                  fill_pending_{false};
 };
 
 }

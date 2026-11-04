@@ -7,6 +7,8 @@
 #include "../execution/engine_bridge.h"
 #include <cerfcore/socs/guest_cpu_reset.h>
 
+#include <utility>
+
 namespace cerfcore {
 
 REGISTER_SERVICE(GuestColdBoot);
@@ -39,15 +41,30 @@ void GuestColdBoot::RestoreState(StateReader& r) {
     pending_.store(pending != 0, std::memory_order_release);
 }
 
-void GuestColdBoot::ExecuteIfPending() {
-    if (!pending_.exchange(false, std::memory_order_acq_rel)) return;
+void GuestColdBoot::RequestResetFillingRam(std::function<void()> fill) {
+    fill_ = std::move(fill);
+    fill_pending_.store(true, std::memory_order_release);
+    emu_.Get<GuestCpuReset>().ColdReset();
+}
 
-    LOG(Boot, "GuestColdBoot: hard reset - wiping volatile RAM, replaying "
-              "%zu boot-time writes\n", replays_.size());
-    emu_.Get<EmulatedMemory>().WipeVolatileRegions();
+void GuestColdBoot::ExecuteIfPending() {
+    const bool wipe = pending_.exchange(false, std::memory_order_acq_rel);
+    std::function<void()> fill;
+    if (fill_pending_.exchange(false, std::memory_order_acq_rel)) fill = std::exchange(fill_, nullptr);
+    if (!wipe && !fill) return;
+
+    if (wipe) {
+        LOG(Boot, "GuestColdBoot: hard reset - wiping volatile RAM, replaying "
+                  "%zu boot-time writes\n", replays_.size());
+        emu_.Get<EmulatedMemory>().WipeVolatileRegions();
+    } else {
+        LOG(Boot, "GuestColdBoot: reset filling RAM from a saved image, replaying "
+                  "%zu boot-time writes\n", replays_.size());
+        fill();
+    }
     for (auto& fn : replays_) fn();
     emu_.Get<EngineBridge>().Guest().FlushTranslationCache();
-    emu_.Get<GuestPowerNotifier>().NotifyHardReset();
+    if (wipe) emu_.Get<GuestPowerNotifier>().NotifyHardReset();
 }
 
 }

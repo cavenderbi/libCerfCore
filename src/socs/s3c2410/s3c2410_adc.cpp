@@ -192,17 +192,18 @@ void S3C2410Adc::WriteWord(uint32_t addr, uint32_t value) {
 }
 
 void S3C2410Adc::SetPen(bool down, uint16_t sample_x, uint16_t sample_y) {
-    auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
-    bool raise_touch = false;
-    {
-        std::lock_guard<std::mutex> lk(state_mutex_);
-        pen_down_   = down;
-        pen_x_      = sample_x;
-        pen_y_      = sample_y;
-        raise_touch = PenInterruptAssertedLocked();
-    }
-    if (raise_touch)
-        emu_.Get<IrqController>().AssertSubIrq(kMainSourceAdc, kSubSourceTc);
+    emu_.Get<EmulationFreeze>().RunOrQueue([this, down, sample_x, sample_y] {
+        bool raise_touch = false;
+        {
+            std::lock_guard<std::mutex> lk(state_mutex_);
+            pen_down_   = down;
+            pen_x_      = sample_x;
+            pen_y_      = sample_y;
+            raise_touch = PenInterruptAssertedLocked();
+        }
+        if (raise_touch)
+            emu_.Get<IrqController>().AssertSubIrq(kMainSourceAdc, kSubSourceTc);
+    });
 }
 
 void S3C2410Adc::SaveState(StateWriter& w) {

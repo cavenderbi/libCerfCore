@@ -28,12 +28,13 @@ bool CompaqIpaqH3000MicroKeys::ShouldRegister() {
 }
 
 void CompaqIpaqH3000MicroKeys::SetPressed(uint8_t key, bool pressed) {
-    const uint8_t code   = static_cast<uint8_t>(key & kKeyCodeMask);
-    auto          frozen = emu_.Get<EmulationFreeze>().WorkerSection();
-    std::lock_guard<std::mutex> lk(mtx_);
-    if ((held_[code] != 0u) == pressed) return;
-    held_[code] = pressed ? 1u : 0u;
-    SendLocked(code, pressed);
+    const uint8_t code = static_cast<uint8_t>(key & kKeyCodeMask);
+    emu_.Get<EmulationFreeze>().RunOrQueue([this, code, pressed] {
+        std::lock_guard<std::mutex> lk(mtx_);
+        if ((held_[code] != 0u) == pressed) return;
+        held_[code] = pressed ? 1u : 0u;
+        SendLocked(code, pressed);
+    });
 }
 
 void CompaqIpaqH3000MicroKeys::SaveState(StateWriter& w) {

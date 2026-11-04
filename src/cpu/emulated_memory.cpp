@@ -381,9 +381,9 @@ void EmulatedMemory::SaveState(StateWriter& w) { SaveRegions(w, false); }
 
 void EmulatedMemory::SaveFlashRegions(StateWriter& w) { SaveRegions(w, true); }
 
-void EmulatedMemory::RestoreState(StateReader& r) { RestoreRegions(r, false); }
+void EmulatedMemory::RestoreState(StateReader& r) { RestoreRegions(r, false, true); }
 
-void EmulatedMemory::RestoreFlashRegions(StateReader& r) { RestoreRegions(r, true); }
+void EmulatedMemory::RestoreFlashRegions(StateReader& r) { RestoreRegions(r, true, true); }
 
 uint32_t EmulatedMemory::RegionCount(bool flash) const {
     const size_t n = count_.load(std::memory_order_acquire);
@@ -409,7 +409,7 @@ void EmulatedMemory::SaveRegions(StateWriter& w, bool flash) {
     }
 }
 
-void EmulatedMemory::RestoreRegions(StateReader& r, bool flash) {
+void EmulatedMemory::RestoreRegions(StateReader& r, bool flash, bool write) {
     const char* kind = flash ? "flash" : "RAM";
     uint32_t count = 0;
     r.Read(flash ? "flash_count" : "volatile_count", count);
@@ -426,7 +426,9 @@ void EmulatedMemory::RestoreRegions(StateReader& r, bool flash) {
                      kind, base, size);
         uint8_t backed = 0;
         r.Read("backed", backed);
-        if (backed) {
+        if (!write) {
+            if (backed) r.SkipBytes("host", size);
+        } else if (backed) {
             r.ReadBytes("host", EnsureBacked(reg), size);
         } else if (uint8_t* host = reg->host_ptr.load(std::memory_order_acquire)) {
             std::memset(host, 0, size);

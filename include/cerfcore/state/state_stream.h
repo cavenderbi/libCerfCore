@@ -133,6 +133,8 @@ public:
         ReadBlock(name, dst, n);
     }
 
+    void SkipBytes(const char* name, size_t n);
+
     uint32_t EnterFrame();
     void     LeaveFrame();
     void     SkipFrame();
@@ -153,6 +155,7 @@ private:
     void ReadRaw(void* dst, size_t n);
     void ReadBlock(const char* name, void* dst, size_t n);
     void ExpectTag(uint8_t kind, const char* name, uint64_t size);
+    void RequireRemaining(size_t n);
     void SeekTo(uint64_t offset);
 
     CerfEmulator&           emu_;

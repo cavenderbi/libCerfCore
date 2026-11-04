@@ -173,11 +173,15 @@ uint64_t StateReader::Remaining() const {
     return limit > pos_ ? limit - pos_ : 0;
 }
 
-void StateReader::ReadRaw(void* dst, size_t n) {
+void StateReader::RequireRemaining(size_t n) {
     if (!ok_) Reject("the image is not open");
     if (n > Remaining())
         Reject("the saved data ends %llu bytes short of what this build reads",
                static_cast<unsigned long long>(n - Remaining()));
+}
+
+void StateReader::ReadRaw(void* dst, size_t n) {
+    RequireRemaining(n);
     auto* p = static_cast<uint8_t*>(dst);
     while (n > 0) {
         const uint32_t chunk = n > kIoChunk ? kIoChunk : static_cast<uint32_t>(n);
@@ -206,6 +210,12 @@ void StateReader::ExpectTag(uint8_t kind, const char* name, uint64_t size) {
 void StateReader::ReadBlock(const char* name, void* dst, size_t n) {
     ExpectTag(kStateFieldBytes, name, n);
     if (n) ReadRaw(dst, n);
+}
+
+void StateReader::SkipBytes(const char* name, size_t n) {
+    ExpectTag(kStateFieldBytes, name, n);
+    RequireRemaining(n);
+    SeekTo(pos_ + n);
 }
 
 uint32_t StateReader::EnterFrame() {

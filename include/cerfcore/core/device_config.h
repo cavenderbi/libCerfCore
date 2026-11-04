@@ -37,8 +37,8 @@ struct BundledCompactFlashCard {
 /* Boot action when a saved state image exists in the device directory
    (--boot=resume|cold|warm). */
 enum class StateBootMode {
-    Resume,   /* full restore from state.img if present, else cold boot */
-    Warm,     /* RAM + flash only (OS reboots) if present, else cold boot */
+    Resume,
+    Warm,
     Cold,     /* ignore state.img, cold boot */
 };
 

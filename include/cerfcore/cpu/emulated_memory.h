@@ -86,6 +86,8 @@ public:
     void SaveFlashRegions(StateWriter& w);
     void RestoreFlashRegions(StateReader& r);
 
+    void RestoreRegions(StateReader& r, bool flash, bool write);
+
     /* Total bytes across volatile regions - the save-progress denominator. */
     uint64_t VolatileByteCount() const;
 
@@ -139,7 +141,6 @@ private:
     static bool IsFlash(const Region& r);
     uint32_t RegionCount(bool flash) const;
     void     SaveRegions(StateWriter& w, bool flash);
-    void     RestoreRegions(StateReader& r, bool flash);
     uint8_t* EnsureBacked(Region* r);
 
     Region              regions_[kMaxRegions]{};

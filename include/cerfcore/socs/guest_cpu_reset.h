@@ -40,7 +40,6 @@ public:
     /* Any thread. Host soft reset: RAM survives the reset. */
     void WarmReset();
 
-    /* Any thread. Host hard reset: caller wipes RAM at delivery. */
     void ColdReset();
 
     /* Any thread. SoC watchdog expiry (e.g. OSMR3 match with OWER.WME=1). */
@@ -54,8 +53,6 @@ public:
 
     void SetPendingResume(bool is_resume);
 
-    /* JIT thread, reset-delivery branch only: runs the reset-line
-       listeners, then an armed GuestColdBoot hard reset. */
     void OnResetDelivered();
 
     bool DeliveredResetWasResume() const { return delivered_is_resume_; }
