@@ -24,6 +24,11 @@ typedef struct CerfGradDescriptor {
     uint32_t band_y_first;
     uint32_t band_y_count;
     CerfBltSurface dst;
+
+    uint32_t dst_palette_off;
+    uint32_t dst_palette_entries;
+    int32_t  dither_x;
+    int32_t  dither_y;
 } CerfGradDescriptor;
 
 #if defined(__cplusplus)

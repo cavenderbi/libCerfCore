@@ -134,6 +134,8 @@ struct DeviceConfig : public Service {
 
     bool guest_additions_allow_untrusted_apps = kDefaultAllowUntrustedApps;
 
+    std::vector<uint32_t> guest_additions_palette;
+
     /* Startup tab. Dev builds default to the hardware console so debug output
        shows instantly; production defaults to the boot screen. --tab overrides. */
     CanvasTab start_tab =

@@ -2,6 +2,7 @@
 
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_blt_descriptor.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_rotation.h>
+#include "cerf_virt_blt_index_converter.h"
 #include "cerf_virt_blt_pixelops.h"
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_framebuffer.h>
 #include "cerf_virt_dma_arena.h"
@@ -38,10 +39,13 @@ protected:
     uint32_t ReadStraddlePixel(const Surface& s, int32_t x, int32_t y, uint32_t bpp);
     void     WriteStraddlePixel(const Surface& s, int32_t x, int32_t y,
                                 uint32_t bpp, uint32_t value);
+    uint8_t* SubBytePixelPtr(const Surface& s, int32_t x, int32_t y, uint32_t bits,
+                             uint32_t* shift);
     bool ReadSubBytePixel(const Surface& s, int32_t x, int32_t y, uint32_t bits,
                           uint32_t* out);
     bool WriteSubBytePixel(const Surface& s, int32_t x, int32_t y, uint32_t bits,
                            uint32_t value);
+    void LoadIndexConverter(BltIndexConverter* converter, uint32_t palette_off, uint32_t entries);
 
     [[noreturn]] void FatalStraddle(const Surface& s, int32_t x, int32_t y,
                                     ptrdiff_t off) {
@@ -136,28 +140,54 @@ inline void BltSurfaceAccess::WriteStraddlePixel(const Surface& s, int32_t x,
     BltPixelOps::WritePixel(p, bpp, value);
 }
 
+inline uint8_t* BltSurfaceAccess::SubBytePixelPtr(const Surface& s, int32_t x, int32_t y,
+                                                  uint32_t bits, uint32_t* shift) {
+    const CerfBltSurface& d = *s.desc;
+    if (!d.is_rotate) {
+        const uint32_t bit_x = (uint32_t)x * bits;
+        uint32_t run = 0;
+        *shift = lcd_pixel::MsbFirstShift(bit_x, bits);
+        return PixelPtr(s, (int32_t)(bit_x >> 3), y, 1u, &run);
+    }
+    const CerfRotatedLayout l = CerfRotatedLayoutFor(d.rotate, (int32_t)d.screen_w, (int32_t)d.screen_h,
+                                                     d.stride * 8, (int32_t)bits);
+    const int64_t bit = (int64_t)l.origin + (int64_t)x * l.x_pitch + (int64_t)y * l.y_pitch;
+    if (bit < 0) return nullptr;
+    uint8_t* p = s.host_base + (bit >> 3);
+    if (p < s.host_lo || p >= s.host_hi) return nullptr;
+    *shift = lcd_pixel::MsbFirstShift((uint32_t)bit, bits);
+    return p;
+}
+
 inline bool BltSurfaceAccess::ReadSubBytePixel(const Surface& s, int32_t x,
                                                int32_t y, uint32_t bits,
                                                uint32_t* out) {
-    const uint32_t bit_x = (uint32_t)x * bits;
-    uint32_t run = 0;
-    uint8_t* p = PixelPtr(s, (int32_t)(bit_x >> 3), y, 1u, &run);
+    uint32_t shift = 0;
+    uint8_t* p = SubBytePixelPtr(s, x, y, bits, &shift);
     if (!p) return false;
-    *out = (uint32_t)((*p >> lcd_pixel::MsbFirstShift(bit_x, bits)) & ((1u << bits) - 1u));
+    *out = (uint32_t)((*p >> shift) & ((1u << bits) - 1u));
     return true;
 }
 
 inline bool BltSurfaceAccess::WriteSubBytePixel(const Surface& s, int32_t x,
                                                 int32_t y, uint32_t bits,
                                                 uint32_t value) {
-    const uint32_t bit_x = (uint32_t)x * bits;
-    uint32_t run = 0;
-    uint8_t* p = PixelPtr(s, (int32_t)(bit_x >> 3), y, 1u, &run);
+    uint32_t shift = 0;
+    uint8_t* p = SubBytePixelPtr(s, x, y, bits, &shift);
     if (!p) return false;
-    const uint32_t shift = lcd_pixel::MsbFirstShift(bit_x, bits);
     const uint8_t  mask  = (uint8_t)(((1u << bits) - 1u) << shift);
     *p = (uint8_t)((*p & ~mask) | ((value << shift) & mask));
     return true;
+}
+
+inline void BltSurfaceAccess::LoadIndexConverter(BltIndexConverter* converter, uint32_t palette_off,
+                                                 uint32_t entries) {
+    if (entries == 0u || entries > BltIndexConverter::kMaxColors)
+        fatal_->Die("[BltSurfaceAccess] direct-colour source to an indexed dst with %u palette entries",
+                    entries);
+    const uint8_t* p = arena_->At(palette_off, entries * (uint32_t)sizeof(uint32_t));
+    if (!p) fatal_->Die("[BltSurfaceAccess] dst palette outside the arena off=0x%X entries=%u", palette_off, entries);
+    converter->Build(reinterpret_cast<const uint32_t*>(p), entries);
 }
 
 }

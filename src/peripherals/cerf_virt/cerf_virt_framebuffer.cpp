@@ -1,8 +1,10 @@
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_framebuffer.h>
 
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_addr_map.h>
+#include <cerfcore/peripherals/cerf_virt/cerf_virt_fb_regs.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_resize_regs.h>
 #include <cerfcore/boards/board_context.h>
+#include <cerfcore/core/board_database.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/fatal.h>
@@ -51,13 +53,13 @@ void CerfVirtFramebuffer::Geometry(uint32_t& w, uint32_t& h) const {
 }
 
 uint32_t CerfVirtFramebuffer::Stride() const {
-    return Width() * (Bpp() >> 3u);
+    return CerfVirt::FbRowBytes(Width(), Bpp());
 }
 
 uint32_t CerfVirtFramebuffer::SizeBytes() const {
     uint32_t w = 0, h = 0;
     Geometry(w, h);
-    return h * w * (Bpp() >> 3u);
+    return h * CerfVirt::FbRowBytes(w, Bpp());
 }
 
 void CerfVirtFramebuffer::StoreGeometry(uint32_t w, uint32_t h) {
@@ -79,7 +81,7 @@ uint32_t CerfVirtFramebuffer::RegionBytesIn(uint32_t window_size) {
 }
 
 uint64_t CerfVirtFramebuffer::PrimaryBytesAt(uint32_t w, uint32_t h, uint32_t bpp) {
-    return uint64_t{h} * w * (bpp >> 3u);
+    return uint64_t{h} * CerfVirt::FbRowBytes(w, bpp);
 }
 
 bool CerfVirtFramebuffer::PrimaryFitsReserve(uint32_t w, uint32_t h) const {
@@ -130,11 +132,45 @@ uint32_t CerfVirtFramebuffer::MemBasePa() const {
          + CerfVirt::kFramebufferMemOffset;
 }
 
+uint32_t CerfVirtFramebuffer::ConfiguredDepth() const {
+    const uint32_t bpp = emu_.Get<BoardContext>().ResolveGuestAdditionsColorDepth();
+    switch (bpp) {
+        case 1u: case 2u: case 4u: case 8u: case 16u: case 24u: case 32u:
+            return bpp;
+        default:
+            emu_.Get<Fatal>().UserError("[CerfVirtFramebuffer] guest-additions colour depth %u bpp; "
+                                        "the depth must be 1, 2, 4, 8, 16, 24 or 32", bpp);
+    }
+}
+
+void CerfVirtFramebuffer::LoadConfiguredPalette() {
+    const uint32_t               bpp        = Bpp();
+    const bool                   own_depth  = bpp == ConfiguredDepth();
+    const std::vector<uint32_t>& configured = emu_.Get<DeviceConfig>().guest_additions_palette;
+    if (bpp > 8u) {
+        if (own_depth && !configured.empty())
+            emu_.Get<Fatal>().UserError("[CerfVirtFramebuffer] an indexed palette is set for the %u bpp "
+                                        "guest-additions colour depth; only 1, 2, 4 and 8 bpp use a palette", bpp);
+        return;
+    }
+    const DbGaPalette* const     preset = (own_depth && !configured.empty())
+                                              ? nullptr
+                                              : emu_.Get<BoardDatabase>().DefaultGaPalette(bpp);
+    const std::vector<uint32_t>& colors = preset ? preset->colors : configured;
+    const size_t                 entries = size_t{1} << bpp;
+    if (colors.size() != entries)
+        emu_.Get<Fatal>().UserError("[CerfVirtFramebuffer] the indexed palette has %zu colours; %u bpp needs %zu",
+                                    colors.size(), bpp, entries);
+    std::copy(colors.begin(), colors.end(), palette_);
+    LOG(Periph, "[CerfVirtFramebuffer] %u bpp palette '%s' with %zu colours\n", bpp,
+        preset ? preset->id.c_str() : "configured", entries);
+}
+
 void CerfVirtFramebuffer::OnReady() {
     const auto& cfg = emu_.Get<DeviceConfig>();
     StoreGeometry(cfg.board_configurable_screen_width, cfg.board_configurable_screen_height);
-    bpp_.store(emu_.Get<BoardContext>().ResolveGuestAdditionsColorDepth(),
-               std::memory_order_release);
+    bpp_.store(ConfiguredDepth(), std::memory_order_release);
+    LoadConfiguredPalette();
     region_bytes_ = ComputeRegionBytes();
     if (emu_.Get<EmulatedMemory>().OverlapsRegion(MemBasePa(), region_bytes_))
         emu_.Get<Fatal>().Die("[CerfVirtFramebuffer] FB region at 0x%08X, %u B, overlaps backed "
@@ -151,6 +187,7 @@ void CerfVirtFramebuffer::OnReady() {
             scanout_.store(0u, std::memory_order_release);
         }
         ReapplyConfiguredDepth();
+        LoadConfiguredPalette();
         ClearContent();
         TurnBackForReset();
     });
@@ -235,7 +272,7 @@ void CerfVirtFramebuffer::ClearContent() {
 }
 
 void CerfVirtFramebuffer::ReapplyConfiguredDepth() {
-    const uint32_t want = emu_.Get<BoardContext>().ResolveGuestAdditionsColorDepth();
+    const uint32_t want = ConfiguredDepth();
     const uint32_t was  = Bpp();
     if (want == was) return;
     uint32_t w = 0, h = 0;

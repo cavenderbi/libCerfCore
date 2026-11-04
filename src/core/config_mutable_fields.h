@@ -22,6 +22,8 @@ public:
     void LoadGaFontSize(const nlohmann::json& ga, DeviceConfig& config, const std::string& path);
     void LoadGaClearType(const nlohmann::json& ga, DeviceConfig& config, const std::string& path);
     void LoadGaAllowUntrustedApps(const nlohmann::json& ga, DeviceConfig& config, const std::string& path);
+    void LoadGaPalette(const nlohmann::json& ga, DeviceConfig& config, const std::string& path);
+    void LoadGaFields(const nlohmann::json& ga, DeviceConfig& config, const std::string& path);
     void LoadHud(const nlohmann::json& root, DeviceConfig& config, const std::string& path);
     void LoadAll(const nlohmann::json& root, DeviceConfig& config, const std::string& path);
 };

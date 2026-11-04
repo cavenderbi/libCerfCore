@@ -37,5 +37,7 @@ const uint32_t kFbRegAllowUntrustedApps = 0x3Cu;
 
 const uint32_t kFbRegScanoutOffset = 0x40u;
 
+inline uint32_t FbRowBytes(uint32_t width, uint32_t bpp) { return (width * bpp + 7u) >> 3; }
+
 }
 }

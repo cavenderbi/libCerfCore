@@ -36,6 +36,7 @@ inline constexpr char kColorScheme[]           = "override_color_scheme";
 inline constexpr char kFontSize[]              = "override_font_size";
 inline constexpr char kClearType[]             = "override_cleartype";
 inline constexpr char kAllowUntrustedApps[]    = "allow_untrusted_apps";
+inline constexpr char kIndexedPalette[]        = "indexed_palette";
 inline constexpr char kShareFolder[]           = "share_folder";
 inline constexpr char kShareFolderMountPoint[] = "shared_folder_mount_point";
 inline constexpr char kAutorun[]               = "autorun";

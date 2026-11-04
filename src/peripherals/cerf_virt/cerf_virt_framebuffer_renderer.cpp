@@ -1,6 +1,7 @@
 #define NOMINMAX
 
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_framebuffer.h>
+#include <cerfcore/peripherals/cerf_virt/cerf_virt_fb_regs.h>
 
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
@@ -33,7 +34,8 @@ public:
         if (latch_.Latched()) return true;
         const CerfVirtScanout s = fb.Scanout();
         return latch_.ProbeAndLatch(fb.Bytes() + s.offset,
-                                    static_cast<size_t>(s.height) * s.width * (s.bpp >> 3u));
+                                    static_cast<size_t>(s.height) *
+                                        CerfVirt::FbRowBytes(s.width, s.bpp));
     }
 
     void RearmContentLatch() override {
@@ -57,12 +59,16 @@ public:
         const uint32_t copy_h = std::min(s.height, host_h);
         if (copy_w == 0 || copy_h == 0) return;
 
-        const uint32_t guest_stride = guest_w * (bpp >> 3u);
+        const uint32_t guest_stride = CerfVirt::FbRowBytes(guest_w, bpp);
         for (uint32_t y = 0; y < copy_h; ++y) {
             const uint8_t* src_row = src + static_cast<size_t>(y) * guest_stride;
             uint32_t* dst_row = dib_bgra32 + static_cast<size_t>(y) * host_w;
             if (bpp == 32u) {
                 std::memcpy(dst_row, src_row, static_cast<size_t>(copy_w) * 4u);
+            } else if (bpp < 8u) {
+                const uint32_t* pal = fb.Palette();
+                for (uint32_t x = 0; x < copy_w; ++x)
+                    dst_row[x] = 0xFF000000u | pal[lcd_pixel::PackedIndexMsbFirst(src_row, x, bpp)];
             } else if (bpp == 8u) {
                 const uint32_t* pal = fb.Palette();
                 for (uint32_t x = 0; x < copy_w; ++x)

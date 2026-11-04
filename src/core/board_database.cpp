@@ -4,6 +4,7 @@
 #include <cerfcore/core/cerf_paths.h>
 #include <cerfcore/core/config_json.h>
 #include <cerfcore/core/cpu_arch_name.h>
+#include <cerfcore/core/ga_palette_json.h>
 #include <cerfcore/core/support_level_text.h>
 
 #include "name_table.h"
@@ -22,6 +23,9 @@ using nlohmann::json;
 
 constexpr char kGaSharedFolderMountPoint[] = "ga_shared_folder_mount_point";
 constexpr char kGaVideoDriverNames[]       = "ga_video_driver_names";
+constexpr char kGaPalettes[]               = "ga_palettes";
+constexpr char kBpp[]                      = "bpp";
+constexpr char kValues[]                   = "values";
 constexpr char kSocFamilies[]              = "soc_families";
 constexpr char kSocs[]                     = "socs";
 constexpr char kDeviceFeatures[]           = "device_features";
@@ -113,6 +117,10 @@ void BoardDatabase::OnReady() {
     ga_shared_folder_mount_point_ = root.at(kGaSharedFolderMountPoint).get<std::string>();
     ga_video_driver_names_        = root.at(kGaVideoDriverNames).get<std::vector<std::string>>();
 
+    for (const auto& p : root.at(kGaPalettes))
+        ga_palettes_.push_back(DbGaPalette{p.at(kId).get<std::string>(), p.at(kName).get<std::string>(),
+                                           p.at(kBpp).get<uint32_t>(), GaPaletteFromJson(p.at(kValues)).value()});
+
     for (const auto& f : root.at(kSocFamilies))
         soc_families_.push_back(DbSocFamily{f.at(kId).get<std::string>(), f.at(kName).get<std::string>(),
                                             CpuArchFromName(f.at(kArch).get<std::string>())});
@@ -163,6 +171,12 @@ void BoardDatabase::OnReady() {
         MergeFeatures(b, row.features);
         boards_.push_back(std::move(row));
     }
+}
+
+const DbGaPalette* BoardDatabase::DefaultGaPalette(uint32_t bpp) const {
+    for (const auto& p : ga_palettes_)
+        if (p.bpp == bpp) return &p;
+    return nullptr;
 }
 
 const DbBoard* BoardDatabase::FindBoard(std::string_view id) const {

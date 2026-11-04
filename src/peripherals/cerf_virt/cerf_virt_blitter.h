@@ -28,6 +28,7 @@ private:
 
     std::vector<int32_t> sx_lut_;
     std::vector<int32_t> sy_lut_;
+    BltIndexConverter    index_converter_;
 };
 
 }

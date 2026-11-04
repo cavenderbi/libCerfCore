@@ -109,13 +109,7 @@ void ConfigLoader::LoadFeatures(const json& root, DeviceConfig& config, const st
             Reader().Fail(path, std::string("'") + config_key::kGuestAdditions + "' must be an object: { \"" +
                                     config_key::kEnabled + "\": true }");
         Reader().LoadOptBool(ga, config_key::kEnabled, config.guest_additions, path, config_key::kGuestAdditions);
-        auto& fields = emu_.Get<ConfigMutableFields>();
-        fields.LoadColorScheme(ga, config, path);
-        fields.LoadGaFontSize(ga, config, path);
-        fields.LoadGaClearType(ga, config, path);
-        fields.LoadGaAllowUntrustedApps(ga, config, path);
-        fields.LoadShareFolder(ga, config, path);
-        fields.LoadShareFolderMountPoint(ga, config, path);
+        emu_.Get<ConfigMutableFields>().LoadGaFields(ga, config, path);
         LoadGaAutorun(ga, config, path);
     }
     Reader().LoadOptBool(root, config_key::kFullScreen, config.start_fullscreen, path, {});
@@ -336,6 +330,7 @@ void ConfigLoader::LoadInto(DeviceConfig& config) {
         } else if (ReadCliOption(a, kArgScreenBpp, v)) {
             int n = atoi(v);
             if (n < 1) Reader().Fail("(command line)", "--screen-bpp must be >= 1");
+            if ((uint32_t)n != config.board_configurable_screen_bpp) config.guest_additions_palette.clear();
             config.board_configurable_screen_bpp = (uint32_t)n;
         } else if (ReadCliOption(a, kArgScreenRefreshRate, v)) {
             int n = atoi(v);

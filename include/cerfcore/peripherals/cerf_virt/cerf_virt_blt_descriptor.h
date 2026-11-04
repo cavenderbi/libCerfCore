@@ -95,6 +95,9 @@ typedef struct CerfBltDescriptor {
     uint32_t band_row_count;
 
     uint32_t cleartype_indices;
+
+    uint32_t dst_palette_off;
+    uint32_t dst_palette_entries;
 } CerfBltDescriptor;
 
 #if defined(__cplusplus)

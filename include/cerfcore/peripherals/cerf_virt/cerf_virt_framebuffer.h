@@ -77,6 +77,8 @@ public:
 
 private:
     uint32_t ComputeRegionBytes() const;
+    uint32_t ConfiguredDepth() const;
+    void     LoadConfiguredPalette();
     void     ReservePrimary();
     void     StoreGeometry(uint32_t w, uint32_t h);
     bool     PrimaryFitsReserve(uint32_t w, uint32_t h) const;

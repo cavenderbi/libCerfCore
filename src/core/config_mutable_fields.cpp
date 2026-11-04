@@ -4,7 +4,12 @@
 #include <cerfcore/core/config_json.h>
 #include <cerfcore/core/config_reader.h>
 #include <cerfcore/core/device_config_keys.h>
+#include <cerfcore/core/ga_palette_json.h>
 #include <cerfcore/core/share_folder_mount_name.h>
+
+#include <optional>
+#include <utility>
+#include <vector>
 
 namespace cerfcore {
 
@@ -22,6 +27,7 @@ void CfgResetMutableFields(DeviceConfig& config) {
     config.guest_additions_cleartype     = false;
     config.guest_additions_cleartype_set = false;
     config.guest_additions_allow_untrusted_apps = kDefaultAllowUntrustedApps;
+    config.guest_additions_palette.clear();
     config.share_folder.clear();
     config.share_folder_mount_point.clear();
     config.hud.clear();
@@ -110,6 +116,29 @@ void ConfigMutableFields::LoadGaAllowUntrustedApps(const nlohmann::json& ga, Dev
                                          path, config_key::kGuestAdditions);
 }
 
+void ConfigMutableFields::LoadGaPalette(const nlohmann::json& ga, DeviceConfig& config, const std::string& path) {
+    if (!ga.contains(config_key::kIndexedPalette)) return;
+    const auto& v = ga[config_key::kIndexedPalette];
+    if (v.is_null()) return;
+    std::optional<std::vector<uint32_t>> colors = GaPaletteFromJson(v);
+    if (!colors)
+        emu_.Get<ConfigReader>().Fail(
+            path, "'" + CfgKeyPath({config_key::kGuestAdditions, config_key::kIndexedPalette}) +
+                      "' must be an array of up to 256 [red, green, blue] colors with values from 0 to 255 "
+                      "(or null)");
+    config.guest_additions_palette = std::move(*colors);
+}
+
+void ConfigMutableFields::LoadGaFields(const nlohmann::json& ga, DeviceConfig& config, const std::string& path) {
+    LoadColorScheme(ga, config, path);
+    LoadGaFontSize(ga, config, path);
+    LoadGaClearType(ga, config, path);
+    LoadGaAllowUntrustedApps(ga, config, path);
+    LoadGaPalette(ga, config, path);
+    LoadShareFolder(ga, config, path);
+    LoadShareFolderMountPoint(ga, config, path);
+}
+
 void ConfigMutableFields::LoadHud(const nlohmann::json& root, DeviceConfig& config, const std::string& path) {
     if (root.contains(config_key::kHud))
         config.hud = emu_.Get<ConfigReader>().ReadOptString(root, config_key::kHud, path, {});
@@ -125,14 +154,7 @@ void ConfigMutableFields::LoadAll(const nlohmann::json& root, DeviceConfig& conf
     }
     if (root.contains(config_key::kGuestAdditions)) {
         const auto& ga = root[config_key::kGuestAdditions];
-        if (ga.is_object()) {
-            LoadColorScheme(ga, config, path);
-            LoadGaFontSize(ga, config, path);
-            LoadGaClearType(ga, config, path);
-            LoadGaAllowUntrustedApps(ga, config, path);
-            LoadShareFolder(ga, config, path);
-            LoadShareFolderMountPoint(ga, config, path);
-        }
+        if (ga.is_object()) LoadGaFields(ga, config, path);
     }
 }
 

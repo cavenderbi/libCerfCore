@@ -112,15 +112,8 @@ bool CerfVirtBlitter::Execute(const CerfBltDescriptor& d) {
         }
         for (int i = 0; i < 3; ++i) d_shift[i] = 32u - BltPixelOps::HighBitPos(d_masks[i]);
     }
-    if (d_indexed && alpha_blend) {
-        fatal_->Die("[CerfVirtBlitter] UNIMPLEMENTED alpha blend to indexed dst "
-                    "format %u (%u bpp), rop4=0x%04X", d.dst.format, d_bits, d.rop4);
-    }
-    if (d_indexed && d.convert_active != 0u) {
-        fatal_->Die("[CerfVirtBlitter] UNIMPLEMENTED channel conversion to indexed dst "
-                    "format %u (%u bpp), src format %u",
-                    d.dst.format, d_bits, d.src.format);
-    }
+    if (d_indexed && (d.convert_active != 0u || alpha_blend))
+        LoadIndexConverter(&index_converter_, d.dst_palette_off, d.dst_palette_entries);
     Surface dst;
     if (!ResolveSurface(d.dst, d_subbyte ? 1u : d_bpp, &dst)) FatalSurface("dst", d.dst);
 
@@ -212,16 +205,21 @@ bool CerfVirtBlitter::Execute(const CerfBltDescriptor& d) {
 
     BltAlphaContext ac{};
     if (alpha_blend) {
-        ac.red_mask = d_masks[0]; ac.green_mask = d_masks[1]; ac.blue_mask = d_masks[2];
-        ac.alpha_mask = (d_bpp == 4u) ? 0xFF000000u : 0u;
+        if (d_indexed) {
+            ac.red_mask = 0x000000FFu; ac.green_mask = 0x0000FF00u; ac.blue_mask = 0x00FF0000u;
+            ac.alpha_mask = 0xFF000000u;
+        } else {
+            ac.red_mask = d_masks[0]; ac.green_mask = d_masks[1]; ac.blue_mask = d_masks[2];
+            ac.alpha_mask = (d_bpp == 4u) ? 0xFF000000u : 0u;
+        }
 
-        ac.red_shift   = BltAlpha::ShiftOf(d_masks[0]);
-        ac.green_shift = BltAlpha::ShiftOf(d_masks[1]);
-        ac.blue_shift  = BltAlpha::ShiftOf(d_masks[2]);
+        ac.red_shift   = BltAlpha::ShiftOf(ac.red_mask);
+        ac.green_shift = BltAlpha::ShiftOf(ac.green_mask);
+        ac.blue_shift  = BltAlpha::ShiftOf(ac.blue_mask);
         ac.alpha_shift = BltAlpha::ShiftOf(ac.alpha_mask);
-        ac.red_bits   = BltAlpha::BitsOf(d_masks[0]);
-        ac.green_bits = BltAlpha::BitsOf(d_masks[1]);
-        ac.blue_bits  = BltAlpha::BitsOf(d_masks[2]);
+        ac.red_bits   = BltAlpha::BitsOf(ac.red_mask);
+        ac.green_bits = BltAlpha::BitsOf(ac.green_mask);
+        ac.blue_bits  = BltAlpha::BitsOf(ac.blue_mask);
         ac.alpha_bits = BltAlpha::BitsOf(ac.alpha_mask);
         ac.src_alpha_mask = 0xFF000000u; ac.src_alpha_shift = 24u;
         ac.const_alpha = (uint8_t)(d.blend_function >> 16);
@@ -264,13 +262,16 @@ bool CerfVirtBlitter::Execute(const CerfBltDescriptor& d) {
             uint32_t value = solid;
             uint32_t original_src = 0u;
             if (has_src && src_pal) {
-                const uint32_t bit_x = (uint32_t)src_col_x * src_bits;
-                uint32_t run = 0;
-                uint8_t* sp = PixelPtr(src, (int32_t)(bit_x >> 3), src_row_y, 1u, &run);
-                if (!sp) FatalPixel("src", d.src, src_col_x, src_row_y);
-                const uint32_t idx = (src_bits == 8u)
-                    ? *sp
-                    : (uint32_t)((*sp >> (8u - src_bits - (bit_x & 7u))) & ((1u << src_bits) - 1u));
+                uint32_t idx = 0u;
+                if (src_bits < 8u) {
+                    if (!ReadSubBytePixel(src, src_col_x, src_row_y, src_bits, &idx))
+                        FatalPixel("src", d.src, src_col_x, src_row_y);
+                } else {
+                    uint32_t run = 0;
+                    uint8_t* sp = PixelPtr(src, src_col_x, src_row_y, 1u, &run);
+                    if (!sp) FatalPixel("src", d.src, src_col_x, src_row_y);
+                    idx = *sp;
+                }
                 original_src = idx;
                 value = pal_lut[idx];
             } else if (has_src) {
@@ -284,20 +285,19 @@ bool CerfVirtBlitter::Execute(const CerfBltDescriptor& d) {
                 if (d.to_mono) {
                     value = (value == d.mono_bg) ? 1u : 0u;
                 } else if (d.convert_active) {
-                    const uint32_t cv = BltPixelOps::ConvertPixel(value, s_masks, s_shift, s_bits,
-                                                                  d_masks, d_shift);
-                    value = cv;
+                    value = d_indexed
+                        ? index_converter_.Convert(BltIndexConverter::ColorRefOf(value, s_masks, s_shift))
+                        : BltPixelOps::ConvertPixel(value, s_masks, s_shift, s_bits, d_masks, d_shift);
                 }
             }
 
             if (complex) {
                 uint8_t rop3 = fg_rop3;
                 if (has_mask) {
-                    const uint32_t mx = (uint32_t)(d.mask_rect.left + col);
-                    uint32_t mrun = 0;
-                    uint8_t* mp = PixelPtr(mask, (int32_t)(mx >> 3), mask_y, 1u, &mrun);
-                    if (!mp) FatalPixel("mask", d.mask, (int32_t)mx, mask_y);
-                    rop3 = ((*mp >> lcd_pixel::MsbFirstShift(mx, 1u)) & 1u) ? fg_rop3 : bg_rop3;
+                    const int32_t mx = d.mask_rect.left + col;
+                    uint32_t mbit = 0u;
+                    if (!ReadSubBytePixel(mask, mx, mask_y, 1u, &mbit)) FatalPixel("mask", d.mask, mx, mask_y);
+                    rop3 = mbit ? fg_rop3 : bg_rop3;
                 }
 
                 uint32_t brush_val = solid;
@@ -341,7 +341,10 @@ bool CerfVirtBlitter::Execute(const CerfBltDescriptor& d) {
                 value = BltPixelOps::ApplyRop3(rop3, value, dst_val, brush_val, (uint8_t)d_bits);
 
                 if (alpha_blend) {
-                    value = BltAlpha::Blend(ac, value, dst_val, original_src);
+                    value = d_indexed
+                        ? index_converter_.Nearest(BltAlpha::Blend(ac, index_converter_.ColorOf(value),
+                                                                   index_converter_.ColorOf(dst_val), original_src))
+                        : BltAlpha::Blend(ac, value, dst_val, original_src);
                 }
 
                 value &= dst_mask;
