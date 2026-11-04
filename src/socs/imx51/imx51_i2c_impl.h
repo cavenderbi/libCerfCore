@@ -35,6 +35,7 @@ constexpr uint16_t kI2crMsta = 0x20u;       /* master mode: 0->1 START, 1->0 STO
 constexpr uint16_t kI2crMtx  = 0x10u;       /* transmit (1) / receive (0) */
 constexpr uint16_t kI2crTxak = 0x08u;       /* transmit-ack (NACK the byte) */
 constexpr uint16_t kI2crRsta = 0x04u;       /* repeated START */
+constexpr uint16_t kI2crReadable = kI2crIen | kI2crIien | kI2crMsta | kI2crMtx | kI2crTxak;
 
 constexpr uint16_t kI2srIcf  = 0x80u;       /* data transfer complete */
 constexpr uint16_t kI2srIbb  = 0x20u;       /* bus busy */
@@ -89,7 +90,7 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write("iadr", iadr_); w.Write("ifdr", ifdr_); w.Write("i2cr", i2cr_);
+        w.Write("iadr", iadr_); w.Write("ifdr", ifdr_); w.Write("i2cr_readable", i2cr_);
         w.Write("i2sr", i2sr_); w.Write("i2dr", i2dr_);
         w.Write<uint8_t>("addr_phase", addr_phase_ ? 1 : 0);
         w.Write<uint8_t>("matched", matched_ ? 1 : 0);
@@ -98,7 +99,7 @@ public:
         if (auto* s = WiredSlave()) s->SaveState(w);
     }
     void RestoreState(StateReader& r) override {
-        r.Read("iadr", iadr_); r.Read("ifdr", ifdr_); r.Read("i2cr", i2cr_);
+        r.Read("iadr", iadr_); r.Read("ifdr", ifdr_); r.Read("i2cr_readable", i2cr_);
         r.Read("i2sr", i2sr_); r.Read("i2dr", i2dr_);
         uint8_t b = 0;
         r.Read("addr_phase", b); addr_phase_ = b != 0;
@@ -120,17 +121,21 @@ private:
         const bool was_master = (i2cr_ & kI2crMsta) != 0;
         const bool is_master  = (value & kI2crMsta) != 0;
         const bool rsta       = (value & kI2crRsta) != 0;
-        i2cr_ = value;
+        i2cr_ = static_cast<uint16_t>(value & kI2crReadable);
+        I2cSlave* s = WiredSlave();
         if (!was_master && is_master) {            /* START */
             i2sr_ |= kI2srIbb;
             addr_phase_ = true;
             matched_ = false;
+            if (s) s->BusStart();
         } else if (was_master && !is_master) {     /* STOP */
             i2sr_ &= ~(kI2srIbb | kI2srIcf);
             addr_phase_ = false;
             matched_ = false;
+            if (s) s->BusStop();
         } else if (is_master && rsta) {            /* repeated START */
             addr_phase_ = true;
+            if (s) s->BusStart();
         }
         UpdateIrq();   /* IIEN may have just been (de)asserted */
     }

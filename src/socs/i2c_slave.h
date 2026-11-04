@@ -42,6 +42,9 @@ public:
     /* Master is reading one byte from us. We return the register
        at the current sub_address and auto-increment. */
     virtual uint8_t TxnReadByte(uint8_t slave_addr) = 0;
+
+    virtual void BusStart() {}
+    virtual void BusStop() {}
 };
 
 }

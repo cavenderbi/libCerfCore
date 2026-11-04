@@ -33,6 +33,7 @@ void I2cBitBangTarget::Start() {
     master_nack_ = false;
     slave_       = nullptr;
     drive_(true);
+    for (I2cSlave* s : slaves_) s->BusStart();
 }
 
 void I2cBitBangTarget::Stop() {
@@ -40,6 +41,7 @@ void I2cBitBangTarget::Stop() {
     bit_    = 0;
     in_ack_ = false;
     drive_(true);
+    for (I2cSlave* s : slaves_) s->BusStop();
 }
 
 void I2cBitBangTarget::ClockRise() {
