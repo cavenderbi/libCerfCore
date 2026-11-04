@@ -37,28 +37,22 @@ protected:
 
     void OnChipSelectReady() override {
         gpio_ = &emu_.Get<Vrc4172Gpio>();
-        StartDataPump();
+        StartDataPump(kRcvdl56dpflTypicalSelfTest);
         emu_.Get<PeripheralDispatcher>().Register(this);
         emu_.Get<Vr41xxHsp>().RegisterAferstListener([this](bool high) { SetResetPin(high); });
     }
 
     uint8_t SelectedReadByte(uint32_t addr) override {
-        return ReadPumpRegister(RegisterOf(addr, 0u));
+        return ReadA1AddressedRegister(addr);
     }
 
     void SelectedWriteByte(uint32_t addr, uint8_t value) override {
-        WritePumpRegister(RegisterOf(addr, value), value);
+        WriteA1AddressedRegister(addr, value);
     }
 
     void DriveIrq(bool asserted) override { gpio_->SetPinLevel(kIrqGpioPin, asserted); }
 
 private:
-    uint32_t RegisterOf(uint32_t addr, uint8_t value) {
-        const uint32_t offset = addr - kWindowBase;
-        if (offset & 1u) HaltUnsupportedAccess("odd-address byte access", addr, value);
-        return offset >> 1;
-    }
-
     Vrc4172Gpio* gpio_ = nullptr;
 };
 

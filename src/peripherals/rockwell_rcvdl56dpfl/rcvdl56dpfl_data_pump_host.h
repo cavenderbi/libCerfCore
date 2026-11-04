@@ -11,6 +11,7 @@ public:
     virtual uint64_t BitTickNow()                         = 0;
     virtual uint64_t BitTicksElapsed()                    = 0;
     virtual void     ArmTimer(uint64_t tick)              = 0;
+    virtual int64_t  GuestNs()                            = 0;
 
 protected:
     ~Rcvdl56dpflDataPumpHost() = default;

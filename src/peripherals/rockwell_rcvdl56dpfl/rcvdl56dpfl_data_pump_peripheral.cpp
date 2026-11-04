@@ -8,19 +8,27 @@
 
 namespace cerfcore {
 
-void Rcvdl56dpflDataPumpPeripheral::StartDataPump() {
+void Rcvdl56dpflDataPumpPeripheral::StartDataPump(const Rcvdl56dpflSelfTest& self_test) {
+    pump_.SetSelfTestResults(self_test);
     clock_ = &emu_.Get<GuestCycleClock>();
     event_ = clock_->Add([this] { pump_.TimerElapsed(); });
     clock_->RegisterRateListener([this] { RescaleBitClock(); });
 }
 
-uint8_t Rcvdl56dpflDataPumpPeripheral::ReadPumpRegister(uint32_t reg) {
-    return pump_.Read(reg);
+uint8_t Rcvdl56dpflDataPumpPeripheral::ReadA1AddressedRegister(uint32_t addr) {
+    return pump_.Read(A1AddressedRegister(addr, 0u));
 }
 
-void Rcvdl56dpflDataPumpPeripheral::WritePumpRegister(uint32_t reg, uint8_t value) {
+void Rcvdl56dpflDataPumpPeripheral::WriteA1AddressedRegister(uint32_t addr, uint8_t value) {
+    const uint32_t reg = A1AddressedRegister(addr, value);
     if (const char* refused = pump_.Write(reg, value))
         emu_.Get<Fatal>().Die("[MDP] register %02Xh write 0x%02X: %s", reg, value, refused);
+}
+
+uint32_t Rcvdl56dpflDataPumpPeripheral::A1AddressedRegister(uint32_t addr, uint8_t value) {
+    const uint32_t offset = addr - MmioBase();
+    if (offset & 1u) HaltUnsupportedAccess("odd-address byte access", addr, value);
+    return offset >> 1;
 }
 
 void Rcvdl56dpflDataPumpPeripheral::SetResetPin(bool high) {
@@ -94,6 +102,10 @@ void Rcvdl56dpflDataPumpPeripheral::ArmTimer(uint64_t tick) {
         return;
     }
     clock_->Arm(event_, bit_ticks_.CycleOfTick(tick));
+}
+
+int64_t Rcvdl56dpflDataPumpPeripheral::GuestNs() {
+    return clock_->NowNs();
 }
 
 void Rcvdl56dpflDataPumpPeripheral::RescaleBitClock() {

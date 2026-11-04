@@ -18,9 +18,9 @@ public:
     void RestoreState(StateReader& r) override;
 
 protected:
-    void    StartDataPump();
-    uint8_t ReadPumpRegister(uint32_t reg);
-    void    WritePumpRegister(uint32_t reg, uint8_t value);
+    void    StartDataPump(const Rcvdl56dpflSelfTest& self_test);
+    uint8_t ReadA1AddressedRegister(uint32_t addr);
+    void    WriteA1AddressedRegister(uint32_t addr, uint8_t value);
     void    SetResetPin(bool high);
 
     virtual void DriveIrq(bool asserted) = 0;
@@ -31,7 +31,9 @@ private:
     uint64_t BitTickNow() override;
     uint64_t BitTicksElapsed() override;
     void     ArmTimer(uint64_t tick) override;
+    int64_t  GuestNs() override;
     void     RescaleBitClock();
+    uint32_t A1AddressedRegister(uint32_t addr, uint8_t value);
 
     GuestCycleClock*        clock_ = nullptr;
     GuestCycleClock::Event* event_ = nullptr;
