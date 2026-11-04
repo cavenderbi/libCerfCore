@@ -114,6 +114,13 @@ void GuestDeepSleep::PollPark() {
 
 void GuestDeepSleep::FinishPark() {
     for (auto& fn : park_clocks_) fn();
+    auto& guest = emu_.Get<EngineBridge>().Guest();
+    if (!guest.DeepSleep() || !guest.ResetPending()) return;
+    if (!wake_claimed_.exchange(true, std::memory_order_acq_rel)) {
+        ConsumeSleepSpan();
+        TearDownPromptForHardwareWake();
+    }
+    if (clock_stop_) PowerUpClockStop();
 }
 
 int64_t GuestDeepSleep::SleptNs() const {
@@ -256,7 +263,6 @@ void GuestDeepSleep::Recover() {
             static_cast<int>(c));
         return;
     }
-    if (c == ShutdownChoice::SoftReset && clock_stop_) PowerUpClockStop();
     emu_.Get<ShutdownAction>().Perform(c);
 }
 
