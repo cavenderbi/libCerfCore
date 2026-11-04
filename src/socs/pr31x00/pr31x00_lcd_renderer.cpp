@@ -1,7 +1,8 @@
 #define NOMINMAX
 
 #include "pr31x00_lcd.h"
-#include "pr31x00_lcd_gray_scale.h"
+#include "pr31x00_lcd_shading.h"
+#include "pr31x00_panel.h"
 
 #include <cerfcore/boards/board_context.h>
 #include "pr31500_id.h"
@@ -11,16 +12,15 @@
 #include <cerfcore/host/panel_frame_renderer.h>
 #include <cerfcore/lcd/lcd_pixel_expand.h>
 
+#include <algorithm>
 #include <cstring>
 
 namespace cerfcore {
 
 namespace {
 
-/* The gray modes vary a pixel's duty cycle over frames so the monochrome panel
-   takes on one of 16 shades (§17.3.7). */
-inline uint32_t ExpandShade(uint32_t shade) {
-    const uint32_t g = lcd_pixel::Expand4(shade);
+uint32_t MonoDot(uint32_t on_level) {
+    const uint32_t g = 255u - on_level;
     return lcd_pixel::PackXrgb(g, g, g);
 }
 
@@ -29,64 +29,80 @@ public:
     using PanelFrameRenderer::PanelFrameRenderer;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        if (!bd) return false;
-        const std::string_view soc = bd->GetSocId();
+        const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
         return soc == SocId::Pr31500 || soc == SocId::Pr31700;
     }
 
+    void OnReady() override { panel_color_ = emu_.Get<Pr31x00Panel>().Color(); }
+
     void PresentedSize(uint32_t& w, uint32_t& h) override {
-        auto& lcd = emu_.Get<Pr31x00Lcd>();
-        w = lcd.GetGuestW();
-        h = lcd.GetGuestH();
+        const Pr31x00Lcd::Scanout s = emu_.Get<Pr31x00Lcd>().GetScanout();
+        w = Width(s);
+        h = s.lines;
     }
 
     bool HasFrame() override {
-        auto& lcd = emu_.Get<Pr31x00Lcd>();
-        if (!lcd.IsEnabled())  return false;
+        const Pr31x00Lcd::Scanout s = emu_.Get<Pr31x00Lcd>().GetScanout();
+        if (!s.enabled)        return false;
         if (latch_.Latched())  return true;
-        const uint32_t fb_pa   = lcd.GetFbPa();
-        const uint32_t guest_w = lcd.GetGuestW();
-        const uint32_t guest_h = lcd.GetGuestH();
-        if (fb_pa == 0 || guest_w == 0 || guest_h == 0) return false;
-        const size_t fb_bytes =
-            (size_t)guest_h * (size_t)guest_w * lcd.GetBitsPerPixel() / 8u;
+        if (s.fb_pa == 0) return false;
+        const size_t fb_bytes = (size_t)s.lines * s.StrideBytes();
         return latch_.ProbeAndLatch(emu_.Get<EmulatedMemory>(),
-                                    fb_pa, fb_bytes);
+                                    s.fb_pa, fb_bytes);
     }
 
     void RenderInto(uint32_t* dib_bgra32, uint32_t host_w, uint32_t host_h) override {
-        auto& lcd = emu_.Get<Pr31x00Lcd>();
-        const auto& gray       = emu_.Get<Pr31x00LcdGrayScale>();
-        const uint32_t fb_pa   = lcd.GetFbPa();
-        const uint32_t guest_w = lcd.GetGuestW();
-        const uint32_t guest_h = lcd.GetGuestH();
-        const uint32_t bpp     = lcd.GetBitsPerPixel();
-        const bool     invert  = lcd.IsInverted();
+        const Pr31x00Lcd::Scanout s = emu_.Get<Pr31x00Lcd>().GetScanout();
+        const auto& shading = emu_.Get<Pr31x00LcdShading>();
 
         std::memset(dib_bgra32, 0, (size_t)host_w * host_h * 4u);
+        if (!s.enabled) return;
 
-        const uint32_t copy_w = (guest_w < host_w) ? guest_w : host_w;
-        const uint32_t copy_h = (guest_h < host_h) ? guest_h : host_h;
-        if (copy_w == 0 || copy_h == 0) return;
+        const uint32_t copy_w = std::min(Width(s), host_w);
+        const uint32_t copy_h = std::min(s.lines, host_h);
 
-        const uint8_t* src_base = emu_.Get<EmulatedMemory>().TryTranslate(fb_pa);
+        const uint8_t* src_base = emu_.Get<EmulatedMemory>().TryTranslate(s.fb_pa);
         if (!src_base) return;
 
-        const size_t stride = (size_t)guest_w * bpp / 8u;
+        const size_t stride = s.StrideBytes();
+        if (s.color_mode) {
+            uint32_t xrgb[256];
+            shading.FillColorLevels(xrgb, s.inverted);
+            for (uint32_t y = 0; y < copy_h; ++y) {
+                const uint8_t* src_row = src_base + (size_t)y * stride;
+                uint32_t* dst_row = dib_bgra32 + (size_t)y * host_w;
+                for (uint32_t x = 0; x < copy_w; ++x) {
+                    dst_row[x] = panel_color_
+                        ? xrgb[src_row[x]]
+                        : MonoDot((xrgb[src_row[x / 3u]] >> (16u - 8u * (x % 3u))) & 0xFFu);
+                }
+            }
+            return;
+        }
+        uint32_t level[16];
+        shading.FillDotLevels(level, s.bits_per_pixel, s.inverted);
         for (uint32_t y = 0; y < copy_h; ++y) {
             const uint8_t* src_row = src_base + (size_t)y * stride;
             uint32_t* dst_row = dib_bgra32 + (size_t)y * host_w;
+            auto dot = [&](uint32_t d) -> uint32_t {
+                return d < s.dots ? level[lcd_pixel::PackedIndexMsbFirst(src_row, d, s.bits_per_pixel)] : 0u;
+            };
             for (uint32_t x = 0; x < copy_w; ++x) {
-                /* Figure 17.2.1: the leftmost pixels of a line are driven by UD3, UD2, UD1, UD0,
-                   so a byte's most significant bits hold the leftmost pixel. */
-                dst_row[x] = ExpandShade(gray.ShadeFor(lcd_pixel::PackedIndexMsbFirst(src_row, x, bpp), bpp, invert));
+                dst_row[x] = panel_color_ ? lcd_pixel::PackXrgb(dot(3u * x), dot(3u * x + 1u), dot(3u * x + 2u))
+                                          : MonoDot(dot(x));
             }
         }
     }
+
+private:
+    uint32_t Width(const Pr31x00Lcd::Scanout& s) const {
+        return panel_color_ ? (s.dots + 2u) / 3u : s.dots;
+    }
+
+    bool panel_color_ = false;
 };
 
-}  /* namespace */
+}
 
 REGISTER_SERVICE_AS(Pr31x00LcdRenderer, PanelFrameRenderer);
 

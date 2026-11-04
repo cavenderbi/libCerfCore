@@ -79,12 +79,16 @@ constexpr uint32_t kCtl2Reserved  = 0x00200C00u;
 constexpr uint32_t kCtl3Reserved  = 0x0000000Fu;
 constexpr uint32_t kCtl4Reserved  = 0x0000000Fu;
 
+bool ColorModeOf(uint32_t ctl1) { return ((ctl1 >> kBitSelShift) & 3u) == kBitSel8BitColor; }
+
+uint32_t DotsOf(uint32_t ctl1, uint32_t ctl2) {
+    return (((ctl2 >> kHorzValShift) & kHorzValMask) + 1u) * ((ctl1 & kDisp8) ? 8u : 4u);
+}
+
 }  /* namespace */
 
 bool Pr31x00Lcd::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    if (!bd) return false;
-    const std::string_view soc = bd->GetSocId();
+    const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
     return soc == SocId::Pr31500 || soc == SocId::Pr31700;
 }
 
@@ -276,20 +280,30 @@ void Pr31x00Lcd::RearmLoad() {
     ArmLoadLocked();
 }
 
-bool Pr31x00Lcd::IsEnabled() const { return (reg_[kCtl1] & kEnVid) != 0; }
-bool Pr31x00Lcd::IsInverted() const { return (reg_[kCtl1] & kInvVid) != 0; }
-
-uint32_t Pr31x00Lcd::GetFbPa() const { return reg_[kCtl3] & kFbAddrMask; }
-
-uint32_t Pr31x00Lcd::GetGuestW() const {
-    const uint32_t horzval = (reg_[kCtl2] >> kHorzValShift) & kHorzValMask;
-    return (horzval + 1u) * ((reg_[kCtl1] & kDisp8) ? 8u : 4u);
+uint32_t Pr31x00Lcd::Scanout::StrideBytes() const {
+    return color_mode ? dots / 3u : dots * bits_per_pixel / 8u;
 }
 
-uint32_t Pr31x00Lcd::GetGuestH() const { return (reg_[kCtl2] & kLineValMask) + 1u; }
+Pr31x00Lcd::Scanout Pr31x00Lcd::GetScanout() const {
+    std::lock_guard<std::mutex> lk(state_mtx_);
+    const uint32_t ctl1 = reg_[kCtl1];
+    const uint32_t ctl2 = reg_[kCtl2];
+    Scanout s;
+    s.enabled        = (ctl1 & kEnVid) != 0u;
+    s.color_mode     = ColorModeOf(ctl1);
+    s.inverted       = (ctl1 & kInvVid) != 0u;
+    s.bits_per_pixel = 1u << ((ctl1 >> kBitSelShift) & 3u);
+    s.dots           = DotsOf(ctl1, ctl2);
+    s.lines          = (ctl2 & kLineValMask) + 1u;
+    s.fb_pa          = reg_[kCtl3] & kFbAddrMask;
+    return s;
+}
 
-uint32_t Pr31x00Lcd::GetBitsPerPixel() const {
-    return 1u << ((reg_[kCtl1] >> kBitSelShift) & 3u);
+void Pr31x00Lcd::CheckRgbTriLine(uint32_t addr, uint32_t value, uint32_t ctl1, uint32_t ctl2) {
+    if ((ctl1 & kEnVid) == 0u || !ColorModeOf(ctl1)) return;
+    if (DotsOf(ctl1, ctl2) % 3u != 0u) {
+        HaltUnsupportedAccess("PR31x00 LCD RGB-tri line with a partial tri", addr, value);
+    }
 }
 
 uint32_t Pr31x00Lcd::ReadWord(uint32_t addr) {
@@ -342,9 +356,7 @@ void Pr31x00Lcd::WriteRegLocked(uint32_t addr, uint32_t value, uint64_t now) {
             if (value & kDispSplit) {
                 HaltUnsupportedAccess("PR31x00 LCD DISPSPLIT", addr, value);
             }
-            if (((value >> kBitSelShift) & 3u) == kBitSel8BitColor) {
-                HaltUnsupportedAccess("PR31x00 LCD BITSEL 8-bit color", addr, value);
-            }
+            CheckRgbTriLine(addr, value, value, reg_[kCtl2]);
             const bool was_live   = ScanLiveLocked();
             const bool cp_changed = ((reg_[kCtl1] ^ value) & kCtl1Timing) != 0u;
             const bool was_enabled = (reg_[kCtl1] & kEnVid) != 0u;
@@ -367,6 +379,7 @@ void Pr31x00Lcd::WriteRegLocked(uint32_t addr, uint32_t value, uint64_t now) {
             if (value & kCtl2Reserved) {
                 HaltUnsupportedAccess("PR31x00 LCD VIDEO_CTL2 reserved", addr, value);
             }
+            CheckRgbTriLine(addr, value, reg_[kCtl1], value);
             WriteTimingLocked(value, now);
             return;
         }

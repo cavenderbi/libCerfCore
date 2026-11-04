@@ -1,9 +1,10 @@
-#include "pr31x00_lcd_gray_scale.h"
+#include "pr31x00_lcd_shading.h"
 
 #include <cerfcore/boards/board_context.h>
 #include "pr31500_id.h"
 #include "pr31700_id.h"
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/lcd/lcd_pixel_expand.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
 
@@ -46,25 +47,40 @@ constexpr uint32_t kCtl8Reserved  = 0xFFFFF000u;
 constexpr uint32_t kPat20Reserved = 0xFFF00000u;
 constexpr uint32_t kPat28Reserved = 0xF0000000u;
 
+struct DutyCycle {
+    uint32_t num;
+    uint32_t den;
+};
+
+constexpr DutyCycle kDutyCycle[16] = {
+    {0, 1}, {1, 7}, {1, 5}, {2, 7}, {1, 3}, {2, 5}, {3, 7}, {2, 4},
+    {4, 7}, {3, 5}, {2, 3}, {5, 7}, {3, 4}, {4, 5}, {6, 7}, {1, 1},
+};
+
+uint32_t OnLevel(uint32_t vdat, bool inverted) {
+    const DutyCycle duty = kDutyCycle[vdat];
+    const uint32_t  on   = (255u * duty.num + duty.den / 2u) / duty.den;
+    return inverted ? 255u - on : on;
 }
 
-bool Pr31x00LcdGrayScale::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    if (!bd) return false;
-    const std::string_view soc = bd->GetSocId();
+}
+
+bool Pr31x00LcdShading::ShouldRegister() {
+    const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
     return soc == SocId::Pr31500 || soc == SocId::Pr31700;
 }
 
-void Pr31x00LcdGrayScale::OnReady() {
+void Pr31x00LcdShading::OnReady() {
     emu_.Get<PeripheralDispatcher>().Register(this);
 }
 
 /* §17.4.5-§17.4.14: Video Control 5-14 are write-only. */
-uint32_t Pr31x00LcdGrayScale::ReadWord(uint32_t addr) {
+uint32_t Pr31x00LcdShading::ReadWord(uint32_t addr) {
     HaltUnsupportedAccess("PR31x00 LCD ReadWord", addr, 0);
 }
 
-void Pr31x00LcdGrayScale::WriteWord(uint32_t addr, uint32_t value) {
+void Pr31x00LcdShading::WriteWord(uint32_t addr, uint32_t value) {
+    std::lock_guard<std::mutex> lk(mtx_);
     switch ((addr - kBase) / 4u) {
         case kCtl5: reg_[kCtl5] = value; return;
         case kCtl6: reg_[kCtl6] = value; return;
@@ -127,7 +143,7 @@ void Pr31x00LcdGrayScale::WriteWord(uint32_t addr, uint32_t value) {
     }
 }
 
-void Pr31x00LcdGrayScale::StorePattern(uint32_t idx, uint32_t addr, uint32_t value,
+void Pr31x00LcdShading::StorePattern(uint32_t idx, uint32_t addr, uint32_t value,
                                        uint32_t recommended, const char* op) {
     if (value != recommended) {
         HaltUnsupportedAccess(op, addr, value);
@@ -138,28 +154,41 @@ void Pr31x00LcdGrayScale::StorePattern(uint32_t idx, uint32_t addr, uint32_t val
 /* §17.3.7 (printed p.17-14): gray scale is "the duty cycle (i.e., number of frames) for which a
    given pixel is turned on", 2-bit gray selects a BLUESEL nibble (§17.4.7, printed p.17-24);
    §17.4.1 (printed p.17-20) INVVID: "the VDAT[3:0] signals to be inverted". */
-uint32_t Pr31x00LcdGrayScale::ShadeFor(uint32_t raw, uint32_t bits_per_pixel, bool inverted) const {
-    uint32_t vdat;
-    if (bits_per_pixel == 2u) {
-        vdat = (reg_[kCtl7] >> (4u * raw)) & 0xFu;
-    } else if (bits_per_pixel == 1u) {
-        vdat = raw ? 0xFu : 0u;
-    } else {
-        vdat = raw;
-    }
-    const uint32_t on_duty = inverted ? (0xFu - vdat) : vdat;
-    return 0xFu - on_duty;
+uint32_t Pr31x00LcdShading::DotLevelLocked(uint32_t raw, uint32_t bits_per_pixel, bool inverted) const {
+    uint32_t vdat = raw;
+    if (bits_per_pixel == 2u) vdat = (reg_[kCtl7] >> (4u * raw)) & 0xFu;
+    if (bits_per_pixel == 1u) vdat = raw ? 0xFu : 0u;
+    return OnLevel(vdat, inverted);
 }
 
-void Pr31x00LcdGrayScale::SaveState(StateWriter& w) {
+void Pr31x00LcdShading::FillDotLevels(uint32_t (&level)[16], uint32_t bits_per_pixel, bool inverted) const {
+    std::lock_guard<std::mutex> lk(mtx_);
+    for (uint32_t v = 0; v < (1u << bits_per_pixel); ++v) {
+        level[v] = DotLevelLocked(v, bits_per_pixel, inverted);
+    }
+}
+
+void Pr31x00LcdShading::FillColorLevels(uint32_t (&xrgb)[256], bool inverted) const {
+    std::lock_guard<std::mutex> lk(mtx_);
+    for (uint32_t i = 0; i < 256u; ++i) {
+        const uint32_t r = OnLevel((reg_[kCtl5] >> (4u * ((i >> 5) & 7u))) & 0xFu, inverted);
+        const uint32_t g = OnLevel((reg_[kCtl6] >> (4u * ((i >> 2) & 7u))) & 0xFu, inverted);
+        const uint32_t b = OnLevel((reg_[kCtl7] >> (4u * (i & 3u))) & 0xFu, inverted);
+        xrgb[i] = lcd_pixel::PackXrgb(r, g, b);
+    }
+}
+
+void Pr31x00LcdShading::SaveState(StateWriter& w) {
     static_assert(sizeof(kRegNames) / sizeof(kRegNames[0]) == kRegs);
+    std::lock_guard<std::mutex> lk(mtx_);
     for (uint32_t i = 0; i < kRegs; ++i) w.Write(kRegNames[i], reg_[i]);
 }
 
-void Pr31x00LcdGrayScale::RestoreState(StateReader& r) {
+void Pr31x00LcdShading::RestoreState(StateReader& r) {
+    std::lock_guard<std::mutex> lk(mtx_);
     for (uint32_t i = 0; i < kRegs; ++i) r.Read(kRegNames[i], reg_[i]);
 }
 
-REGISTER_SERVICE(Pr31x00LcdGrayScale);
+REGISTER_SERVICE(Pr31x00LcdShading);
 
 }

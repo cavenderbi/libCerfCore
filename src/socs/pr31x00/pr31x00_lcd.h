@@ -29,12 +29,19 @@ public:
     void WriteHalf(uint32_t addr, uint16_t v) override { HaltUnsupportedAccess("PR31x00 LCD WriteHalf", addr, v); }
 
     /* Consumed by Pr31x00LcdRenderer. */
-    bool     IsEnabled() const;
-    bool     IsInverted() const;
-    uint32_t GetFbPa() const;
-    uint32_t GetGuestW() const;
-    uint32_t GetGuestH() const;
-    uint32_t GetBitsPerPixel() const;
+    struct Scanout {
+        bool     enabled;
+        bool     color_mode;
+        bool     inverted;
+        uint32_t bits_per_pixel;
+        uint32_t dots;
+        uint32_t lines;
+        uint32_t fb_pa;
+
+        uint32_t StrideBytes() const;
+    };
+
+    Scanout GetScanout() const;
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
@@ -48,6 +55,7 @@ protected:
 
 private:
     void     WriteRegLocked(uint32_t addr, uint32_t value, uint64_t now);
+    void     CheckRgbTriLine(uint32_t addr, uint32_t value, uint32_t ctl1, uint32_t ctl2);
     bool     ScanWantedLocked() const;
     void     SyncScanLocked(uint64_t now);
     uint32_t LineCntLocked(uint64_t now) const;

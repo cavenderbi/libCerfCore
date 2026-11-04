@@ -3,12 +3,13 @@
 #include <cerfcore/peripherals/peripheral_base.h>
 
 #include <cstdint>
+#include <mutex>
 
 namespace cerfcore {
 
 /* TMPR3911 §17.4.5-§17.4.14: Video Control 5-14 ($038-$05C), REDSEL / GREENSEL / BLUESEL and the
    PATn_m dither patterns. */
-class Pr31x00LcdGrayScale : public Peripheral {
+class Pr31x00LcdShading : public Peripheral {
 public:
     using Peripheral::Peripheral;
 
@@ -26,7 +27,8 @@ public:
     void WriteByte(uint32_t addr, uint8_t  v) override { HaltUnsupportedAccess("PR31x00 LCD WriteByte", addr, v); }
     void WriteHalf(uint32_t addr, uint16_t v) override { HaltUnsupportedAccess("PR31x00 LCD WriteHalf", addr, v); }
 
-    uint32_t ShadeFor(uint32_t raw, uint32_t bits_per_pixel, bool inverted) const;
+    void FillDotLevels(uint32_t (&level)[16], uint32_t bits_per_pixel, bool inverted) const;
+    void FillColorLevels(uint32_t (&xrgb)[256], bool inverted) const;
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
@@ -34,9 +36,11 @@ public:
 private:
     void StorePattern(uint32_t idx, uint32_t addr, uint32_t value,
                       uint32_t recommended, const char* op);
+    uint32_t DotLevelLocked(uint32_t raw, uint32_t bits_per_pixel, bool inverted) const;
 
     static constexpr uint32_t kRegs = 10;
 
+    mutable std::mutex mtx_;
     uint32_t reg_[kRegs] = {};
 };
 
