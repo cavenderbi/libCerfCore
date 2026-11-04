@@ -10,7 +10,8 @@ namespace {
 constexpr Vr41xxCoreClockModel kVr4102CoreClock{
     32u,
     2u,
-    {{18u, 4u}, {16u, 4u}, {14u, 4u}, {13u, 4u}, {12u, 4u}, {11u, 4u}, {0u, 0u}, {0u, 0u}},
+    {{18u, 4u, 0u}, {16u, 4u, 0u}, {14u, 4u, 0u}, {13u, 4u, 0u}, {12u, 4u, 0u}, {11u, 4u, 0u},
+     {0u, 0u, 0u}, {0u, 0u, 0u}},
 };
 
 class Vr4102CoreClock : public Vr41xxCoreClockBase<SocId::Vr4102, kVr4102CoreClock> {

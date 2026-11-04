@@ -69,7 +69,6 @@ constexpr uint16_t kCnt2SoftRst  = 0x0010u;
 /* PMUTCLKDIVREG (VR4131 UM 12.2.6, 0x0F0000CC): D8 TDIV + D2:0 VTDIV(2:0) R/W,
    D15:9/D7:3 RFU read 0; cleared to 0 at RTC reset (VTDIV 000 = CLKSEL strap mode). */
 constexpr uint32_t kOffTclkDivReg   = 0x0Cu;
-constexpr uint16_t kTclkDivWritable = 0x0107u;
 
 class Vr4122Pmu : public Vr41xxPmuBase<SocId::Vr4122, kModel> {
 public:
@@ -155,8 +154,9 @@ protected:
                                std::memory_order_release);
                 return;
             case kOffTclkDivReg:
-                emu_.Get<Vr4122ClockState>().SetPending(
-                    static_cast<uint16_t>(value & kTclkDivWritable));
+                if (const char* why = emu_.Get<Vr4122ClockState>().WritePending(value)) {
+                    HaltUnsupportedAccess(why, addr, value);
+                }
                 return;
             default: Vr41xxPmuBase::WriteHalfExt(addr, value); return;
         }

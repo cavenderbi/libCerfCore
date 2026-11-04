@@ -3,6 +3,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 
 #include <cstdint>
+#include "vr4121_clock_state.h"
 #include "vr4121_id.h"
 
 namespace cerfcore {
@@ -55,13 +56,7 @@ constexpr Vr41xxPmuModel kModel = {
     true,
 };
 
-constexpr uint32_t kOffDivReg   = 0x0Cu;
-constexpr uint16_t kDivWritable = 0x000Fu;
-
-constexpr bool DivModeDefined(uint16_t value) {
-    const uint16_t div = static_cast<uint16_t>(value & kDivWritable);
-    return div <= 0x6u || div == 0x9u || div == 0xAu;
-}
+constexpr uint32_t kOffDivReg = 0x0Cu;
 
 class Vr4121Pmu : public Vr41xxPmuBase<SocId::Vr4121, kModel> {
 public:
@@ -69,22 +64,17 @@ public:
 
     void SaveState(StateWriter& w) override {
         Vr41xxPmuBase::SaveState(w);
-        w.Write("divreg", divreg_);
+        emu_.Get<Vr4121ClockState>().SaveState(w);
     }
 
     void RestoreState(StateReader& r) override {
         Vr41xxPmuBase::RestoreState(r);
-        r.Read("divreg", divreg_);
-        if ((divreg_ & ~kDivWritable) != 0u || !DivModeDefined(divreg_)) {
-            r.Reject("Vr4121Pmu: restored PMUDIVREG 0x%04X is no DIV mode a write stores", divreg_);
-        }
+        emu_.Get<Vr4121ClockState>().RestoreState(r);
     }
 
 protected:
-    void ResetExt() override { divreg_ = 0; }
-
     uint16_t ReadHalfExt(uint32_t addr) override {
-        if (addr - kModel.base == kOffDivReg) return divreg_;
+        if (addr - kModel.base == kOffDivReg) return emu_.Get<Vr4121ClockState>().Pending();
         return Vr41xxPmuBase::ReadHalfExt(addr);
     }
 
@@ -93,14 +83,10 @@ protected:
             Vr41xxPmuBase::WriteHalfExt(addr, value);
             return;
         }
-        if (!DivModeDefined(value)) {
-            HaltUnsupportedAccess("PMUDIVREG WriteHalf with an RFU DIV mode", addr, value);
+        if (const char* why = emu_.Get<Vr4121ClockState>().WritePending(value)) {
+            HaltUnsupportedAccess(why, addr, value);
         }
-        divreg_ = static_cast<uint16_t>(value & kDivWritable);
     }
-
-private:
-    uint16_t divreg_ = 0;
 };
 
 }  /* namespace */

@@ -3,10 +3,7 @@
 #include <cerfcore/boards/board_context.h>
 #include "vr4122_id.h"
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/core/fatal.h>
 #include "../../cpu/mips/mips_core_clock.h"
-#include <cerfcore/state/state_stream.h>
-#include <cerfcore/socs/guest_cpu_reset.h>
 #include "../vr41xx/vr41xx_clock_strap.h"
 
 namespace cerfcore {
@@ -18,18 +15,19 @@ namespace {
 struct ClkselRow {
     uint16_t clksp;
     uint16_t vtdiv;
+    uint16_t vtdiv_modes;
 };
 
 /* VR4122 data sheet U15585EJ1V0DS Table 1-1 p.11, PClock = CLKX / CLKSP x 98
    (NetBSD hpcmips vrbcu_vrip_getcpuclock); CLKSEL 111 RFU. */
 constexpr ClkselRow kClksel[8] = {
-    {23u, 3u}, {20u, 3u}, {18u, 3u}, {14u, 4u}, {12u, 5u}, {11u, 5u}, {10u, 6u}, {0u, 0u},
+    {23u, 3u, 0x0Du}, {20u, 3u, 0x0Du}, {18u, 3u, 0x0Du}, {14u, 4u, 0x1Du},
+    {12u, 5u, 0x39u}, {11u, 5u, 0x38u}, {10u, 6u, 0x78u}, {0u, 0u, 0x00u},
 };
 
 constexpr uint64_t kPClockMult = 98u;
+constexpr uint16_t kTclkDivWritable = 0x0107u;
 constexpr uint16_t kVtDivMask = 0x7u;
-constexpr uint16_t kVtDivRfu1 = 0x1u;
-constexpr uint16_t kVtDivRfu7 = 0x7u;
 constexpr uint16_t kTDivShift = 8u;
 constexpr uint64_t kTClockPerMasterOut = 4u;
 
@@ -41,28 +39,29 @@ bool Vr4122ClockState::ShouldRegister() {
 }
 
 void Vr4122ClockState::OnReady() {
+    Vr41xxClockState::OnReady();
     const ClkselRow& row = emu_.Get<Vr41xxClockStrap>().StrapRow(kClksel);
     clksp_       = row.clksp;
     strap_vtdiv_ = row.vtdiv;
-    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
-        if (kind == ResetLineKind::Rtc) { pending_ = 0; active_ = 0; }
-        else                            { active_ = pending_; }
-    });
+    vtdiv_modes_ = row.vtdiv_modes;
 }
 
-void Vr4122ClockState::SetPending(uint16_t tclkdiv) { pending_ = tclkdiv; }
+const char* Vr4122ClockState::RejectedPending(uint16_t value) const {
+    if ((value & ~kTclkDivWritable) != 0u) return "PMUTCLKDIVREG WriteHalf sets a write-0 RFU bit";
+    if (((vtdiv_modes_ >> (value & kVtDivMask)) & 1u) == 0u) {
+        return "PMUTCLKDIVREG WriteHalf with a VTDIV this CLKSEL does not allow";
+    }
+    return nullptr;
+}
 
 uint16_t Vr4122ClockState::VtDivMode() const {
-    const uint16_t vtdiv = active_ & kVtDivMask;
-    if (vtdiv == kVtDivRfu1 || vtdiv == kVtDivRfu7) {
-        emu_.Get<Fatal>().Die("Vr4122ClockState: PMUTCLKDIVREG VTDIV %u is RFU", vtdiv);
-    }
+    const uint16_t vtdiv = Active() & kVtDivMask;
     return vtdiv != 0u ? vtdiv : strap_vtdiv_;
 }
 
 uint16_t Vr4122ClockState::TDivMode() const {
-    if ((active_ & kVtDivMask) == 0u) return 0u;
-    return static_cast<uint16_t>((active_ >> kTDivShift) & 1u);
+    if ((Active() & kVtDivMask) == 0u) return 0u;
+    return static_cast<uint16_t>((Active() >> kTDivShift) & 1u);
 }
 
 uint16_t Vr4122ClockState::ClkSpeedReg() const {
@@ -83,14 +82,6 @@ uint64_t Vr4122ClockState::CyclesPerTclkCounterTick() const {
     return VtDivMode();
 }
 
-void Vr4122ClockState::SaveState(StateWriter& w) const {
-    w.Write("pending", pending_);
-    w.Write("active", active_);
-}
-void Vr4122ClockState::RestoreState(StateReader& r) {
-    r.Read("pending", pending_);
-    r.Read("active", active_);
-    emu_.Get<MipsCoreClock>().CountRateRestored();
-}
+void Vr4122ClockState::ActiveRestored() { emu_.Get<MipsCoreClock>().CountRateRestored(); }
 
 }

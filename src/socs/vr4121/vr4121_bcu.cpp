@@ -4,6 +4,7 @@
 #include <cerfcore/core/fatal.h>
 #include "vr4121_bcu_board.h"
 #include "vr4121_bcu_regs.h"
+#include "vr4121_clock_state.h"
 #include "vr4121_dram_decode.h"
 
 #include <cstdint>
@@ -108,6 +109,11 @@ public:
         Vr41xxBcuBase::OnReady();
         emu_.Get<Vr4121DramDecode>().Begin(StoredReg(kIdxCnt1), StoredReg(kIdxCnt3),
                                            StoredReg(kIdxRamSize));
+    }
+
+    uint16_t ReadHalf(uint32_t addr) override {
+        if (addr - kModel.base == kOffClkSpeed) return emu_.Get<Vr4121ClockState>().ClkSpeedReg();
+        return Vr41xxBcuBase::ReadHalf(addr);
     }
 
     void WriteHalf(uint32_t addr, uint16_t value) override {
