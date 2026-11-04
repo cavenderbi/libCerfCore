@@ -5,6 +5,7 @@
 #include <cerfcore/state/state_stream.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "sharp_mobilon_hc4500_id.h"
+#include "sharp_mobilon_hc4500_8mb_id.h"
 #include "sharp_mobilon_hc4600_id.h"
 
 #include <cstdint>
@@ -19,7 +20,8 @@ public:
 
     bool ShouldRegister() override {
         const std::string_view id = emu_.Get<BoardContext>().GetBoardId();
-        return id == BoardId::SharpMobilonHc4500 || id == BoardId::SharpMobilonHc4600;
+        return id == BoardId::SharpMobilonHc4500 || id == BoardId::SharpMobilonHc45008mb ||
+               id == BoardId::SharpMobilonHc4600;
     }
 
     void OnReady() override {

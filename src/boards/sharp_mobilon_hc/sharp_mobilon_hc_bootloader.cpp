@@ -1,10 +1,12 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/service.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
+#include "../../socs/pr31x00/pr31x00_biu.h"
 #include "../../socs/pr31x00/pr31x00_clock.h"
 #include "../../socs/pr31x00/pr31x00_intc.h"
 #include <cerfcore/boards/board_context.h>
 #include "sharp_mobilon_hc_family_id.h"
+#include "sharp_mobilon_hc_memory.h"
 
 #include <cstdint>
 
@@ -25,8 +27,7 @@ public:
     using Service::Service;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
     }
 
     void OnReady() override {
@@ -40,6 +41,7 @@ private:
     void Apply() {
         emu_.Get<Pr31x00Intc>().SetGlobalEnable();
         emu_.Get<Pr31x00Clock>().PresetSerialClock(kCserDiv);
+        emu_.Get<Pr31x00Biu>().PresetBanks(emu_.Get<SharpMobilonHcMemory>().MemConfig0Banks());
     }
 };
 

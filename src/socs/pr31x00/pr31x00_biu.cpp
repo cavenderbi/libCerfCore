@@ -31,6 +31,8 @@ constexpr uint32_t kCfg0Unmodeled = 0x7E000000u;
    DRAM the board backs. */
 constexpr uint32_t kCfg0EnCs1Dram = 1u << 20;
 
+constexpr uint32_t kCfg0Banks = 0x000FFFF0u;
+
 /* §4.7.4: CARD2ACCVAL<31:28> CARD1ACCVAL<27:24> CARD2IOACCVAL<23:20>
    CARD1IOACCVAL<19:16> ENMCS3PAGE<15> ENMCS2PAGE<14> ENMCS1PAGE<13> ENMCS0PAGE<12>
    ENCS3PAGE<11> ENCS2PAGE<10> ENCS1PAGE<9> ENCS0PAGE<8> CARD2WAITEN<7> CARD1WAITEN<6>
@@ -106,6 +108,10 @@ void Pr31x00Biu::ApplyCsPortSizes() {
     for (uint32_t i = 0; i < kCsWindows; ++i) {
         dispatcher.SetHalfwordPort(cs_ports_[i], (reg_[0] & (1u << kCsWindowMap[i].cs)) == 0u);
     }
+}
+
+void Pr31x00Biu::PresetBanks(uint32_t banks) {
+    reg_[0] = (reg_[0] & ~kCfg0Banks) | banks;
 }
 
 bool Pr31x00Biu::Card1IoSpace() const { return (reg_[3] & kCfg3Card1IoEn) != 0; }

@@ -32,6 +32,8 @@ public:
     bool Card1IoSpace() const;
     bool Card2IoSpace() const;
 
+    void PresetBanks(uint32_t banks);
+
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
 

@@ -4,6 +4,7 @@
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "sharp_mobilon_hc4000_id.h"
 #include "sharp_mobilon_hc4100_id.h"
+#include "sharp_mobilon_hc4100_8mb_id.h"
 
 #include <cstdint>
 
@@ -17,7 +18,8 @@ public:
 
     bool ShouldRegister() override {
         const std::string_view id = emu_.Get<BoardContext>().GetBoardId();
-        return id == BoardId::SharpMobilonHc4000 || id == BoardId::SharpMobilonHc4100;
+        return id == BoardId::SharpMobilonHc4000 || id == BoardId::SharpMobilonHc4100 ||
+               id == BoardId::SharpMobilonHc41008mb;
     }
 
     void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
