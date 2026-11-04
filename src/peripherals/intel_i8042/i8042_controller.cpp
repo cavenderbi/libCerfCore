@@ -31,7 +31,9 @@ REGISTER_SERVICE(I8042Controller);
 I8042Controller::I8042Controller(CerfEmulator& emu)
     : Service(emu),
       kbd_([] {}),
-      mouse_([] {}) {}
+      mouse_([] {}, [this](const char* what, unsigned value) {
+          emu_.Get<Fatal>().Die("i8042 aux device: %s 0x%X", what, value);
+      }) {}
 
 bool I8042Controller::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();

@@ -14,8 +14,7 @@ namespace cerfcore {
    0x1A0000 - 8042 status +0x400, command/data +0x800 (glidepad.dll). */
 class HpJornada820CompanionAsic : public Peripheral {
 public:
-    explicit HpJornada820CompanionAsic(CerfEmulator& emu)
-        : Peripheral(emu), mouse_([this] { RaiseIrq(); }) {}
+    explicit HpJornada820CompanionAsic(CerfEmulator& emu);
 
     bool ShouldRegister() override;
     void OnReady() override;

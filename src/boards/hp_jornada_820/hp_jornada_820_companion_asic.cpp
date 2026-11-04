@@ -1,6 +1,7 @@
 #include "hp_jornada_820_companion_asic.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/fatal.h>
 #include <cerfcore/boards/board_context.h>
 #include "hp_jornada_820_family_id.h"
 #include "../../peripherals/peripheral_dispatcher.h"
@@ -17,6 +18,13 @@ namespace {
    (e.g. GPIO1, masked in ICMR) never deliver and the touchpad goes dead. */
 constexpr uint32_t kGpio = 14u;
 }  /* namespace */
+
+HpJornada820CompanionAsic::HpJornada820CompanionAsic(CerfEmulator& emu)
+    : Peripheral(emu),
+      mouse_([this] { RaiseIrq(); },
+             [this](const char* what, unsigned value) {
+                 emu_.Get<Fatal>().Die("Jornada 820 GlidePad: %s 0x%X", what, value);
+             }) {}
 
 bool HpJornada820CompanionAsic::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();

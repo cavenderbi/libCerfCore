@@ -1,8 +1,7 @@
 #include "rcvdl56dpfl_transmitter.h"
 
+#include "../serial/uart_frame.h"
 #include <cerfcore/state/state_stream.h>
-
-#include <bit>
 
 namespace cerfcore {
 
@@ -274,9 +273,11 @@ uint64_t Rcvdl56dpflTransmitter::NextBoundary(uint64_t now) const {
 uint8_t Rcvdl56dpflTransmitter::ParityBit(const Rcvdl56dpflLineConfig& c, uint8_t value) const {
     if (!c.parity) return 0u;
     if (c.parity_select == kParityStuff) return (shift_flags_ & kEntryNinth) ? 1u : 0u;
-    if (c.parity_select == kParitySpace) return 0u;
-    const uint8_t ones = static_cast<uint8_t>(std::popcount(value) & 1);
-    return c.parity_select == kParityEven ? ones : static_cast<uint8_t>(ones ^ 1u);
+    const SerialLine::LineConfig::Parity parity =
+        c.parity_select == kParitySpace  ? SerialLine::LineConfig::Parity::Space
+        : c.parity_select == kParityEven ? SerialLine::LineConfig::Parity::Even
+                                         : SerialLine::LineConfig::Parity::Odd;
+    return UartParityBit(parity, value, c.data_bits) ? 1u : 0u;
 }
 
 uint32_t Rcvdl56dpflTransmitter::StuffedBits(uint8_t value) {

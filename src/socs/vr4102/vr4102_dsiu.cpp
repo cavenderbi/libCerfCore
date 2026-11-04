@@ -26,6 +26,6 @@ public:
 
 }  /* namespace */
 
-REGISTER_SERVICE(Vr4102Dsiu);
+REGISTER_SERVICE_AS(Vr4102Dsiu, Vr41xxDsiu);
 
 }

@@ -68,15 +68,7 @@ void S3C2410Spi::Reset() {
     }
 }
 
-void S3C2410Spi::SetSlave(int channel, SpiSlave* slave) {
-    if (channel < 0 || channel >= kChannels) {
-        emu_.Get<Fatal>().Die("S3C2410Spi::SetSlave: channel %d out of range", channel);
-    }
-    if (slave_[channel] != nullptr) {
-        emu_.Get<Fatal>().Die("S3C2410Spi::SetSlave: channel %d already attached", channel);
-    }
-    slave_[channel] = slave;
-}
+void S3C2410Spi::SetSlave(int channel, SpiSlave* slave) { slave_[channel] = slave; }
 
 uint32_t S3C2410Spi::ReadWord(uint32_t addr) {
     const uint32_t off = addr - MmioBase();

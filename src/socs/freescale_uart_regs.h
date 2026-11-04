@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../peripherals/serial/uart_frame.h"
+
 #include <cstdint>
 
 namespace cerfcore {
@@ -171,22 +173,25 @@ inline FreescaleUartFrame FrameOf(uint32_t ucr2) {
     return f;
 }
 
+inline SerialLine::LineConfig LineFormat(const FreescaleUartFrame& f) {
+    SerialLine::LineConfig c;
+    c.data_bits = static_cast<uint8_t>(f.data_bits);
+    c.parity    = !f.parity ? SerialLine::LineConfig::Parity::None
+                : f.odd     ? SerialLine::LineConfig::Parity::Odd
+                            : SerialLine::LineConfig::Parity::Even;
+    c.stop      = f.bits - 1u - f.data_bits - (f.parity ? 1u : 0u) == 2u
+                      ? SerialLine::LineConfig::Stop::Two
+                      : SerialLine::LineConfig::Stop::One;
+    return c;
+}
+
 /* MCIMX51RM Figure 59-24 (page 59-61): start bit 0, data bits from bit 0, the optional parity bit,
    stop bits 1; Table 59-9 PROE: "When PROE is high, odd parity is generated and expected". Bit i of
    the result is the line level during bit time i of the frame. */
 inline uint32_t WireBits(uint8_t byte, bool parity_error, bool brk, const FreescaleUartFrame& f) {
     if (brk) return 0u;
-    const uint32_t data = byte & ((1u << f.data_bits) - 1u);
-    uint32_t bits = data << 1;
-    uint32_t pos  = 1u + f.data_bits;
-    if (f.parity) {
-        uint32_t ones = 0u;
-        for (uint32_t v = data; v != 0u; v &= v - 1u) ++ones;
-        const bool level = ((ones & 1u) != 0u) != f.odd;
-        if (level != parity_error) bits |= 1u << pos;
-        ++pos;
-    }
-    for (; pos < f.bits; ++pos) bits |= 1u << pos;
+    uint32_t bits = UartFrameLevels(LineFormat(f), byte);
+    if (f.parity && parity_error) bits ^= 1u << (1u + f.data_bits);
     return bits;
 }
 

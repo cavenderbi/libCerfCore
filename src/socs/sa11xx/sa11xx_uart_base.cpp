@@ -1,7 +1,6 @@
 #include "sa11xx_uart_base.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/core/fatal.h>
 #include <cerfcore/boards/board_context.h>
 #include "sa1110_id.h"
 #include "sa1100_id.h"
@@ -137,10 +136,7 @@ void Sa11xxUartBase::RefreshIrqLocked() {
     }
 }
 
-void Sa11xxUartBase::AttachDevice(UartLineDevice* device) {
-    if (device_ != nullptr) emu_.Get<Fatal>().Die("%s: a second line device attached", ChannelName());
-    device_ = device;
-}
+void Sa11xxUartBase::AttachDevice(UartLineDevice* device) { device_ = device; }
 
 void Sa11xxUartBase::AttachEndpoint(UartEndpoint* endpoint) {
     AttachDevice(endpoint);

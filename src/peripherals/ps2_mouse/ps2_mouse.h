@@ -4,53 +4,74 @@
 #include <deque>
 #include <functional>
 #include <mutex>
+#include <vector>
 
 namespace cerfcore {
 
 class StateWriter;
 class StateReader;
 
-/* Generic PS/2 mouse device: the standard command/response handshake and
-   3-byte motion packet, independent of any host controller. A board maps its
-   controller's data/status registers onto WriteCommand / HasData / ReadData,
-   and supplies on_data to raise its IRQ when a motion packet is queued. */
+struct Ps2MouseTraits {
+    bool reset_wrap_disables_stream = false;
+    bool applies_scaling            = true;
+};
+
 class Ps2Mouse {
 public:
     static constexpr uint32_t kButtonLeft  = 0x1u;
     static constexpr uint32_t kButtonRight = 0x2u;
 
-    explicit Ps2Mouse(std::function<void()> on_data)
-        : on_data_(std::move(on_data)) {}
+    using HaltFn = std::function<void(const char* what, unsigned value)>;
 
-    /* Driver -> device: a command byte (or a parameter for the previous
-       command). Queues the ACK + any command-specific response. */
-    void WriteCommand(uint8_t cmd);
+    Ps2Mouse(std::function<void()> on_data, HaltFn halt, Ps2MouseTraits traits = {});
 
-    bool    HasData() const;   /* a response/packet byte is pending */
-    uint8_t ReadData();        /* device -> driver, pops one byte */
+    void    WriteCommand(uint8_t byte);
+    bool    HasData() const;
+    uint8_t ReadData();
+    void    QueueMotion(int dx, int dy, uint32_t button_mask);
 
-    /* Host motion -> a 3-byte packet + the data IRQ. dx>0 right, dy>0 down. */
-    void QueueMotion(int dx, int dy, uint32_t button_mask);
+    bool AwaitsCommand() const;
+    void Acknowledge(std::vector<uint8_t> data = {});
+    bool Reject();
+    void AbortCommand();
 
-    /* reporting_/expect_param_ are guest-set modes that persist; the motion
-       packet queue is transient host input and is cleared on restore. */
     void SaveState(StateWriter& w) const;
     void RestoreState(StateReader& r);
-
-    /* Power-cycle reset: drop queued motion + return to defaults. A real PS/2
-       mouse comes back empty after a system reset; the guest re-inits with F6+F4
-       (no FF reset), so a leftover motion packet ahead of the F6 ACK desyncs it. */
     void Reset();
 
 private:
-    void PushLocked(uint8_t b) { out_.push_back(b); }
-    void RaiseData();   /* invoke on_data_ (IRQ) outside the queue lock */
+    void                 CommandLocked(uint8_t b);
+    void                 ParameterLocked(uint8_t b);
+    void                 AcknowledgeLocked(std::vector<uint8_t> data);
+    bool                 RejectLocked();
+    void                 SetDefaultsLocked();
+    void                 ResetCountersLocked();
+    bool                 StreamingLocked() const;
+    uint8_t              StatusLocked() const;
+    uint8_t              ButtonBitsLocked() const;
+    std::vector<uint8_t> AccumulatedPacketLocked() const;
+    void                 RaiseData();
 
     mutable std::mutex    mtx_;
-    std::deque<uint8_t>   out_;
-    bool                  expect_param_ = false;
-    bool                  reporting_    = false;  /* 0xF4 enables motion stream + IRQs */
     std::function<void()> on_data_;
+    HaltFn                halt_;
+    Ps2MouseTraits        traits_;
+
+    std::deque<uint8_t>  out_;
+    std::vector<uint8_t> last_packet_;
+    uint8_t              pending_command_ = 0;
+    uint8_t              invalid_count_   = 0;
+    bool                 reporting_       = false;
+    bool                 remote_          = false;
+    bool                 wrap_            = false;
+    bool                 scaling_2to1_    = false;
+    uint8_t              sample_rate_     = 100;
+    uint8_t              resolution_      = 2;
+    uint32_t             buttons_         = 0;
+    int32_t              count_x_         = 0;
+    int32_t              count_y_         = 0;
+    bool                 overflow_x_      = false;
+    bool                 overflow_y_      = false;
 };
 
 }
