@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cerfcore/lcd/lcd_pixel_expand.h>
+#include "../raster/rop3.h"
 
 #include <cstdint>
 #include <vector>
@@ -122,8 +123,6 @@ protected:
     uint32_t BytesPerPixel() const { return DepthBytes(reg_[kGe0ADstStride]); }
     uint32_t DestStrideBytes() const { return reg_[kGe0ADstStride] & Lyt().stride_mask; }
     uint32_t BaseAddr()        const { return reg_[kGe0BBase] & Lyt().base_mask; }
-
-    static uint32_t Rop3(uint8_t rop, uint32_t p, uint32_t s, uint32_t d);
 
     /* ROP pattern operand P for a MONO_PATTERN blit: the 8x8 mono pattern
        (MONO_PATTERN0/1, two dwords = 8 rows x 8 bits, MSB-first per byte) tiled

@@ -34,3 +34,4 @@
 - **[Wine](https://www.winehq.org/)**
 - **[XNU](https://github.com/apple-oss-distributions/xnu)**
 - **[Android Open Source Project](https://source.android.com/)**
+- **[X.Org Trident driver](https://gitlab.freedesktop.org/xorg/driver/xf86-video-trident)**

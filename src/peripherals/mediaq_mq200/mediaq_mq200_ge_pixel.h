@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mediaq_mq200_ge.h"
+#include "../raster/rop3.h"
 
 #include <cstdint>
 
@@ -11,15 +12,13 @@ public:
     Pixel(const uint32_t* r, const Layout& layout, uint8_t* fb, uint32_t fb_size);
 
     static uint8_t Rop(uint32_t cmd);
-    static bool    ReadsPattern(uint8_t rop);
-    static bool    ReadsSource(uint8_t rop);
 
     uint32_t Bpp() const    { return bpp_; }
     uint32_t Mask() const   { return mask_; }
     uint32_t Stride() const { return stride_; }
     uint32_t Base() const   { return base_; }
-    bool ReadsPattern() const { return ReadsPattern(rop_); }
-    bool ReadsSource() const  { return ReadsSource(rop_); }
+    bool ReadsPattern() const { return Rop3ReadsPattern(rop_); }
+    bool ReadsSource() const  { return Rop3ReadsSource(rop_); }
 
     bool Outside(int x, int y) const;
     bool Fetch(int64_t addr, uint32_t& value) const;

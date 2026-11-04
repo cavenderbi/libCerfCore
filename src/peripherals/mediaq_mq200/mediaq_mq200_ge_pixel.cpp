@@ -44,14 +44,6 @@ uint8_t MediaQMq200Ge::Pixel::Rop(uint32_t cmd) {
     return static_cast<uint8_t>((rop & 0x0Fu) | ((rop & 0x0Fu) << 4));
 }
 
-bool MediaQMq200Ge::Pixel::ReadsPattern(uint8_t rop) {
-    return ((rop >> 4) & 0x0Fu) != (rop & 0x0Fu);
-}
-
-bool MediaQMq200Ge::Pixel::ReadsSource(uint8_t rop) {
-    return ((rop >> 2) & 0x33u) != (rop & 0x33u);
-}
-
 bool MediaQMq200Ge::Pixel::Outside(int x, int y) const {
     if (x < 0 || y < 0) return true;
     return clip_ && (x < cl_ || x > cr_ || y < ct_ || y > cb_);

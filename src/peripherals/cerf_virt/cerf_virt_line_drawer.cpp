@@ -1,5 +1,6 @@
 #include "cerf_virt_line_drawer.h"
 #include "cerf_virt_blt_pixelops.h"
+#include "../raster/gpe_line_walk.h"
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_framebuffer.h>
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -49,20 +50,13 @@ bool CerfVirtLineDrawer::Execute(const CerfLineDescriptor& l) {
     const uint8_t  rop2_mark  = (uint8_t)l.mix;
     const uint8_t  rop2_space = (uint8_t)(l.mix >> 8);
 
-    static const int8_t kDir[8][4] = {
-        {  1,  0,  0,  1 }, {  0,  1,  1,  0 }, {  0,  1, -1,  0 }, { -1,  0,  0,  1 },
-        { -1,  0,  0, -1 }, {  0, -1, -1,  0 }, {  0, -1,  1,  0 }, {  1,  0,  0, -1 },
-    };
-    const int8_t* dir = kDir[l.i_dir];
-
-    long accum = (long)l.d_n + l.ll_gamma;
-    const long axstp = (long)l.d_n;
-    const long dgstp = (long)l.d_n - (long)l.d_m;
-
-    int32_t x = l.x_start, y = l.y_start;
+    GpeLineWalk walk(l.x_start, l.y_start, static_cast<uint32_t>(l.i_dir), l.d_m, l.d_n,
+                     l.ll_gamma);
     int32_t style_state = l.style_state;
     Fatal& fatal = *fatal_;
     for (int32_t n = l.c_pels; n > 0; --n) {
+        const int32_t x = walk.X();
+        const int32_t y = walk.Y();
         const uint8_t rop2 = ((l.style >> ((uint32_t)(style_state++) & 31u)) & 1u)
                            ? rop2_space : rop2_mark;
         const bool clipped_out = l.has_clip != 0u &&
@@ -104,11 +98,7 @@ bool CerfVirtLineDrawer::Execute(const CerfLineDescriptor& l) {
             }
         }
         if (n == 1) break;
-        x += dir[0]; y += dir[1];
-        if (axstp) {
-            if (accum < 0) accum += axstp;
-            else { x += dir[2]; y += dir[3]; accum += dgstp; }
-        }
+        walk.Advance();
     }
     fb_->MarkDirty();
     return true;

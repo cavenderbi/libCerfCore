@@ -2,23 +2,36 @@
 
 #include <cerfcore/peripherals/peripheral_base.h>
 
-#include "../../lcd/display_size_latch.h"
+#include "../../lcd/display_mode_latch.h"
+#include "ite_it8181_gui.h"
+#include "ite_it8181_vga.h"
 
 #include <cstdint>
 #include <vector>
 
 namespace cerfcore {
 
-/* ITE IT8181 VGA/LCD controller (NetBSD hpcmips ite8181reg.h; guest ddi.dll). */
 class IteIt8181 : public Peripheral {
 public:
     using Peripheral::Peripheral;
 
+    struct Scanout {
+        bool     shown  = false;
+        uint32_t width  = 0;
+        uint32_t height = 0;
+        uint32_t stride = 0;
+        uint32_t start  = 0;
+        uint32_t bytes  = 0;
+    };
+
+    static constexpr uint32_t kVramBytes   = 0x00400000u;
+    static constexpr uint32_t kCursorImage = 0x000FFF00u;
+
     bool ShouldRegister() override;
     void OnReady() override;
 
-    uint32_t MmioBase() const override { return kLcdCsBase; }
-    uint32_t MmioSize() const override { return kLcdCsSize; }
+    uint32_t MmioBase() const override { return base_; }
+    uint32_t MmioSize() const override { return kWindowBytes; }
 
     uint8_t  ReadByte (uint32_t addr) override;
     uint16_t ReadHalf (uint32_t addr) override;
@@ -30,30 +43,40 @@ public:
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
 
-    bool     IsEnabled() const { return fb_written_; }
-    uint32_t GuestW()    const { return kSplashW; }
-    uint32_t GuestH()    const { return kSplashH; }
-    uint32_t Bpp()       const { return kSplashBpp; }
-    uint32_t StrideBytes() const { return kSplashStride; }
-    const uint8_t* FbBytes() const { return fb_.data(); }
+    Scanout        Display() const;
+    const uint8_t* Vram() const { return vram_.data(); }
+    uint32_t       PaletteXrgb(uint8_t index) const { return vga_.PaletteXrgb(index); }
+    const IteIt8181Gui& Gui() const { return gui_; }
 
 private:
-    static constexpr uint32_t kLcdCsBase = 0x0A000000u;
-    static constexpr uint32_t kLcdCsSize = 0x00800000u;
-    static constexpr uint32_t kVramSize  = 0x00080000u;
+    static constexpr uint32_t kWindowBytes = 0x00800000u;
 
-    /* Splash geometry is bootloader-seeded (no register carries it at splash);
-       nk.exe sub_9F003660 blits 640x240 2bpp at a 256-byte line pitch. */
-    static constexpr uint32_t kSplashW      = 640u;
-    static constexpr uint32_t kSplashH      = 240u;
-    static constexpr uint32_t kSplashBpp    = 2u;
-    static constexpr uint32_t kSplashStride = 256u;
+    enum class Region : uint8_t { Config, Vram, Gui, Vga };
+    struct Target {
+        Region   region;
+        uint32_t off;
+    };
 
-    void PublishScreenSizeOnWriteEdge();
+    Target   Decode(uint32_t addr, const char* op, uint64_t value) const;
+    uint32_t ConfigRead(uint32_t off);
+    void     ConfigWrite(uint32_t off, uint32_t value);
+    void     PowerOnReset();
+    void     PublishDisplay();
 
-    std::vector<uint8_t> fb_;
-    bool     fb_written_      = false;
-    DisplaySizeLatch size_latch_;
+    uint32_t base_     = 0;
+    uint8_t  revision_ = 0;
+    uint32_t mba_      = 0;
+    uint32_t gba_      = 0;
+    uint32_t sba_      = 0;
+    uint32_t test_     = 0;
+    uint32_t standby_  = 0;
+    uint32_t pll1_     = 0;
+    uint32_t pll2_     = 0;
+
+    std::vector<uint8_t> vram_;
+    IteIt8181Vga         vga_{emu_};
+    IteIt8181Gui         gui_{emu_, vram_, vga_};
+    DisplayModeLatch     mode_latch_;
 };
 
 }

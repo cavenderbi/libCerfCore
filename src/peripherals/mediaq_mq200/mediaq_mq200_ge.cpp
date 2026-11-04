@@ -209,8 +209,8 @@ const char* MediaQMq200Ge::CommandUnmodeled(uint32_t cmd) const {
     const bool    mono_src = (cmd & kCmdMonoSrc) != 0u;
     const bool    mono_pat = (cmd & kCmdMonoPat) != 0u;
     const bool    solid    = (cmd & kCmdSolidSrc) != 0u;
-    const bool    need_s   = Pixel::ReadsSource(rop) || ((cmd & kCmdMonoTrans) && mono_src);
-    const bool    need_p   = Pixel::ReadsPattern(rop) || ((cmd & kCmdMonoTrans) && mono_pat && !mono_src);
+    const bool    need_s   = Rop3ReadsSource(rop) || ((cmd & kCmdMonoTrans) && mono_src);
+    const bool    need_p   = Rop3ReadsPattern(rop) || ((cmd & kCmdMonoTrans) && mono_pat && !mono_src);
     if (path == CommandPath::Line) {
         if (need_s && !(mono_src && solid)) return "draws a line from a source other than the solid colour";
         if (need_p && !(mono_pat && solid)) return "draws a line from a pattern other than the solid colour";
