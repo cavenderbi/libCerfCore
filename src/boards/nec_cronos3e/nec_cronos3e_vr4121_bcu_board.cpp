@@ -36,6 +36,8 @@ public:
             { vr4121_bcu::kOffRamSize, kBootRamSize },
         };
     }
+
+    std::optional<Vr4121Revision> Revision() const override { return std::nullopt; }
 };
 
 }

@@ -38,6 +38,8 @@ public:
             { 0x1Eu, 0x0342u },
         };
     }
+
+    std::optional<Vr4121Revision> Revision() const override { return std::nullopt; }
 };
 
 }

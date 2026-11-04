@@ -33,6 +33,8 @@ public:
             { vr41xx_bcu::kOffCnt1, vr4121_bcu::kCnt1Rom64 | vr4121_bcu::kCnt1Dram64 },
         };
     }
+
+    std::optional<Vr4121Revision> Revision() const override { return Vr4121Revision{ 0u, 0u }; }
 };
 
 }

@@ -115,6 +115,7 @@ public:
 
     uint16_t ReadHalf(uint32_t addr) override {
         if (addr - kModel.base == kOffClkSpeed) return emu_.Get<Vr4121ClockState>().ClkSpeedReg();
+        if (addr - kModel.base == kOffRevId) return RevIdReg(addr);
         return Vr41xxBcuBase::ReadHalf(addr);
     }
 
@@ -169,6 +170,12 @@ protected:
     bool LcdSpaceSixteenBit() const override { return (StoredReg(kIdxCnt3) & kCnt3Lcd32) == 0u; }
 
 private:
+    uint16_t RevIdReg(uint32_t addr) const {
+        const auto rev = emu_.Get<Vr4121BcuBoard>().Revision();
+        if (!rev) HaltUnsupportedAccess("REVIDREG ReadHalf on a board with no stated revision", addr, 0u);
+        return static_cast<uint16_t>(kRevIdVr4121 | (rev->major << kRevIdMajorShift) | rev->minor);
+    }
+
     uint16_t SettableCnt3(uint16_t value) const {
         const auto wiring = emu_.Get<Vr4121BcuBoard>().DramWiring();
         if (!wiring || wiring->dbus32) return value;

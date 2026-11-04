@@ -15,6 +15,11 @@ struct Vr4121DramWiring {
     std::array<uint32_t, 4> bank_chip_bytes{};
 };
 
+struct Vr4121Revision {
+    uint8_t major = 0;
+    uint8_t minor = 0;
+};
+
 class Vr4121BcuBoard : public Service {
 public:
     using Service::Service;
@@ -24,6 +29,8 @@ public:
     virtual std::optional<Vr4121DramWiring> DramWiring() const = 0;
 
     virtual std::vector<Vr41xxBcuBootWrite> KernelEntryWrites() const = 0;
+
+    virtual std::optional<Vr4121Revision> Revision() const = 0;
 };
 
 }
