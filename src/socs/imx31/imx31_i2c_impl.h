@@ -7,6 +7,7 @@
 #include "imx31_id.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
+#include "../freescale_i2c_regs.h"
 #include "../freescale_module_clocks.h"
 
 #include <cstdint>
@@ -15,22 +16,7 @@ namespace cerfcore {
 
 namespace cerf_imx31_i2c_detail {
 
-/* MCIMX31RM Table 26-3/26-4 (Ch 26 I2C). 16-bit registers, 16 KB window. */
-constexpr uint32_t kSize = 0x00004000u;
-
-constexpr uint32_t kOffIadr = 0x00u;
-constexpr uint32_t kOffIfdr = 0x04u;
-constexpr uint32_t kOffI2cr = 0x08u;
-constexpr uint32_t kOffI2sr = 0x0Cu;
-constexpr uint32_t kOffI2dr = 0x10u;
-
-constexpr uint16_t kI2crMsta = 0x20u;  /* master mode: 0->1 START, 1->0 STOP */
-
-constexpr uint16_t kI2srIcf  = 0x80u;  /* data transfer complete */
-constexpr uint16_t kI2srIbb  = 0x20u;  /* bus busy */
-constexpr uint16_t kI2srIal  = 0x10u;  /* arbitration lost */
-constexpr uint16_t kI2srIif  = 0x02u;  /* interrupt flag (w0c) */
-constexpr uint16_t kI2srRxak = 0x01u;  /* 0 = ACK received */
+using namespace cerf_freescale_i2c;
 
 template <uint32_t kBase, FreescaleModule kModule>
 class Imx31I2cImpl : public Peripheral {
@@ -72,7 +58,7 @@ public:
                 const bool is_master  = (value & kI2crMsta) != 0;
                 if (was_master != is_master)
                     module_clocks_->RequireRunning(kModule, "drives a START or STOP");
-                i2cr_ = value;
+                i2cr_ = static_cast<uint16_t>(value & kI2crReadable);
                 if (!was_master && is_master)      i2sr_ |= kI2srIbb;
                 else if (was_master && !is_master) i2sr_ &= ~(kI2srIbb | kI2srIcf);
                 return;
@@ -92,11 +78,11 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        w.Write("iadr", iadr_); w.Write("ifdr", ifdr_); w.Write("i2cr", i2cr_);
+        w.Write("iadr", iadr_); w.Write("ifdr", ifdr_); w.Write("i2cr_readable", i2cr_);
         w.Write("i2sr", i2sr_); w.Write("i2dr", i2dr_);
     }
     void RestoreState(StateReader& r) override {
-        r.Read("iadr", iadr_); r.Read("ifdr", ifdr_); r.Read("i2cr", i2cr_);
+        r.Read("iadr", iadr_); r.Read("ifdr", ifdr_); r.Read("i2cr_readable", i2cr_);
         r.Read("i2sr", i2sr_); r.Read("i2dr", i2dr_);
     }
 

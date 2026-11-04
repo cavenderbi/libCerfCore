@@ -8,6 +8,7 @@
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/state/state_stream.h>
+#include "../freescale_i2c_regs.h"
 #include "../freescale_module_clocks.h"
 #include "../i2c_slave.h"
 #include "../irq_controller.h"
@@ -21,27 +22,7 @@ namespace cerf_imx51_i2c_detail {
 /* i.MX51 I2C controller - Freescale I2C v1 (register offsets + bit semantics:
    MCIMX31RM Ch 26, same IP as the i.MX31 I2C; confirmed against the BSP
    i2c.dll IST). Interrupt-mode master FSM with I2cSlave dispatch. */
-constexpr uint32_t kSize = 0x00004000u;     /* AIPS slot (RM Table 2-1) */
-
-constexpr uint32_t kOffIadr = 0x00u;        /* I2C Address Register */
-constexpr uint32_t kOffIfdr = 0x04u;        /* I2C Frequency Divider */
-constexpr uint32_t kOffI2cr = 0x08u;        /* I2C Control Register */
-constexpr uint32_t kOffI2sr = 0x0Cu;        /* I2C Status Register */
-constexpr uint32_t kOffI2dr = 0x10u;        /* I2C Data Register */
-
-constexpr uint16_t kI2crIen  = 0x80u;       /* module enable */
-constexpr uint16_t kI2crIien = 0x40u;       /* interrupt enable */
-constexpr uint16_t kI2crMsta = 0x20u;       /* master mode: 0->1 START, 1->0 STOP */
-constexpr uint16_t kI2crMtx  = 0x10u;       /* transmit (1) / receive (0) */
-constexpr uint16_t kI2crTxak = 0x08u;       /* transmit-ack (NACK the byte) */
-constexpr uint16_t kI2crRsta = 0x04u;       /* repeated START */
-constexpr uint16_t kI2crReadable = kI2crIen | kI2crIien | kI2crMsta | kI2crMtx | kI2crTxak;
-
-constexpr uint16_t kI2srIcf  = 0x80u;       /* data transfer complete */
-constexpr uint16_t kI2srIbb  = 0x20u;       /* bus busy */
-constexpr uint16_t kI2srIal  = 0x10u;       /* arbitration lost (w0c) */
-constexpr uint16_t kI2srIif  = 0x02u;       /* interrupt flag (w0c) */
-constexpr uint16_t kI2srRxak = 0x01u;       /* 0 = ACK received */
+using namespace cerf_freescale_i2c;
 
 template <uint32_t kBase, int kIrq, FreescaleModule kModule>
 class Imx51I2cImpl : public Peripheral {
