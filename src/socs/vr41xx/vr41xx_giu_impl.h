@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vr41xx_giu.h"
+#include "vr41xx_giu_regs.h"
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
@@ -22,34 +23,6 @@
 namespace cerfcore {
 
 namespace cerf_vr41xx_giu_detail {
-
-/* VR4121 UM Table 1-9 == VR4102 UM Table 18-2. */
-constexpr uint32_t kOffIoSelL    = 0x00u;   /* GIUIOSELL    (VR4121 19.2.1,  VR4102 18.2.1)  */
-constexpr uint32_t kOffIoSelH    = 0x02u;   /* GIUIOSELH    (VR4121 19.2.2,  VR4102 18.2.2)  */
-constexpr uint32_t kOffPiodL     = 0x04u;   /* GIUPIODL     (VR4121 19.2.3,  VR4102 18.2.3)  */
-constexpr uint32_t kOffPiodH     = 0x06u;   /* GIUPIODH     (VR4121 19.2.4,  VR4102 18.2.4)  */
-constexpr uint32_t kOffIntStatL  = 0x08u;   /* GIUINTSTATL  (VR4121 19.2.5,  VR4102 18.2.5)  */
-constexpr uint32_t kOffIntStatH  = 0x0Au;   /* GIUINTSTATH  (VR4121 19.2.6,  VR4102 18.2.6)  */
-constexpr uint32_t kOffIntEnL    = 0x0Cu;   /* GIUINTENL    (VR4121 19.2.7,  VR4102 18.2.7)  */
-constexpr uint32_t kOffIntEnH    = 0x0Eu;   /* GIUINTENH    (VR4121 19.2.8,  VR4102 18.2.8)  */
-constexpr uint32_t kOffIntTypL   = 0x10u;   /* GIUINTTYPL   (VR4121 19.2.9,  VR4102 18.2.9)  */
-constexpr uint32_t kOffIntTypH   = 0x12u;   /* GIUINTTYPH   (VR4121 19.2.10, VR4102 18.2.10) */
-constexpr uint32_t kOffIntAlSelL = 0x14u;   /* GIUINTALSELL (VR4121 19.2.11, VR4102 18.2.11) */
-constexpr uint32_t kOffIntAlSelH = 0x16u;   /* GIUINTALSELH (VR4121 19.2.12, VR4102 18.2.12) */
-constexpr uint32_t kOffIntHtSelL = 0x18u;   /* GIUINTHTSELL (VR4121 19.2.13, VR4102 18.2.13) */
-constexpr uint32_t kOffIntHtSelH = 0x1Au;   /* GIUINTHTSELH (VR4121 19.2.14, VR4102 18.2.14) */
-constexpr uint32_t kOffPoDatL    = 0x1Cu;   /* GIUPODATL    (VR4121 19.2.15, VR4102 18.2.15) */
-constexpr uint32_t kOffPoDatH    = 0x1Eu;   /* GIUPODATH    (VR4121 19.2.16, VR4102 18.2.16) */
-
-/* GIUIOSELL IOS15: "Since GPIO15 (DCD#) is fixed as input, IOS15 cannot be set for
-   output" - R, where IOS(14:0) are R/W (VR4121 UM 19.2.1, VR4102 UM 18.2.1). */
-constexpr uint16_t kIoSelLWritable = 0x7FFFu;
-
-/* GIUPODATH D9:8 PIOEN(1:0) and D1:0 PIOD(49:48) are R/W; D15:10 and D7:2 carry an "R"
-   column on all three (VR4111 UM 19.2.16 p416, VR4121 UM 19.2.16 p464, VR4102 UM 18.2.16
-   p380), which the VR4111 and VR4121 tables gloss "Write 0 to these bits. 0 is returned
-   after a read" and the VR4102 table names only "Reserved". */
-constexpr uint16_t kPoDatHWritable = 0x0303u;
 
 struct Vr41xxGiuModel {
     uint32_t base;

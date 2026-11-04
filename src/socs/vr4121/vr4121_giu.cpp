@@ -33,9 +33,16 @@ constexpr Vr41xxGiuModel kModel = {
     0u,
 };
 
+constexpr uint8_t kPostPoDatLByte = 0xFFu;
+
 class Vr4121Giu : public Vr41xxGiuBase<SocId::Vr4121, kModel> {
 public:
     using Vr41xxGiuBase::Vr41xxGiuBase;
+
+    void WriteByte(uint32_t addr, uint8_t value) override {
+        if (addr == kModel.base + cerf_vr41xx_giu_detail::kOffPoDatL && value == kPostPoDatLByte) return;
+        HaltUnsupportedAccess("VR4121 GIU WriteByte", addr, value);
+    }
 };
 
 }  /* namespace */
