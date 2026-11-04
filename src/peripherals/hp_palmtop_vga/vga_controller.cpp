@@ -87,7 +87,7 @@ constexpr uint8_t kPixelDepthHiColor = 1;
 constexpr uint8_t kPixelBus8Gate   = 0x10;
 
 constexpr uint8_t kDacModeField = 0xF0;
-constexpr uint8_t kDacMode15    = 0x10;
+// constexpr uint8_t kDacMode15    = 0x10;
 constexpr uint8_t kDacMode16    = 0x30;
 constexpr uint8_t kDacUnlockReads = 4;
 
