@@ -362,17 +362,6 @@ void Vr41xxRtc::WriteHalf(uint32_t addr, uint16_t value) {
     UpdateLocked();
 }
 
-uint32_t Vr41xxRtc::ReadWord(uint32_t addr) {
-    const uint32_t off = addr - MmioBase();
-    return static_cast<uint32_t>(ReadHalf(MmioBase() + off)) |
-           (static_cast<uint32_t>(ReadHalf(MmioBase() + off + 2)) << 16);
-}
-void Vr41xxRtc::WriteWord(uint32_t addr, uint32_t value) {
-    const uint32_t off = addr - MmioBase();
-    WriteHalf(MmioBase() + off,     static_cast<uint16_t>(value & 0xFFFF));
-    WriteHalf(MmioBase() + off + 2, static_cast<uint16_t>(value >> 16));
-}
-
 /* ---- RTC2 MMIO (0x0B0001C0), via Vr41xxRtc2Mmio ---- */
 
 uint16_t Vr41xxRtc::ReadHalf2(uint32_t off) {
@@ -398,14 +387,6 @@ void Vr41xxRtc::WriteHalf2(uint32_t off, uint16_t value) {
         default: HaltUnsupportedAccess("RTC2 WriteHalf", 0x0B0001C0u + off, value);
     }
     UpdateLocked();
-}
-uint32_t Vr41xxRtc::ReadWord2(uint32_t off) {
-    return static_cast<uint32_t>(ReadHalf2(off)) |
-           (static_cast<uint32_t>(ReadHalf2(off + 2)) << 16);
-}
-void Vr41xxRtc::WriteWord2(uint32_t off, uint32_t value) {
-    WriteHalf2(off,     static_cast<uint16_t>(value & 0xFFFF));
-    WriteHalf2(off + 2, static_cast<uint16_t>(value >> 16));
 }
 
 /* ---- hibernation ---- */

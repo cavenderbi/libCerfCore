@@ -38,6 +38,32 @@ void Peripheral::AutoFastWrite(void* ctx, uint32_t off, uint32_t value, uint32_t
     p->HaltUnsupportedAccess("AutoFastWrite", addr, value);
 }
 
+uint32_t Peripheral::ReadWordAsHalves(uint32_t addr) {
+    const uint32_t lo = ReadHalf(addr);
+    const uint32_t hi = ReadHalf(addr + 2u);
+    return lo | (hi << 16);
+}
+
+void Peripheral::WriteWordAsHalves(uint32_t addr, uint32_t value) {
+    WriteHalf(addr, static_cast<uint16_t>(value));
+    WriteHalf(addr + 2u, static_cast<uint16_t>(value >> 16));
+}
+
+uint32_t Peripheral::SplitWordRead(void* ctx, uint32_t off, uint32_t width) {
+    if (width != 4u) return AutoFastRead(ctx, off, width);
+    auto* p = static_cast<Peripheral*>(ctx);
+    return p->ReadWordAsHalves(p->MmioBase() + off);
+}
+
+void Peripheral::SplitWordWrite(void* ctx, uint32_t off, uint32_t value, uint32_t width) {
+    if (width != 4u) {
+        AutoFastWrite(ctx, off, value, width);
+        return;
+    }
+    auto* p = static_cast<Peripheral*>(ctx);
+    p->WriteWordAsHalves(p->MmioBase() + off, value);
+}
+
 void Peripheral::HaltUnsupportedAccess(const char* op,
                                        uint32_t addr,
                                        uint64_t value) const {

@@ -367,13 +367,24 @@ uint16_t CasioPocketpostpetAsic::ReadHalf(uint32_t addr) {
     return ReadReg(off);
 }
 
+uint32_t CasioPocketpostpetAsic::FbWord(uint32_t off) const {
+    return cerf::le::U32(fb_.data(), off - kFbOffset);
+}
+
+void CasioPocketpostpetAsic::PutFbWord(uint32_t off, uint32_t value) {
+    cerf::le::Put32(fb_.data() + (off - kFbOffset), value);
+}
+
 uint32_t CasioPocketpostpetAsic::ReadWord(uint32_t addr) {
     const uint32_t off = addr - kBase;
-    if (InFb(off)) return cerf::le::U32(fb_.data(), off - kFbOffset);
-    /* ddi.dll blit sub_13815A8 drives the blit registers as 32-bit words; the 16-bit bus
-       splits each into low-then-high halfword accesses. */
-    return static_cast<uint32_t>(ReadReg(off)) |
-           (static_cast<uint32_t>(ReadReg(off + 2u)) << 16);
+    if (InFb(off)) return FbWord(off);
+    HaltUnsupportedAccess("Casio ASIC ReadWord", addr, 0);
+}
+
+uint32_t CasioPocketpostpetAsic::ReadWordAsHalves(uint32_t addr) {
+    const uint32_t off = addr - kBase;
+    if (InFb(off)) return FbWord(off);
+    return Peripheral::ReadWordAsHalves(addr);
 }
 
 void CasioPocketpostpetAsic::WriteByte(uint32_t addr, uint8_t value) {
@@ -390,11 +401,14 @@ void CasioPocketpostpetAsic::WriteHalf(uint32_t addr, uint16_t value) {
 
 void CasioPocketpostpetAsic::WriteWord(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - kBase;
-    if (InFb(off)) { cerf::le::Put32(fb_.data() + (off - kFbOffset), value); return; }
-    /* ddi.dll blit sub_13815A8 drives the blit registers as 32-bit words; the 16-bit bus
-       splits each into low-then-high halfword accesses. */
-    WriteReg(off,      static_cast<uint16_t>(value & 0xFFFFu));
-    WriteReg(off + 2u, static_cast<uint16_t>(value >> 16));
+    if (InFb(off)) { PutFbWord(off, value); return; }
+    HaltUnsupportedAccess("Casio ASIC WriteWord", addr, value);
+}
+
+void CasioPocketpostpetAsic::WriteWordAsHalves(uint32_t addr, uint32_t value) {
+    const uint32_t off = addr - kBase;
+    if (InFb(off)) { PutFbWord(off, value); return; }
+    Peripheral::WriteWordAsHalves(addr, value);
 }
 
 void CasioPocketpostpetAsic::SaveState(StateWriter& w) {

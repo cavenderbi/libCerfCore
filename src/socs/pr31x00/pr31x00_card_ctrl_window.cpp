@@ -39,22 +39,11 @@ public:
     uint16_t ReadHalf(uint32_t addr) override {
         return emu_.Get<Pr31x00CardSpace>().ReadCtrl16(addr - kBase);
     }
-    /* A 16-bit PC Card bus has no 32-bit cycle; the BIU runs two halfword cycles. */
-    uint32_t ReadWord(uint32_t addr) override {
-        const uint32_t lo = ReadHalf(addr);
-        const uint32_t hi = ReadHalf(addr + 2u);
-        return lo | (hi << 16);
-    }
-
     void WriteByte(uint32_t addr, uint8_t value) override {
         emu_.Get<Pr31x00CardSpace>().WriteCtrl8(addr - kBase, value);
     }
     void WriteHalf(uint32_t addr, uint16_t value) override {
         emu_.Get<Pr31x00CardSpace>().WriteCtrl16(addr - kBase, value);
-    }
-    void WriteWord(uint32_t addr, uint32_t value) override {
-        WriteHalf(addr, static_cast<uint16_t>(value));
-        WriteHalf(addr + 2u, static_cast<uint16_t>(value >> 16));
     }
 };
 

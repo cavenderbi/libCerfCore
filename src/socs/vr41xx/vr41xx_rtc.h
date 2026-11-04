@@ -28,16 +28,14 @@ public:
 
     uint16_t ReadHalf(uint32_t addr) override;
     void     WriteHalf(uint32_t addr, uint16_t value) override;
-    uint32_t ReadWord(uint32_t addr) override;
-    void     WriteWord(uint32_t addr, uint32_t value) override;
     uint8_t  ReadByte(uint32_t addr) override { HaltUnsupportedAccess("RTC ReadByte", addr, 0); }
     void     WriteByte(uint32_t addr, uint8_t v) override { HaltUnsupportedAccess("RTC WriteByte", addr, v); }
+    FastReadFn  FastReader() override { return &Peripheral::SplitWordRead; }
+    FastWriteFn FastWriter() override { return &Peripheral::SplitWordWrite; }
 
     /* RTC2 block (0x0B0001C0) accessors, driven by the Vr41xxRtc2Mmio adapter. */
     uint16_t ReadHalf2(uint32_t off);
     void     WriteHalf2(uint32_t off, uint16_t value);
-    uint32_t ReadWord2(uint32_t off);
-    void     WriteWord2(uint32_t off, uint32_t value);
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;

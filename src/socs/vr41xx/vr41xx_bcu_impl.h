@@ -53,6 +53,8 @@ public:
         lcd_space_id_ = dispatcher_->InstallDataInversion(vr41xx_bcu::kLcdSpaceBase,
                                                           vr41xx_bcu::kLcdSpaceEnd);
         UpdateLcdInversion();
+        lcd_port_ = dispatcher_->InstallHalfwordPort(vr41xx_bcu::kLcdSpaceBase,
+                                                     vr41xx_bcu::kLcdSpaceEnd, LcdSpaceSixteenBit());
     }
 
     void WriteHalf(uint32_t addr, uint16_t value) override {
@@ -62,11 +64,13 @@ public:
         }
         Base::WriteHalf(addr, value);
         if (off == vr41xx_bcu::kOffCnt1 || off == vr41xx_bcu::kOffCnt2) UpdateLcdInversion();
+        UpdateLcdPort();
     }
 
     void RestoreState(StateReader& r) override {
         Base::RestoreState(r);
         UpdateLcdInversion();
+        UpdateLcdPort();
     }
 
 protected:
@@ -86,7 +90,10 @@ protected:
     void AfterReset() override {
         ApplyEntryWrites();
         UpdateLcdInversion();
+        UpdateLcdPort();
     }
+
+    virtual bool LcdSpaceSixteenBit() const { return true; }
 
 private:
     void ApplyEntryWrites() {
@@ -111,8 +118,11 @@ private:
                                (this->StoredReg(kCnt2Slot) & vr41xx_bcu::kCnt2Gmode) == 0u);
     }
 
+    void UpdateLcdPort() { dispatcher_->SetHalfwordPort(lcd_port_, LcdSpaceSixteenBit()); }
+
     PeripheralDispatcher*                  dispatcher_   = nullptr;
     PeripheralDispatcher::DataInversionId lcd_space_id_ = 0u;
+    PeripheralDispatcher::HalfwordPortId  lcd_port_     = 0u;
 };
 
 }

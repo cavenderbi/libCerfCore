@@ -191,8 +191,7 @@ public:
         const uint32_t off = addr - Base;
         if (off != kOffHts && off != kOffHltcl)
             HaltUnsupportedAccess("LED WriteWord", addr, value);
-        WriteHalf(Base + off,      static_cast<uint16_t>(value));
-        WriteHalf(Base + off + 2u, static_cast<uint16_t>(value >> 16));
+        WriteWordAsHalves(addr, value);
     }
 
     uint8_t  ReadByte (uint32_t addr) override { HaltUnsupportedAccess("LED ReadByte", addr, 0); }

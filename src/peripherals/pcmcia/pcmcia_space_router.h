@@ -15,7 +15,6 @@ class PcmciaSpaceRouter : public Peripheral {
 public:
     using Peripheral::Peripheral;
 
-    bool ShouldRegister() override;
     void OnReady() override;
 
     uint32_t MmioBase() const override { return 0x20000000u; }
@@ -23,10 +22,8 @@ public:
 
     uint8_t  ReadByte (uint32_t addr) override;
     uint16_t ReadHalf (uint32_t addr) override;
-    uint32_t ReadWord (uint32_t addr) override;
     void     WriteByte(uint32_t addr, uint8_t  value) override;
     void     WriteHalf(uint32_t addr, uint16_t value) override;
-    void     WriteWord(uint32_t addr, uint32_t value) override;
 
     /* Called from the board socket controller's OnReady. */
     void ProvideSockets(PcmciaSlot* socket0, PcmciaSlot* socket1);
@@ -38,14 +35,18 @@ public:
     void RestoreState(StateReader& r) override;
     void PostRestore() override;
 
-private:
+protected:
     enum class Region { Io, Reserved, Attribute, Common };
+
+    static constexpr const char* kFloatingTag = "PC Card space";
 
     PcmciaSlot* Decode(uint32_t addr, Region* region,
                        uint32_t* card_offset) const;
 
-    PcmciaSlot* sockets_[2] = {};
     FloatingBus floating_;
+
+private:
+    PcmciaSlot* sockets_[2] = {};
 };
 
 }

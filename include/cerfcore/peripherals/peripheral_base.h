@@ -44,15 +44,19 @@ public:
     using FastReadFn  = cerfengine::MmioReadFn;
     using FastWriteFn = cerfengine::MmioWriteFn;
 
-    /* Override to install direct-state thunks bypassing the virtual
-       Read / Write dispatch. Default routes through them. */
     virtual FastReadFn  FastReader() { return &AutoFastRead;  }
     virtual FastWriteFn FastWriter() { return &AutoFastWrite; }
+
+    static uint32_t SplitWordRead (void* ctx, uint32_t off, uint32_t width_bytes);
+    static void     SplitWordWrite(void* ctx, uint32_t off, uint32_t value, uint32_t width_bytes);
 
 protected:
     [[noreturn]] void HaltUnsupportedAccess(const char* op,
                                             uint32_t addr,
                                             uint64_t value) const;
+
+    virtual uint32_t ReadWordAsHalves (uint32_t addr);
+    virtual void     WriteWordAsHalves(uint32_t addr, uint32_t value);
 
 private:
     static uint32_t AutoFastRead (void* ctx, uint32_t off, uint32_t width_bytes);

@@ -21,6 +21,7 @@ public:
     using Service::Service;
 
     using DataInversionId = uint32_t;
+    using HalfwordPortId  = uint32_t;
 
     void Register(Peripheral* p);
 
@@ -29,6 +30,10 @@ public:
     void SetDataInversion(DataInversionId id, bool inverting);
 
     bool OverlapsDataInversion(uint32_t base, uint32_t size) const;
+
+    HalfwordPortId InstallHalfwordPort(uint32_t base, uint32_t end, bool active);
+
+    void SetHalfwordPort(HalfwordPortId id, bool active);
 
     bool IsPeripheralAddress(uint32_t addr) const;
 
@@ -46,7 +51,7 @@ public:
     cerfengine::MmioBusBinding EngineBinding();
 
 private:
-    struct InversionRange {
+    struct BusRange {
         uint32_t base;
         uint32_t end;
     };
@@ -70,7 +75,9 @@ private:
     static constexpr uint32_t kMaxDataInversions = 32u;
 
     bool OverlapsDataInversionLocked(uint32_t base, uint64_t end) const;
-    const InversionRange* InversionRangeOf(const Entry& entry) const;
+    const BusRange* InversionRangeOf(const Entry& entry) const;
+    bool InHalfwordPortLocked(const Entry& entry) const;
+    uint64_t ActiveRoutingLocked() const;
     void PublishLocked();
 
 public:
@@ -137,9 +144,11 @@ private:
 
     mutable std::mutex                            table_mutex_;
     EntryTable                                    entries_;
-    std::vector<InversionRange>                   inversions_;
+    std::vector<BusRange>                         inversions_;
+    std::vector<BusRange>                         halfword_ports_;
     uint32_t                                      active_inversions_ = 0u;
-    std::unordered_map<uint32_t, const EntryTable*> table_by_active_;
+    uint32_t                                      active_halfword_ports_ = 0u;
+    std::unordered_map<uint64_t, const EntryTable*> table_by_active_;
     std::vector<std::unique_ptr<InvertedTarget>>  inverted_targets_;
 
     mutable std::atomic<size_t> last_hit_{0};

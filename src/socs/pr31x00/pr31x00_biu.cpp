@@ -5,6 +5,7 @@
 #include "pr31700_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../peripherals/peripheral_dispatcher.h"
+#include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
 
 #include <cstdint>
@@ -55,6 +56,26 @@ constexpr uint32_t kCfg4Unmodeled = (1u << 29) | (1u << 28) | (1u << 27);
    register accesses hold it. CERF has no cache, so the guest's next access clears it. */
 constexpr uint32_t kCfg4MemPowerDown = 1u << 16;
 
+constexpr uint32_t kCardIoAttrBase = 0x08000000u;
+constexpr uint32_t kCardIoAttrEnd  = 0x10000000u;
+constexpr uint32_t kCardMemBase    = 0x64000000u;
+constexpr uint32_t kCardMemEnd     = 0x6C000000u;
+constexpr uint32_t kMcsBase        = 0x6C000000u;
+constexpr uint32_t kMcsEnd         = 0x7C000000u;
+
+struct CsWindow {
+    uint32_t base;
+    uint32_t end;
+    uint32_t cs;
+};
+
+constexpr CsWindow kCsWindowMap[] = {
+    {0x11000000u, 0x20000000u, 0u}, {0x50000000u, 0x58000000u, 0u},
+    {0x10000000u, 0x10400000u, 1u}, {0x58000000u, 0x5C000000u, 1u},
+    {0x10400000u, 0x10800000u, 2u}, {0x5C000000u, 0x60000000u, 2u},
+    {0x10800000u, 0x10C00000u, 3u}, {0x60000000u, 0x64000000u, 3u},
+};
+
 }  /* namespace */
 
 bool Pr31x00Biu::ShouldRegister() {
@@ -64,7 +85,28 @@ bool Pr31x00Biu::ShouldRegister() {
     return soc == SocId::Pr31500 || soc == SocId::Pr31700;
 }
 
-void Pr31x00Biu::OnReady() { emu_.Get<PeripheralDispatcher>().Register(this); }
+void Pr31x00Biu::OnReady() {
+    auto& dispatcher = emu_.Get<PeripheralDispatcher>();
+    dispatcher.Register(this);
+    dispatcher.InstallHalfwordPort(kCardIoAttrBase, kCardIoAttrEnd, true);
+    dispatcher.InstallHalfwordPort(kCardMemBase, kCardMemEnd, true);
+    dispatcher.InstallHalfwordPort(kMcsBase, kMcsEnd, true);
+    for (uint32_t i = 0; i < kCsWindows; ++i) {
+        const CsWindow& w = kCsWindowMap[i];
+        cs_ports_[i] = dispatcher.InstallHalfwordPort(w.base, w.end, (reg_[0] & (1u << w.cs)) == 0u);
+    }
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
+        reg_ = kResetRegs;
+        ApplyCsPortSizes();
+    });
+}
+
+void Pr31x00Biu::ApplyCsPortSizes() {
+    auto& dispatcher = emu_.Get<PeripheralDispatcher>();
+    for (uint32_t i = 0; i < kCsWindows; ++i) {
+        dispatcher.SetHalfwordPort(cs_ports_[i], (reg_[0] & (1u << kCsWindowMap[i].cs)) == 0u);
+    }
+}
 
 bool Pr31x00Biu::Card1IoSpace() const { return (reg_[3] & kCfg3Card1IoEn) != 0; }
 bool Pr31x00Biu::Card2IoSpace() const { return (reg_[3] & kCfg3Card2IoEn) != 0; }
@@ -102,11 +144,8 @@ void Pr31x00Biu::WriteConfig0(uint32_t addr, uint32_t value) {
     if (value & kCfg0EnCs1Dram) {
         HaltUnsupportedAccess("PR31x00 BIU MEM_CONFIG0 ENCS1DRAM", addr, value);
     }
-    /* BANKnCONF / ROWSELn / COLSELn place address bits on the multiplexed DRAM pins
-       and CSnSIZE picks a 16- or 32-bit port (§4.7.1); ENWRINPAGE holds DRAM page
-       mode, ENCSnUSER expose CS1-CS3 in kuseg. CERF's DRAM is a flat host buffer
-       with no address multiplexing, and its decode is identical in kuseg. */
     reg_[0] = value;
+    ApplyCsPortSizes();
 }
 
 void Pr31x00Biu::WriteConfig3(uint32_t addr, uint32_t value) {
@@ -137,6 +176,7 @@ void Pr31x00Biu::SaveState(StateWriter& w) {
 
 void Pr31x00Biu::RestoreState(StateReader& r) {
     for (uint32_t i = 0; i < kRegs; ++i) r.Read("reg", reg_[i]);
+    ApplyCsPortSizes();
 }
 
 REGISTER_SERVICE(Pr31x00Biu);

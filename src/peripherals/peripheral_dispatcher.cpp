@@ -103,21 +103,46 @@ void PeripheralDispatcher::SetDataInversion(DataInversionId id, bool inverting) 
         id, inverting ? "on" : "off", active, static_cast<int>(wrapped), live->size());
 }
 
+PeripheralDispatcher::HalfwordPortId PeripheralDispatcher::InstallHalfwordPort(
+    uint32_t base, uint32_t end, bool active) {
+    std::lock_guard<std::mutex> lock(table_mutex_);
+    const auto id = static_cast<HalfwordPortId>(halfword_ports_.size());
+    halfword_ports_.push_back({base, end});
+    if (active) active_halfword_ports_ |= 1u << id;
+    table_by_active_.clear();
+    PublishLocked();
+
+    LOG(Periph, "InstallHalfwordPort %u 0x%08X..0x%08X %s\n", id, base, end,
+        active ? "on" : "off");
+    return id;
+}
+
+void PeripheralDispatcher::SetHalfwordPort(HalfwordPortId id, bool active) {
+    std::lock_guard<std::mutex> lock(table_mutex_);
+    const uint32_t bit  = 1u << id;
+    const uint32_t next = active ? (active_halfword_ports_ | bit) : (active_halfword_ports_ & ~bit);
+    if (next == active_halfword_ports_) return;
+    active_halfword_ports_ = next;
+    PublishLocked();
+
+    LOG(Periph, "SetHalfwordPort %u %s\n", id, active ? "on" : "off");
+}
+
 bool PeripheralDispatcher::OverlapsDataInversion(uint32_t base, uint32_t size) const {
     std::lock_guard<std::mutex> lock(table_mutex_);
     return OverlapsDataInversionLocked(base, uint64_t{base} + size);
 }
 
 bool PeripheralDispatcher::OverlapsDataInversionLocked(uint32_t base, uint64_t end) const {
-    for (const InversionRange& r : inversions_) {
+    for (const BusRange& r : inversions_) {
         if (base < r.end && r.base < end) return true;
     }
     return false;
 }
 
-const PeripheralDispatcher::InversionRange* PeripheralDispatcher::InversionRangeOf(
+const PeripheralDispatcher::BusRange* PeripheralDispatcher::InversionRangeOf(
     const Entry& entry) const {
-    for (const InversionRange& r : inversions_) {
+    for (const BusRange& r : inversions_) {
         if (entry.base < r.end && r.base <= entry.last) {
             if (entry.base < r.base || entry.last >= r.end) {
                 emu_.Get<Fatal>().Die("PeripheralDispatcher: %s at [0x%08X..0x%08X] crosses the "
@@ -131,15 +156,38 @@ const PeripheralDispatcher::InversionRange* PeripheralDispatcher::InversionRange
     return nullptr;
 }
 
+bool PeripheralDispatcher::InHalfwordPortLocked(const Entry& entry) const {
+    for (size_t i = 0; i < halfword_ports_.size(); ++i) {
+        const BusRange& r = halfword_ports_[i];
+        if ((active_halfword_ports_ & (1u << i)) != 0u && entry.base >= r.base && entry.base < r.end)
+            return true;
+    }
+    return false;
+}
+
+uint64_t PeripheralDispatcher::ActiveRoutingLocked() const {
+    return (static_cast<uint64_t>(active_halfword_ports_) << 32) | active_inversions_;
+}
+
 void PeripheralDispatcher::PublishLocked() {
     const EntryTable* published = nullptr;
-    const auto cached = table_by_active_.find(active_inversions_);
+    const uint64_t routing = ActiveRoutingLocked();
+    const auto cached = table_by_active_.find(routing);
     if (cached != table_by_active_.end()) {
         published = cached->second;
     } else {
         auto next = std::make_unique<EntryTable>(entries_);
         for (Entry& e : *next) {
-            const InversionRange* r = InversionRangeOf(e);
+            if (InHalfwordPortLocked(e)) {
+                if (e.read != e.p->Peripheral::FastReader() || e.write != e.p->Peripheral::FastWriter()) {
+                    emu_.Get<Fatal>().Die("PeripheralDispatcher: %s at [0x%08X..0x%08X] has its own MMIO "
+                                          "thunks inside a halfword port", typeid(*e.p).name(), e.base,
+                                          e.last);
+                }
+                e.read  = &Peripheral::SplitWordRead;
+                e.write = &Peripheral::SplitWordWrite;
+            }
+            const BusRange* r = InversionRangeOf(e);
             if (!r) continue;
             const uint32_t index = static_cast<uint32_t>(r - inversions_.data());
             if ((active_inversions_ & (1u << index)) == 0u) continue;
@@ -153,7 +201,7 @@ void PeripheralDispatcher::PublishLocked() {
         }
         published = next.get();
         tables_.push_back(std::move(next));
-        table_by_active_.emplace(active_inversions_, published);
+        table_by_active_.emplace(routing, published);
     }
     last_hit_.store(0, std::memory_order_relaxed);
     live_.store(published, std::memory_order_release);

@@ -52,6 +52,10 @@ public:
     uint32_t StrideBytes() const { return kPitchBytes; }
     const uint8_t* FbBytes() const { return fb_.data(); }
 
+protected:
+    uint32_t ReadWordAsHalves (uint32_t addr) override;
+    void     WriteWordAsHalves(uint32_t addr, uint32_t value) override;
+
 private:
     /* nk.exe sub_9F0B7DE0: pixel at 2*(x + (y<<9)) + 0xAA200000, row advance -2*w + 1024
        => framebuffer PA 0x0A200000, 1024-byte pitch (512 px), 16bpp. */
@@ -70,6 +74,8 @@ private:
     }
 
     bool     InFb(uint32_t off) const { return off >= kFbOffset && off < kFbOffset + kFbSize; }
+    uint32_t FbWord(uint32_t off) const;
+    void     PutFbWord(uint32_t off, uint32_t value);
     uint16_t ReadReg(uint32_t off);
     void     WriteReg(uint32_t off, uint16_t value);
     void     RunFillLocked();

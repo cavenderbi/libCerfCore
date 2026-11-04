@@ -1,9 +1,5 @@
 #include "pcmcia_space_router.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../socs/sa11xx/sa1110_id.h"
-#include "../../socs/pxa255/pxa255_id.h"
-#include "../../socs/sa11xx/sa1100_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include "pcmcia_host_cycles.h"
 #include "pcmcia_slot.h"
@@ -11,18 +7,6 @@
 #include <cerfcore/state/state_stream.h>
 
 namespace cerfcore {
-
-namespace {
-
-constexpr const char* kFloatingTag = "PC Card space";
-
-}
-
-bool PcmciaSpaceRouter::ShouldRegister() {
-    const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
-    return soc == SocId::Sa1110 || soc == SocId::Pxa255 ||
-           soc == SocId::Sa1100;
-}
 
 void PcmciaSpaceRouter::OnReady() {
     emu_.Get<PeripheralDispatcher>().Register(this);
@@ -106,13 +90,6 @@ uint16_t PcmciaSpaceRouter::ReadHalf(uint32_t addr) {
     return floating_.Read16(kFloatingTag, addr);
 }
 
-uint32_t PcmciaSpaceRouter::ReadWord(uint32_t addr) {
-    /* 16-bit PC Card bus: a 32-bit access is two halfword cycles. */
-    const uint32_t lo = ReadHalf(addr);
-    const uint32_t hi = ReadHalf(addr + 2u);
-    return lo | (hi << 16);
-}
-
 void PcmciaSpaceRouter::WriteByte(uint32_t addr, uint8_t value) {
     Region region;
     uint32_t off;
@@ -152,12 +129,5 @@ void PcmciaSpaceRouter::WriteHalf(uint32_t addr, uint16_t value) {
     }
     floating_.Write(kFloatingTag, 16u, addr);
 }
-
-void PcmciaSpaceRouter::WriteWord(uint32_t addr, uint32_t value) {
-    WriteHalf(addr,      static_cast<uint16_t>(value & 0xFFFFu));
-    WriteHalf(addr + 2u, static_cast<uint16_t>(value >> 16));
-}
-
-REGISTER_SERVICE(PcmciaSpaceRouter);
 
 }

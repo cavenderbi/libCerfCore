@@ -114,9 +114,8 @@ public:
         if constexpr (!M.word_pairs) {
             this->HaltUnsupportedAccess("ReadWord", addr, 0);
         } else {
-            const uint32_t lo = PairLow(addr, "ReadWord");
-            return ReadHalf(M.base + lo * 2u) |
-                   (static_cast<uint32_t>(ReadHalf(M.base + (lo + 1u) * 2u)) << 16);
+            PairLow(addr, "ReadWord");
+            return this->ReadWordAsHalves(addr);
         }
     }
 
@@ -125,8 +124,7 @@ public:
             this->HaltUnsupportedAccess("WriteWord", addr, value);
         } else {
             PairLow(addr, "WriteWord");
-            WriteHalf(addr,     static_cast<uint16_t>(value));
-            WriteHalf(addr + 2, static_cast<uint16_t>(value >> 16));
+            this->WriteWordAsHalves(addr, value);
         }
     }
 

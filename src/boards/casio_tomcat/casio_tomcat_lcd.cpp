@@ -46,10 +46,10 @@ uint16_t CasioTomcatLcd::ReadHalf(uint32_t addr) {
     HaltUnsupportedAccess("ReadHalf", addr, 0);
 }
 
-uint32_t CasioTomcatLcd::ReadWord(uint32_t addr) {
+uint32_t CasioTomcatLcd::ReadWordAsHalves(uint32_t addr) {
     const uint32_t off = addr - kBase;
     if (InFb(off) && off + 3u < kFbSize) return cerf::le::U32(fb_.data(), off);
-    HaltUnsupportedAccess("ReadWord", addr, 0);
+    return Peripheral::ReadWordAsHalves(addr);
 }
 
 void CasioTomcatLcd::WriteByte(uint32_t addr, uint8_t value) {
@@ -79,13 +79,13 @@ void CasioTomcatLcd::WriteHalf(uint32_t addr, uint16_t value) {
     HaltUnsupportedAccess("WriteHalf", addr, value);
 }
 
-void CasioTomcatLcd::WriteWord(uint32_t addr, uint32_t value) {
+void CasioTomcatLcd::WriteWordAsHalves(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - kBase;
     if (InFb(off) && off + 3u < kFbSize) {
         cerf::le::Put32(fb_.data() + off, value);
         return;
     }
-    HaltUnsupportedAccess("WriteWord", addr, value);
+    Peripheral::WriteWordAsHalves(addr, value);
 }
 
 bool CasioTomcatLcd::IsDisplayEnabled() {

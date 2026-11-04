@@ -166,6 +166,8 @@ protected:
         return RfuEncoding(off, value);
     }
 
+    bool LcdSpaceSixteenBit() const override { return (StoredReg(kIdxCnt3) & kCnt3Lcd32) == 0u; }
+
 private:
     uint16_t SettableCnt3(uint16_t value) const {
         const auto wiring = emu_.Get<Vr4121BcuBoard>().DramWiring();

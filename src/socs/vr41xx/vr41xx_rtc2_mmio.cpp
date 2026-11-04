@@ -37,8 +37,8 @@ public:
 
     uint16_t ReadHalf(uint32_t addr) override { return emu_.Get<Vr41xxRtc>().ReadHalf2(addr - kBase); }
     void     WriteHalf(uint32_t addr, uint16_t v) override { emu_.Get<Vr41xxRtc>().WriteHalf2(addr - kBase, v); }
-    uint32_t ReadWord(uint32_t addr) override { return emu_.Get<Vr41xxRtc>().ReadWord2(addr - kBase); }
-    void     WriteWord(uint32_t addr, uint32_t v) override { emu_.Get<Vr41xxRtc>().WriteWord2(addr - kBase, v); }
+    FastReadFn  FastReader() override { return &Peripheral::SplitWordRead; }
+    FastWriteFn FastWriter() override { return &Peripheral::SplitWordWrite; }
 
     uint8_t  ReadByte(uint32_t addr) override { HaltUnsupportedAccess("RTC2 ReadByte", addr, 0); }
     void     WriteByte(uint32_t addr, uint8_t v) override { HaltUnsupportedAccess("RTC2 WriteByte", addr, v); }

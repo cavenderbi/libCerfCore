@@ -103,11 +103,8 @@ public:
         if (off >= 0x3C000u && off < 0x3D000u) return RegRead16(off);
         HaltUnsupportedAccess("OneNAND halfword read outside modelled RAM/registers", addr, off);
     }
-    uint32_t ReadWord(uint32_t addr) override {
-        const uint16_t lo = ReadHalf(addr);
-        const uint16_t hi = ReadHalf(addr + 2);
-        return static_cast<uint32_t>(lo) | (static_cast<uint32_t>(hi) << 16);
-    }
+    FastReadFn  FastReader() override { return &Peripheral::SplitWordRead; }
+    FastWriteFn FastWriter() override { return &Peripheral::SplitWordWrite; }
     void WriteByte(uint32_t addr, uint8_t v) override {
         const uint32_t off = DecodeOffset(addr);
         if (off < kBufferRamEnd) {
@@ -139,10 +136,6 @@ public:
             return;
         }
         RegWrite16(off, v);
-    }
-    void WriteWord(uint32_t addr, uint32_t v) override {
-        WriteHalf(addr, static_cast<uint16_t>(v & 0xFFFFu));
-        WriteHalf(addr + 2, static_cast<uint16_t>((v >> 16) & 0xFFFFu));
     }
 
     void SaveState(StateWriter& w) override {

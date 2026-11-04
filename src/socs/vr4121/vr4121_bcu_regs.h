@@ -20,6 +20,7 @@ constexpr uint16_t kCnt3ExtRomcsBothRom  = 0x3000u;
 constexpr uint16_t kCnt3ExtRomcsBank3Rom = 0x2000u;
 constexpr uint16_t kCnt3ExtRomcsRfu      = 0x1000u;
 constexpr uint16_t kCnt3ExtMem    = 0x0800u;
+constexpr uint16_t kCnt3Lcd32     = 0x0080u;
 constexpr uint16_t kCnt3Dbus32Only = 0xF880u;
 constexpr uint16_t kCnt3ExtFields = 0xF800u;
 

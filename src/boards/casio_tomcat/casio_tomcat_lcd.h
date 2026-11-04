@@ -25,10 +25,8 @@ public:
 
     uint8_t  ReadByte(uint32_t addr) override;
     uint16_t ReadHalf(uint32_t addr) override;
-    uint32_t ReadWord(uint32_t addr) override;
     void     WriteByte(uint32_t addr, uint8_t value) override;
     void     WriteHalf(uint32_t addr, uint16_t value) override;
-    void     WriteWord(uint32_t addr, uint32_t value) override;
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
@@ -49,6 +47,10 @@ public:
     uint32_t       StrideBytes() const { return kPitchBytes; }
     uint32_t       FbSize()      const { return kFbSize; }
     const uint8_t* FbBytes()     const { return fb_.data(); }
+
+protected:
+    uint32_t ReadWordAsHalves (uint32_t addr) override;
+    void     WriteWordAsHalves(uint32_t addr, uint32_t value) override;
 
 private:
     static constexpr uint32_t kBase       = 0x0A000000u;
