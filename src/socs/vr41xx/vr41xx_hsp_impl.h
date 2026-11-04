@@ -121,6 +121,7 @@ public:
         w.Write<uint8_t>("unlocked", unlocked_ ? 1u : 0u);
         w.Write("signature_pos", signature_pos_);
         w.Write<uint8_t>("signature_broken", signature_broken_ ? 1u : 0u);
+        w.Write<uint8_t>("lone_terminator", lone_terminator_ ? 1u : 0u);
         w.Write<uint8_t>("hibernating", hibernating_ ? 1u : 0u);
     }
 
@@ -141,6 +142,9 @@ public:
         uint8_t broken = 0u;
         r.Read("signature_broken", broken);
         signature_broken_ = broken != 0u;
+        uint8_t lone = 0u;
+        r.Read("lone_terminator", lone);
+        lone_terminator_ = lone != 0u;
         uint8_t hibernating = 0u;
         r.Read("hibernating", hibernating);
         hibernating_ = hibernating != 0u;
@@ -161,6 +165,7 @@ private:
         unlocked_ = false;
         signature_pos_ = 0u;
         signature_broken_ = false;
+        lone_terminator_ = false;
     }
 
     void DriveAferstPin() {
@@ -182,6 +187,8 @@ private:
     void RequireNoPartialSignature(const char* access, std::optional<uint16_t> value) const {
         if (signature_broken_ || signature_pos_ != 0u)
             DieCore(access, value, "during an incomplete or broken HSPPCTEL sequence");
+        if (lone_terminator_)
+            DieCore(access, value, "after a lone HSPPCTEL 0xAA with no complete signature since");
     }
 
     void RequireCoreAccess(const char* access, std::optional<uint16_t> value) const {
@@ -192,7 +199,8 @@ private:
     }
 
     bool CoreAccepts(const char* access, uint16_t value) const {
-        if (!unlocked_ && !signature_broken_ && signature_pos_ == 0u && !CoreHeldInReset())
+        if (!unlocked_ && !signature_broken_ && !lone_terminator_ && signature_pos_ == 0u &&
+            !CoreHeldInReset())
             return false;
         RequireCoreAccess(access, value);
         return true;
@@ -230,12 +238,17 @@ private:
             ++signature_pos_;
             if (signature_pos_ == kSignature.size()) {
                 unlocked_ = true;
+                lone_terminator_ = false;
                 signature_pos_ = 0u;
             }
             return;
         }
         if (signature_pos_ == 1u && value == kSignature[0]) {
             signature_broken_ = true;
+            return;
+        }
+        if (!unlocked_ && signature_pos_ == 0u && value == kSignature.back()) {
+            lone_terminator_ = true;
             return;
         }
         emu_.Get<Fatal>().Die("[HSP] HSPPCTEL write 0x%02X outside the PCtel signature sequence", value);
@@ -247,6 +260,7 @@ private:
     bool     unlocked_      = false;
     uint8_t  signature_pos_ = 0u;
     bool     signature_broken_ = false;
+    bool     lone_terminator_  = false;
     bool     hibernating_   = false;
 };
 
