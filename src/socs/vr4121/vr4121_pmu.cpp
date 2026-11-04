@@ -56,9 +56,18 @@ constexpr Vr41xxPmuModel kModel = {
     true,
 };
 
+constexpr cerf_vr41xx_pmu_detail::Vr41xxPmu2Model kModel2 = {
+    .int2_w1c           = 0xF000u,
+    .int2_write_zero    = 0x0FFFu,
+    .cnt2_writable      = 0xFF00u,
+    .cnt2_write_zero    = 0x00FFu,
+    .cnt2_held_on_reset = 0xFF00u,
+    .cnt2_soft_reset    = 0u,
+};
+
 constexpr uint32_t kOffDivReg = 0x0Cu;
 
-class Vr4121Pmu : public Vr41xxPmuBase<SocId::Vr4121, kModel> {
+class Vr4121Pmu : public Vr41xxPmuBase<SocId::Vr4121, kModel, kModel2> {
 public:
     using Vr41xxPmuBase::Vr41xxPmuBase;
 

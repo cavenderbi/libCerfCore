@@ -49,7 +49,16 @@ constexpr Vr41xxPmuModel kModel = {
     0x0004u,   /* UM 15.2.1 p329: D2 DMSRST "Deadman's switch interrupt detection" */
 };
 
-class Vr4102Pmu : public Vr41xxPmuBase<SocId::Vr4102, kModel> {
+constexpr cerf_vr41xx_pmu_detail::Vr41xxPmu2Model kModel2 = {
+    .int2_w1c           = 0xF000u,
+    .int2_write_zero    = 0x0FFFu,
+    .cnt2_writable      = 0xFF00u,
+    .cnt2_write_zero    = 0x00FFu,
+    .cnt2_held_on_reset = 0x0000u,
+    .cnt2_soft_reset    = 0u,
+};
+
+class Vr4102Pmu : public Vr41xxPmuBase<SocId::Vr4102, kModel, kModel2> {
 public:
     using Vr41xxPmuBase::Vr41xxPmuBase;
 };

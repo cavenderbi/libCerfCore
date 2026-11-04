@@ -54,23 +54,24 @@ constexpr Vr41xxPmuModel kModel = {
 
 constexpr uint16_t kCntPllOffEn = 0x0008u;
 
-constexpr uint32_t kOffInt2Reg = 0x04u;
-constexpr uint32_t kOffCnt2Reg = 0x06u;
-
 /* PMUINT2REG (VR4131 UM 12.2.3): D15-12 GPIO(12:9)INTR W1C; D11:0 RFU read 0;
    RTCRST row all 0. */
-constexpr uint16_t kInt2W1c = 0xF000u;
-
 /* PMUCNT2REG (VR4131 UM 12.2.4): D15-12 GPIO(12:9)MSK, D11-8 GPIO(12:9)TRG,
    D4 SOFTRST ("Software reset switch setting"); RTCRST row all 0. */
-constexpr uint16_t kCnt2Writable = 0xFF10u;
-constexpr uint16_t kCnt2SoftRst  = 0x0010u;
+constexpr cerf_vr41xx_pmu_detail::Vr41xxPmu2Model kModel2 = {
+    .int2_w1c           = 0xF000u,
+    .int2_write_zero    = 0x0FFFu,
+    .cnt2_writable      = 0xFF10u,
+    .cnt2_write_zero    = 0x00EFu,
+    .cnt2_held_on_reset = 0xFF00u,
+    .cnt2_soft_reset    = 0x0010u,
+};
 
 /* PMUTCLKDIVREG (VR4131 UM 12.2.6, 0x0F0000CC): D8 TDIV + D2:0 VTDIV(2:0) R/W,
    D15:9/D7:3 RFU read 0; cleared to 0 at RTC reset (VTDIV 000 = CLKSEL strap mode). */
 constexpr uint32_t kOffTclkDivReg   = 0x0Cu;
 
-class Vr4122Pmu : public Vr41xxPmuBase<SocId::Vr4122, kModel> {
+class Vr4122Pmu : public Vr41xxPmuBase<SocId::Vr4122, kModel, kModel2> {
 public:
     using Vr41xxPmuBase::Vr41xxPmuBase;
 
@@ -100,39 +101,17 @@ public:
 
     void SaveState(StateWriter& w) override {
         Vr41xxPmuBase::SaveState(w);
-        w.Write("int2reg", int2reg_.load(std::memory_order_acquire));
-        w.Write("cnt2reg", cnt2reg_.load(std::memory_order_acquire));
         emu_.Get<Vr4122ClockState>().SaveState(w);
     }
 
     void RestoreState(StateReader& r) override {
         Vr41xxPmuBase::RestoreState(r);
-        uint16_t int2 = 0, cnt2 = 0;
-        r.Read("int2reg", int2);
-        r.Read("cnt2reg", cnt2);
-        int2reg_.store(int2, std::memory_order_release);
-        cnt2reg_.store(cnt2, std::memory_order_release);
         emu_.Get<Vr4122ClockState>().RestoreState(r);
     }
 
 protected:
-    void ResetExt() override {
-        int2reg_.store(0, std::memory_order_release);
-        cnt2reg_.store(0, std::memory_order_release);
-    }
-
-    uint16_t ActivationControl2() const override {
-        return cnt2reg_.load(std::memory_order_acquire);
-    }
-
-    void LatchActivation2(uint16_t bits) override {
-        int2reg_.fetch_or(bits, std::memory_order_acq_rel);
-    }
-
     uint16_t ReadHalfExt(uint32_t addr) override {
         switch (addr - kModel.base) {
-            case kOffInt2Reg: return int2reg_.load(std::memory_order_acquire);
-            case kOffCnt2Reg: return cnt2reg_.load(std::memory_order_acquire);
             case kOffWaitReg: return waitreg_;
             case kOffTclkDivReg: return emu_.Get<Vr4122ClockState>().Pending();
             default: return Vr41xxPmuBase::ReadHalfExt(addr);
@@ -141,18 +120,6 @@ protected:
 
     void WriteHalfExt(uint32_t addr, uint16_t value) override {
         switch (addr - kModel.base) {
-            case kOffInt2Reg:
-                int2reg_.fetch_and(static_cast<uint16_t>(~(value & kInt2W1c)),
-                                   std::memory_order_acq_rel);
-                return;
-            case kOffCnt2Reg:
-                if (value & kCnt2SoftRst) {
-                    emu_.Get<Fatal>().Die("Vr4122Pmu: PMUCNT2REG SOFTRST=1 write (0x%04X) - "
-                                          "software-reset flow not modeled", value);
-                }
-                cnt2reg_.store(static_cast<uint16_t>(value & kCnt2Writable),
-                               std::memory_order_release);
-                return;
             case kOffTclkDivReg:
                 if (const char* why = emu_.Get<Vr4122ClockState>().WritePending(value)) {
                     HaltUnsupportedAccess(why, addr, value);
@@ -161,10 +128,6 @@ protected:
             default: Vr41xxPmuBase::WriteHalfExt(addr, value); return;
         }
     }
-
-private:
-    std::atomic<uint16_t> int2reg_{0};
-    std::atomic<uint16_t> cnt2reg_{0};
 };
 
 }  /* namespace */

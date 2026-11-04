@@ -25,6 +25,8 @@ namespace cerf_vr41xx_pmu_detail {
 
 constexpr uint32_t kOffIntReg  = 0x00u;
 constexpr uint32_t kOffCntReg  = 0x02u;
+constexpr uint32_t kOffInt2Reg = 0x04u;
+constexpr uint32_t kOffCnt2Reg = 0x06u;
 constexpr uint32_t kOffWaitReg = 0x08u;
 
 constexpr uint16_t kIntRtcIntr = 0x0200u;
@@ -60,7 +62,16 @@ struct Vr41xxPmuModel {
     bool     power_holds_wake_factors = false;
 };
 
-template <const std::string_view& Soc, const Vr41xxPmuModel& M>
+struct Vr41xxPmu2Model {
+    uint16_t int2_w1c;
+    uint16_t int2_write_zero;
+    uint16_t cnt2_writable;
+    uint16_t cnt2_write_zero;
+    uint16_t cnt2_held_on_reset;
+    uint16_t cnt2_soft_reset;
+};
+
+template <const std::string_view& Soc, const Vr41xxPmuModel& M, const Vr41xxPmu2Model& M2>
 class Vr41xxPmuBase : public Vr41xxPmu, public ResetCauseLatch, public DeepSleepWaker {
 public:
     using Vr41xxPmu::Vr41xxPmu;
@@ -98,10 +109,12 @@ public:
             std::lock_guard<std::mutex> lk(power_mtx_);
             if (kind == ResetLineKind::Rtc) rtc_alarm_held_ = false;
             if (kind != ResetLineKind::Rtc) {
-                const uint16_t kept = emu_.Get<GuestCpuReset>().DeliveredResetWasResume()
-                    ? IntReg()
-                    : static_cast<uint16_t>(IntReg() & M.int_held_on_reset);
+                const bool     resume = emu_.Get<GuestCpuReset>().DeliveredResetWasResume();
+                const uint16_t kept   = resume ? IntReg()
+                                               : static_cast<uint16_t>(IntReg() & M.int_held_on_reset);
                 StoreIntReg(static_cast<uint16_t>(kept | cause));
+                if (!resume) int2reg_.store(0u, std::memory_order_release);
+                cnt2reg_.fetch_and(M2.cnt2_held_on_reset, std::memory_order_acq_rel);
                 PublishPowerIntrLocked();
                 const uint16_t held = cntreg_.load(std::memory_order_acquire) & kCntHeldOnReset;
                 cntreg_.store(static_cast<uint16_t>(held | (M.cnt_power_on & ~kCntHeldOnReset)),
@@ -111,8 +124,9 @@ public:
             StoreIntReg(static_cast<uint16_t>(M.int_power_on | cause));
             PublishPowerIntrLocked();
             cntreg_.store(M.cnt_power_on, std::memory_order_release);
+            int2reg_.store(0u, std::memory_order_release);
+            cnt2reg_.store(0u, std::memory_order_release);
             waitreg_ = M.wait_power_on;
-            ResetExt();
         });
     }
 
@@ -155,7 +169,7 @@ public:
             cnt = cntreg_.load(std::memory_order_acquire);
             bit = pin;
         } else if (pin >= 9 && pin <= 12) {
-            cnt = ActivationControl2();
+            cnt = cnt2reg_.load(std::memory_order_acquire);
             bit = pin - 9;
         } else {
             return;
@@ -165,7 +179,7 @@ public:
         if ((cnt & msk) == 0u) return;
         if (((cnt & trg) != 0u) == level) return;
         if (pin <= 3) SetIntBits(msk);
-        else          LatchActivation2(msk);
+        else          int2reg_.fetch_or(msk, std::memory_order_acq_rel);
         wake_pending_.store(true, std::memory_order_release);
     }
 
@@ -184,6 +198,8 @@ public:
                 return static_cast<uint16_t>(
                     IntReg() | (emu_.Get<Vr41xxGiu>().GetPinLevel(Vr41xxGiu::kDcdPin) ? kIntDcdSt : 0u));
             case kOffCntReg: return cntreg_.load(std::memory_order_acquire);
+            case kOffInt2Reg: return int2reg_.load(std::memory_order_acquire);
+            case kOffCnt2Reg: return cnt2reg_.load(std::memory_order_acquire);
             default: return ReadHalfExt(addr);
         }
     }
@@ -209,6 +225,23 @@ public:
                 if (M.wait_wmask == 0u) break;
                 waitreg_ = static_cast<uint16_t>(value & M.wait_wmask);
                 return;
+            case kOffInt2Reg:
+                if ((value & M2.int2_write_zero) != 0u) {
+                    emu_.Get<Fatal>().Die("Vr41xxPmu: PMUINT2REG write 0x%04X breaks the "
+                                          "write-0 rule of its reserved bits", value);
+                }
+                int2reg_.fetch_and(static_cast<uint16_t>(~(value & M2.int2_w1c)),
+                                   std::memory_order_acq_rel);
+                return;
+            case kOffCnt2Reg:
+                if ((value & M2.cnt2_write_zero) != 0u) {
+                    emu_.Get<Fatal>().Die("Vr41xxPmu: PMUCNT2REG write 0x%04X breaks the "
+                                          "write-0 rule of its reserved bits", value);
+                }
+                cnt2reg_.store(static_cast<uint16_t>(value & M2.cnt2_writable),
+                               std::memory_order_release);
+                if ((value & M2.cnt2_soft_reset) != 0u) emu_.Get<GuestCpuReset>().WarmReset();
+                return;
             default: break;
         }
         WriteHalfExt(addr, value);
@@ -224,6 +257,8 @@ public:
         w.Write<uint8_t>("hibernating", hibernating_.load(std::memory_order_acquire) ? 1u : 0u);
         w.Write<uint8_t>("wake_pending", wake_pending_.load(std::memory_order_acquire) ? 1u : 0u);
         w.Write("pending_cause", pending_cause_.load(std::memory_order_acquire));
+        w.Write("int2reg", int2reg_.load(std::memory_order_acquire));
+        w.Write("cnt2reg", cnt2reg_.load(std::memory_order_acquire));
     }
 
     void RestoreState(StateReader& r) override {
@@ -250,6 +285,11 @@ public:
             r.Reject("Vr41xxPmu: pending reset cause 0x%04X is no reset's cause bits", cause);
         }
         pending_cause_.store(cause, std::memory_order_release);
+        uint16_t int2 = 0, cnt2 = 0;
+        r.Read("int2reg", int2);
+        r.Read("cnt2reg", cnt2);
+        int2reg_.store(int2, std::memory_order_release);
+        cnt2reg_.store(cnt2, std::memory_order_release);
         intreg_.store(v, std::memory_order_release);
         cntreg_.store(cnt, std::memory_order_release);
         hibernating_.store(hib != 0u, std::memory_order_release);
@@ -274,13 +314,6 @@ protected:
     virtual uint16_t ReadHalfExt(uint32_t addr) { return Peripheral::ReadHalf(addr); }
     virtual void WriteHalfExt(uint32_t addr, uint16_t value) {
         Peripheral::WriteHalf(addr, value);
-    }
-    virtual void ResetExt() {}
-
-    virtual uint16_t ActivationControl2() const { return 0u; }
-    virtual void LatchActivation2(uint16_t bits) {
-        emu_.Get<Fatal>().Die("Vr41xxPmu: GPIO(12:9) activation 0x%04X on a chip without "
-                              "PMUCNT2REG", bits);
     }
 
     uint16_t IntReg() const { return intreg_.load(std::memory_order_acquire); }
@@ -356,6 +389,8 @@ protected:
     std::atomic<uint16_t> intreg_{M.int_power_on};
     std::atomic<uint16_t> pending_cause_{0};
     std::atomic<uint16_t> cntreg_{M.cnt_power_on};
+    std::atomic<uint16_t> int2reg_{0};
+    std::atomic<uint16_t> cnt2reg_{0};
     uint16_t              waitreg_ = M.wait_power_on;
     std::atomic<bool>     hibernating_{false};
     std::atomic<bool>     wake_pending_{false};
