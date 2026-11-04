@@ -38,7 +38,7 @@ constexpr Vr41xxRegWindowModel kModel = {
         { ReadKind::kFatal, WriteKind::kStored, vr4121_bcu::kRamSizeWmask, 0x0000u, 0x8888u,
           OtherReset::kReset },
         {},
-        {},
+        { ReadKind::kStored, WriteKind::kStored, 0xF777u, 0x0000u, 0x0888u },
         { ReadKind::kFatal, WriteKind::kClear, 0x0001u, 0x0000u, 0xFFFEu },
         /* 0x0E BCURFCNTREG (UM 11.2.7): D13:0 BRF(13:0), "Number of DRAM refresh
            cycles (with TClock cycle)"; D15:14 RFU read 0. RTCRST column = BRF9; the
@@ -91,6 +91,7 @@ const char* RfuEncoding(uint32_t off, uint16_t value) {
     if (off == vr4121_bcu::kOffCnt3 && !ExtRomcsDefined(value)) {
         return "BCUCNTREG3 write with the RFU EXT_ROMCS encoding 01";
     }
+    if (off == vr41xx_bcu::kOffSpeed) return vr41xx_bcu::SpeedRfuEncoding(value);
     return nullptr;
 }
 
@@ -99,6 +100,7 @@ using vr41xx_bcu::kOffCnt1;
 
 constexpr uint32_t kIdxCnt1    = kOffCnt1 / 2u;
 constexpr uint32_t kIdxRamSize = kOffRamSize / 2u;
+constexpr uint32_t kIdxSpeed   = vr41xx_bcu::kOffSpeed / 2u;
 constexpr uint32_t kIdxCnt3    = kOffCnt3 / 2u;
 
 class Vr4121Bcu : public Vr41xxBcuBase<SocId::Vr4121, kModel> {
@@ -138,6 +140,10 @@ public:
     }
 
 protected:
+    const char* RegStateName(uint32_t i) const override {
+        return i == kIdxSpeed ? "bcu_speed" : Vr41xxBcuBase::RegStateName(i);
+    }
+
     uint16_t ResetValue(uint32_t i, bool rtc) const override {
         const uint16_t reset = Vr41xxBcuBase::ResetValue(i, rtc);
         const bool sdram = emu_.Get<Vr4121BcuBoard>().Sdram();

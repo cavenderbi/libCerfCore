@@ -29,7 +29,10 @@ public:
     using Vr41xxRegWindowBase::Vr41xxRegWindowBase;
 
 protected:
-    const char* RegStateName() const override { return "fir_reg"; }
+    const char* RegStateName(uint32_t i) const override {
+        (void)i;
+        return "fir_reg";
+    }
 };
 
 }

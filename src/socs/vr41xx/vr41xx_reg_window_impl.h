@@ -136,16 +136,19 @@ public:
     }
 
     void SaveState(StateWriter& w) override {
-        for (uint32_t i = 0; i < M.num_regs; ++i) w.Write(RegStateName(), reg_[i]);
+        for (uint32_t i = 0; i < M.num_regs; ++i) w.Write(RegStateName(i), reg_[i]);
         for (uint32_t i = 0; i < M.num_regs; ++i) w.Write("undefined", undefined_[i]);
     }
     void RestoreState(StateReader& r) override {
-        for (uint32_t i = 0; i < M.num_regs; ++i) r.Read(RegStateName(), reg_[i]);
+        for (uint32_t i = 0; i < M.num_regs; ++i) r.Read(RegStateName(i), reg_[i]);
         for (uint32_t i = 0; i < M.num_regs; ++i) r.Read("undefined", undefined_[i]);
     }
 
 protected:
-    virtual const char* RegStateName() const { return "reg"; }
+    virtual const char* RegStateName(uint32_t i) const {
+        (void)i;
+        return "reg";
+    }
 
     virtual uint16_t ResetValue(uint32_t i, bool rtc) const {
         (void)rtc;

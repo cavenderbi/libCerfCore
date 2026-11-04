@@ -114,7 +114,10 @@ public:
     }
 
 protected:
-    const char* RegStateName() const override { return "fir_reg"; }
+    const char* RegStateName(uint32_t i) const override {
+        (void)i;
+        return "fir_reg";
+    }
 
 private:
     bool IrdaEnabled() const { return (this->StoredReg(kOffIrsr1 / 2u) & kIrsr1IrdaEn) != 0u; }

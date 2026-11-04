@@ -15,6 +15,13 @@ constexpr uint16_t kCnt1IsamLcd = 0x2000u;
 constexpr uint16_t kCnt2Gmode   = 0x0001u;
 constexpr uint32_t kLcdSpaceBase = 0x0A000000u;
 constexpr uint32_t kLcdSpaceEnd  = 0x0B000000u;
+constexpr uint32_t kOffSpeed     = 0x0Au;
+
+constexpr const char* SpeedRfuEncoding(uint16_t speed) {
+    if (((speed >> 12) & 0x3u) == 0x3u) return "BCUSPEEDREG write with the RFU WPROM 11";
+    if (((speed >> 5) & 0x3u) == 0x3u) return "BCUSPEEDREG write with an RFU WISAA 11x";
+    return nullptr;
+}
 
 }
 

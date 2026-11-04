@@ -51,12 +51,12 @@ static_assert(WritableAndWrite0Partition(kModel, 0x00u) &&
                   WritableAndWrite0Partition(kModel, 0x0Eu),
               "VR4111 BCU writable and write-0 RFU bits must partition all 16");
 
-constexpr uint32_t kOffSpeed  = 0x0Au;
+using vr41xx_bcu::kOffSpeed;
+
 constexpr uint16_t kWlcdmHigh = 0x0400u;
 
 const char* SpeedEncodingRejected(uint16_t speed, uint16_t cnt1) {
-    if (((speed >> 12) & 0x3u) == 0x3u) return "BCUSPEEDREG write with the RFU WPROM 11";
-    if (((speed >> 5) & 0x3u) == 0x3u) return "BCUSPEEDREG write with an RFU WISAA 11x";
+    if (const char* why = vr41xx_bcu::SpeedRfuEncoding(speed)) return why;
     if ((speed & kWlcdmHigh) != 0u && (cnt1 & vr41xx_bcu::kCnt1IsamLcd) == 0u) {
         return "BCUSPEEDREG WLCD/M 1xx is RFU while BCUCNTREG1 ISAM/LCD = 0";
     }

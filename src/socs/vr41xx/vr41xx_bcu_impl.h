@@ -70,7 +70,10 @@ public:
     }
 
 protected:
-    const char* RegStateName() const override { return "bcu_reg"; }
+    const char* RegStateName(uint32_t i) const override {
+        (void)i;
+        return "bcu_reg";
+    }
 
     virtual std::vector<Vr41xxBcuBootWrite> KernelEntryWrites() const { return {}; }
 
