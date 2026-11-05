@@ -146,6 +146,8 @@ void FordSyncGen2VmcuPeer::HandlePmRequest() {
 }
 
 void FordSyncGen2VmcuPeer::HandlePmInbound(const uint8_t* pm, std::size_t n) {
+    LOG(Board, "[VMCU PM] type=0x%02X tid=%u len=%zu state=0x%02X status=0x%02X\n",
+        pm[0], pm[1], n, n > 3 ? pm[3] : 0, n > 5 ? pm[5] : 0);
     HandlePmRequest();
     const uint8_t tid = pm[1];
     switch (pm[0]) {
