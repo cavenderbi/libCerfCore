@@ -75,14 +75,9 @@ uint32_t Imx51Gpu2dPixelBlend::BlendPixel(const Gpu2dFillTarget& t, uint32_t src
         b = chan(t.prog_c, 0u);
     }
     if (t.oo_alpha && a != 255u) {
-        if (a == 0u) {
-            if (r | g | b)
-                HaltBlend("OOALPHA divide on zero-alpha nonzero color", t.prog_c);
-        } else {
-            r = UnpremultChannel(r, a);
-            g = UnpremultChannel(g, a);
-            b = UnpremultChannel(b, a);
-        }
+        r = UnpremultChannel(r, a);
+        g = UnpremultChannel(g, a);
+        b = UnpremultChannel(b, a);
     }
     return (a << 24) | (r << 16) | (g << 8) | b;
 }

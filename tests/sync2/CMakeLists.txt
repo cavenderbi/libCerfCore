@@ -39,3 +39,10 @@ target_include_directories(audio_pacing_test PRIVATE "${core}/include"
     "${core}/libCerfEngine/include" "${core}/libCerfEngine/libservicelocator/include")
 target_link_libraries(audio_pacing_test PRIVATE Threads::Threads)
 add_test(NAME audio_pacing COMMAND audio_pacing_test)
+add_executable(imx51_gpu2d_blend_test ../imx51_gpu2d_blend_test.cpp support.cpp
+    "${core}/src/socs/imx51/imx51_gpu2d_pixel_blend.cpp")
+target_compile_features(imx51_gpu2d_blend_test PRIVATE cxx_std_20)
+target_compile_options(imx51_gpu2d_blend_test PRIVATE -Wall -Wextra -Werror)
+target_include_directories(imx51_gpu2d_blend_test PRIVATE "${core}/include"
+    "${core}/libCerfEngine/include" "${core}/libCerfEngine/libservicelocator/include")
+add_test(NAME imx51_gpu2d_blend COMMAND imx51_gpu2d_blend_test)

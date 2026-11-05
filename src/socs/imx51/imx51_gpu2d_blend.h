@@ -94,6 +94,7 @@ constexpr uint32_t PremultArgb(uint32_t argb) {
 
 /* One un-premultiply channel divide (BLENDERCFG.OOALPHA result -> straight alpha). */
 constexpr uint32_t UnpremultChannel(uint32_t ch, uint32_t a) {
+    if (a == 0u) return 0u;
     return (ch * 255u + a / 2u) / a > 255u ? 255u : (ch * 255u + a / 2u) / a;
 }
 
