@@ -25,3 +25,8 @@ target_include_directories(sync2_entertainment_test PRIVATE
     "${core}/libCerfEngine/libservicelocator/include")
 target_link_libraries(sync2_entertainment_test PRIVATE Threads::Threads)
 add_test(NAME sync2_entertainment COMMAND sync2_entertainment_test)
+add_executable(imx51_ipu_blend_test ../imx51_ipu_blend_test.cpp)
+target_compile_features(imx51_ipu_blend_test PRIVATE cxx_std_20)
+target_compile_options(imx51_ipu_blend_test PRIVATE -Wall -Wextra -Werror)
+target_include_directories(imx51_ipu_blend_test PRIVATE "${core}/include" "${core}/libCerfEngine/include")
+add_test(NAME imx51_ipu_blend COMMAND imx51_ipu_blend_test)

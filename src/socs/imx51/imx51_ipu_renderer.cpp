@@ -2,6 +2,7 @@
 
 #include "imx51_ipu_cpmem.h"
 #include "imx51_ipu_srm.h"
+#include "imx51_ipu_blend.h"
 
 #include <cerfcore/boards/board_context.h>
 #include "../../boards/ford_sync_gen2/ford_sync_gen2_family_id.h"
@@ -28,17 +29,6 @@ constexpr uint32_t kDpComComposite = 0x3u; /* FG_EN|GWSEL: partial plane, GWAM=0
 constexpr uint32_t kDpComGlobal    = 0x7u; /* FG_EN|GWSEL|GWAM: partial plane, global alpha */
 constexpr uint32_t kFgPfsRgba8888  = 7u;   /* ch27 PFS for the RGBA8888 FG plane (live: s224) */
 
-/* DP graphic-window local per-pixel alpha (RM Table 42-116, GWAM=0):
-   out = (A*FG + (255-A)*BG)/255 per channel, round-to-nearest. FG/BG/out are
-   0xAARRGGBB words (host DIB BGRA byte order); alpha = FG>>24 (live: FG px b3). */
-inline uint32_t BlendLocalAlpha(uint32_t fg, uint32_t bg) {
-    const uint32_t a  = fg >> 24;
-    const uint32_t ia = 255u - a;
-    auto ch = [&](uint32_t sh) -> uint32_t {
-        return (a * ((fg >> sh) & 0xFFu) + ia * ((bg >> sh) & 0xFFu) + 127u) / 255u;
-    };
-    return lcd_pixel::PackXrgb(ch(16), ch(8), ch(0));
-}
 
 /* i.MX51 IPUv3EX display scanout -> host frame. The DP composites a full
    BACKGROUND plane (ch23, the synchronous display, RGB565) with a partial
@@ -163,12 +153,7 @@ private:
             const uint8_t* frow = fg_src + static_cast<size_t>(y) * fg_stride;
             const uint8_t* brow = bg_src ? bg_src + static_cast<size_t>(y) * bg.sl : nullptr;
             uint32_t* drow = dib + static_cast<size_t>(y) * host_w;
-            for (uint32_t x = 0; x < cw; ++x) {
-                const uint32_t bgpx = brow
-                    ? lcd_pixel::Expand565(cerf::le::U16(brow, static_cast<size_t>(x) * 2u))
-                    : 0xFF000000u;
-                drow[x] = BlendLocalAlpha(cerf::le::U32(frow, static_cast<size_t>(x) * 4u), bgpx);
-            }
+            imx51_ipu::BlendRow(drow, frow, brow, cw);
         }
     }
 
