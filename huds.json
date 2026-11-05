@@ -1,5 +1,110 @@
 {
   "elements": {
+    "sync2_entertainment": {
+      "row": [
+        {
+          "column": [
+            {
+              "row": [
+                {
+                  "button": {
+                    "action": "audio_volume_down",
+                    "label": "VOL −"
+                  }
+                },
+                {
+                  "button": {
+                    "action": "audio_volume_up",
+                    "label": "VOL +"
+                  }
+                }
+              ]
+            },
+            {
+              "row": [
+                {
+                  "button": {
+                    "action": "audio_power",
+                    "label": "Power"
+                  }
+                },
+                {
+                  "button": {
+                    "action": "audio_mute",
+                    "label": "Mute"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "grow": 2,
+          "column": [
+            {
+              "row": [
+                {
+                  "button": {
+                    "action": "audio_source",
+                    "label": "Source"
+                  }
+                },
+                {
+                  "button": {
+                    "action": "audio_sound",
+                    "label": "Sound"
+                  }
+                }
+              ]
+            },
+            {
+              "row": [
+                {
+                  "button": {
+                    "action": "audio_previous",
+                    "label": "◀◀"
+                  }
+                },
+                {
+                  "button": {
+                    "action": "audio_play",
+                    "label": "Play"
+                  }
+                },
+                {
+                  "button": {
+                    "action": "audio_pause",
+                    "label": "Pause"
+                  }
+                },
+                {
+                  "button": {
+                    "action": "audio_next",
+                    "label": "▶▶"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "column": [
+            {
+              "button": {
+                "action": "audio_tune_up",
+                "label": "TUNE +"
+              }
+            },
+            {
+              "button": {
+                "action": "audio_tune_down",
+                "label": "TUNE −"
+              }
+            }
+          ]
+        }
+      ]
+    },
     "soft_left": { "button": { "keys": ["VK_F1"], "icon": "remove" } },
     "soft_right": { "button": { "keys": ["VK_F2"], "icon": "remove" } },
     "home": { "button": { "keys": ["VK_LWIN"], "icon": "home" } },
@@ -587,6 +692,23 @@
     }
   },
   "huds": [
+    {
+      "id": "ford_sync_gen2",
+      "name": "Ford SYNC 2 · C-Max entertainment",
+      "board_family_ids": [
+        "ford_sync_gen2"
+      ],
+      "gap": 0.02,
+      "panels": [
+        {
+          "side": "bottom",
+          "align": "center",
+          "width": 1.0,
+          "height": 0.24,
+          "content": "sync2_entertainment"
+        }
+      ]
+    },
     {
       "id": "device_emulator_pocket_pc",
       "name": "Pocket PC",

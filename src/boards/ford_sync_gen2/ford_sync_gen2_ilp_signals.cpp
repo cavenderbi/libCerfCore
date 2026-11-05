@@ -11,6 +11,7 @@
 #include <cerfcore/core/log.h>
 #include <cerfcore/state/state_stream.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -240,15 +241,25 @@ void FordSyncGen2IlpSignals::RestoreState(StateReader& r) {
     cycle_ = cycle % kSignalCount;
 }
 
-void FordSyncGen2IlpSignals::RegisterComposite(std::initializer_list<uint32_t> ids) {
+void FordSyncGen2IlpSignals::RegisterComposite(std::initializer_list<uint32_t> ids, bool cyclic,
+                                               std::initializer_list<uint32_t> triggers) {
     for (const auto id : ids) {
         const auto index = IndexOf(id);
         if (index == kSignalCount || groups_[index] != 0) {
             emu_.Get<Fatal>().Die("[VMCU] invalid ILP composite registration");
         }
     }
+    for (auto trigger : triggers)
+        if (std::find(ids.begin(), ids.end(), trigger) == ids.end())
+            emu_.Get<Fatal>().Die("[VMCU] invalid composite trigger");
     ++group_count_;
-    for (const auto id : ids) groups_[IndexOf(id)] = group_count_;
+    for (const auto id : ids) {
+        const auto index = IndexOf(id);
+        groups_[index] = group_count_;
+        event_only_[index] = !cyclic;
+        subscription_required_[index] = triggers.size() == 0 ||
+            std::find(triggers.begin(), triggers.end(), id) != triggers.end();
+    }
 }
 
 unsigned FordSyncGen2IlpSignals::CompositeGroup(uint32_t sigid) const {
@@ -258,7 +269,7 @@ unsigned FordSyncGen2IlpSignals::CompositeGroup(uint32_t sigid) const {
 
 void FordSyncGen2IlpSignals::RepublishComposites() {
     for (std::size_t i = 0; i < kSignalCount; ++i) {
-        if (CompositeGroup(kGroundedSignals[i].sigid) == 0u) continue;
+        if (event_only_[i] || CompositeGroup(kGroundedSignals[i].sigid) == 0u) continue;
         if (!reporting_[i].load(std::memory_order_acquire)) continue;
         pending_[i].store(true, std::memory_order_release);
     }
@@ -267,7 +278,7 @@ void FordSyncGen2IlpSignals::RepublishComposites() {
 /* ford_sync_2 ipc_ilprot.dll sub_C08DD3FC reads NumSignals at bytes [4..5].
    sub_C08DB2BC permits per-entry TIDs to differ when registry VMCUSingleFilter is set. */
 std::size_t FordSyncGen2IlpSignals::AppendBatchedIndication(uint32_t* sigids, std::size_t n,
-                                                          std::vector<uint8_t>& pkt) {
+                                                          std::vector<uint8_t>& pkt, bool complete_composite) {
     std::size_t used = 6u, emitted = 0u;
     std::vector<uint8_t> body;
     uint16_t tid   = 0u;
@@ -277,13 +288,17 @@ std::size_t FordSyncGen2IlpSignals::AppendBatchedIndication(uint32_t* sigids, st
         const std::size_t idx = IndexOf(sigids[k]);
         if (idx == kSignalCount) continue;
         if (!reporting_[idx].load(std::memory_order_acquire)) continue;
-        if (sub_tids_[idx].empty()) continue;
+        if (!complete_composite && sub_tids_[idx].empty()) continue;
         const std::size_t width = WireWidth(kGroundedSignals[idx].bits);
         if (emitted != 0u && CompositeGroup(sigids[k]) != group) continue;
         if (used + 4u + width > kMaxReplyPayload) break;
         if (emitted == 0u) {
-            tid   = sub_tids_[idx][0];
             group = CompositeGroup(sigids[k]);
+            if (!sub_tids_[idx].empty()) tid = sub_tids_[idx][0];
+            else {
+                for (size_t j = 0; j < kSignalCount; ++j)
+                    if (groups_[j] == group && !sub_tids_[j].empty()) { tid = sub_tids_[j][0]; break; }
+            }
         }
         const uint32_t sigid = sigids[k];
         sigids[k]            = kTakenSignal;
@@ -315,6 +330,7 @@ std::size_t FordSyncGen2IlpSignals::TakeChangedSignals(uint32_t* out, std::size_
 uint32_t FordSyncGen2IlpSignals::NextCyclicSignal() {
     for (std::size_t n = 0; n < kSignalCount; ++n) {
         const std::size_t i = (cycle_ + n) % kSignalCount;
+        if (event_only_[i]) continue;
         if (!reporting_[i].load(std::memory_order_acquire)) continue;
         if (sub_tids_[i].empty()) continue;
         cycle_ = (i + 1u) % kSignalCount;
@@ -326,6 +342,26 @@ uint32_t FordSyncGen2IlpSignals::NextCyclicSignal() {
 void FordSyncGen2IlpSignals::MarkPublished(uint32_t sigid) {
     const auto index = IndexOf(sigid);
     if (index != kSignalCount) pending_[index].store(false, std::memory_order_release);
+}
+
+bool FordSyncGen2IlpSignals::CompositeReady(uint32_t id) const {
+    const auto group = CompositeGroup(id);
+    if (!group) return false;
+    for (size_t i = 0; i < kSignalCount; ++i)
+        if (groups_[i] == group && subscription_required_[i] && sub_tids_[i].empty()) return false;
+    return true;
+}
+
+std::size_t FordSyncGen2IlpSignals::CompositeSize(uint32_t sigid) const {
+    const auto group = CompositeGroup(sigid);
+    if (group == 0) return 0;
+    std::size_t count = 0;
+    for (const auto candidate : groups_) if (candidate == group) ++count;
+    return count;
+}
+
+bool FordSyncGen2IlpSignals::SameComposite(uint32_t first, uint32_t second) const {
+    return CompositeGroup(first) != 0 && CompositeGroup(first) == CompositeGroup(second);
 }
 
 bool FordSyncGen2IlpSignals::IsComposite(uint32_t sigid) const {

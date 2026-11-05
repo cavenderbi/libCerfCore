@@ -1,4 +1,5 @@
 #pragma once
+#include "ford_sync_gen2_ilp_signal_tables.h"
 
 #include <cerfcore/core/service.h>
 
@@ -25,7 +26,7 @@ public:
                                 std::vector<uint8_t>& pkt);
     void        RepublishComposites();
     std::size_t AppendBatchedIndication(uint32_t* sigids, std::size_t n,
-                                        std::vector<uint8_t>& pkt);
+                                        std::vector<uint8_t>& pkt, bool complete_composite = false);
 
     std::size_t GroundedSignalCount() const;
     uint32_t    GroundedSignalIdAt(std::size_t i) const;
@@ -42,7 +43,11 @@ public:
     uint32_t    NextCyclicSignal();
     void MarkPublished(uint32_t sigid);
     bool IsComposite(uint32_t sigid) const;
-    void RegisterComposite(std::initializer_list<uint32_t> ids);
+    bool SameComposite(uint32_t first, uint32_t second) const;
+    std::size_t CompositeSize(uint32_t sigid) const;
+    void RegisterComposite(std::initializer_list<uint32_t> ids, bool cyclic = true,
+                           std::initializer_list<uint32_t> triggers = {});
+    bool CompositeReady(uint32_t id) const;
 
     void SaveState(StateWriter& w) const;
     void RestoreState(StateReader& r);
@@ -52,11 +57,13 @@ public:
     void    SetReportedValue(uint32_t sigid, uint64_t value);
     void    ClearReportedValue(uint32_t sigid);
 
-    static constexpr std::size_t kSignalCount = 352u;
+    static constexpr std::size_t kSignalCount = cerf_ford_sync_gen2_ilp_detail::kSignalMetadataCount;
 
 private:
     unsigned CompositeGroup(uint32_t sigid) const;
     unsigned groups_[kSignalCount] = {};
+    bool event_only_[kSignalCount] = {};
+    bool subscription_required_[kSignalCount] = {};
     unsigned group_count_ = 0;
     std::size_t IndexOf(uint32_t sigid) const;
 

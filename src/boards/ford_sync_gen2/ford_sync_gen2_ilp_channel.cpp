@@ -131,11 +131,15 @@ void FordSyncGen2IlpChannel::HandleInbound(const uint8_t* data, std::size_t n) {
         const auto sub = signals.NoteFilterRegistration(id, tid);
         /* EA5T-14D544-BA.sec, ipc_ilprot.dll sub_C08D9A10 accepts only status 0/0x40. */
         const bool retained = sub != FordSyncGen2IlpSignals::kNoSubscriber;
-        if (!retained) ++unavailable_;
+        if (!retained) {
+            ++unavailable_;
+            LOG(Caution, "[VMCU] rejected ILP filter SigID=0x%08X tid=%u: missing signal definition\n", id, tid);
+        }
         Complete(5, tid, retained);
         std::vector<uint8_t> body;
         if (retained && signals.AppendSignalIndication(id, sub, body))
             Send(body.data(), body.size());
+        PublishOrdered();
         break;
     }
     case 6: Complete(6, tid, true); break;
@@ -143,6 +147,7 @@ void FordSyncGen2IlpChannel::HandleInbound(const uint8_t* data, std::size_t n) {
         std::vector<uint8_t> body;
         signals.AppendGetAssocReply(data, n, tid, body);
         Send(body.data(), body.size());
+        PublishOrdered();
         break;
     }
     default:
@@ -150,7 +155,51 @@ void FordSyncGen2IlpChannel::HandleInbound(const uint8_t* data, std::size_t n) {
     }
 }
 
+bool FordSyncGen2IlpChannel::QueueIndications(const std::vector<Indication>& frames) {
+    if (frames.size() > kMaxIndications - indications_.size()) return false;
+    auto& signals = emu_.Get<FordSyncGen2IlpSignals>();
+    for (const auto& frame : frames) {
+        if (frame.empty() || frame.size() != signals.CompositeSize(frame.front().id)) return false;
+        std::size_t bytes = 6;
+        std::vector<uint32_t> seen;
+        for (const auto& field : frame) {
+            const auto width = signals.HeadWriteWidth(field.id);
+            uint8_t bits = 0;
+            for (std::size_t i = 0; i < signals.GroundedSignalCount(); ++i)
+                if (signals.GroundedSignalIdAt(i) == field.id) bits = signals.GroundedSignalBitsAt(i);
+            if (!signals.SameComposite(frame.front().id, field.id) || width == 0 || width > 8 ||
+                (bits < 64 && field.value >= (uint64_t{1} << bits)) ||
+                std::find(seen.begin(), seen.end(), field.id) != seen.end()) return false;
+            seen.push_back(field.id);
+            bytes += 4 + width;
+        }
+        if (frame.empty() || bytes > 0x40) return false;
+    }
+    indications_.insert(indications_.end(), frames.begin(), frames.end());
+    return true;
+}
+
+void FordSyncGen2IlpChannel::PublishOrdered() {
+    auto& signals = emu_.Get<FordSyncGen2IlpSignals>();
+    while (!indications_.empty()) {
+        const auto& frame = indications_.front();
+        if (!signals.CompositeReady(frame.front().id)) return;
+        std::vector<uint32_t> ids;
+        for (const auto& field : frame) {
+            signals.SetReportedValue(field.id, field.value);
+            ids.push_back(field.id);
+        }
+        std::vector<uint8_t> body;
+        if (signals.AppendBatchedIndication(ids.data(), ids.size(), body, true) != frame.size())
+            emu_.Get<Fatal>().Die("[VMCU] incomplete ordered ILP indication");
+        Send(body.data(), body.size());
+        for (const auto& field : frame) signals.MarkPublished(field.id);
+        indications_.pop_front();
+    }
+}
+
 void FordSyncGen2IlpChannel::PublishPending(bool cyclic) {
+    PublishOrdered();
     auto& signals = emu_.Get<FordSyncGen2IlpSignals>();
     uint32_t changed[FordSyncGen2IlpSignals::kSignalCount];
     std::size_t count = signals.TakeChangedSignals(changed, std::size(changed));
@@ -213,6 +262,13 @@ void FordSyncGen2IlpChannel::Refresh(bool force) {
 void FordSyncGen2IlpChannel::SaveState(StateWriter& w) const {
     w.Write("tx_seq", tx_seq_); w.Write("watchdog_pets", watchdog_pets_);
     emu_.Get<FordSyncGen2IlpSignals>().SaveState(w);
+    w.Write<uint32_t>("indications_count", static_cast<uint32_t>(indications_.size()));
+    for (const auto& frame : indications_) {
+        w.Write<uint32_t>("fields_count", static_cast<uint32_t>(frame.size()));
+        for (const auto& field : frame) {
+            w.Write("signal_id", field.id); w.Write("signal_value", field.value);
+        }
+    }
     w.Write<uint32_t>("devices_count", static_cast<uint32_t>(devices_.size()));
     for (const auto& device : devices_) {
         w.Write<uint32_t>("key_count", static_cast<uint32_t>(device.key.size()));
@@ -224,6 +280,20 @@ void FordSyncGen2IlpChannel::SaveState(StateWriter& w) const {
 void FordSyncGen2IlpChannel::RestoreState(StateReader& r) {
     r.Read("tx_seq", tx_seq_); r.Read("watchdog_pets", watchdog_pets_);
     emu_.Get<FordSyncGen2IlpSignals>().RestoreState(r);
+    indications_.clear();
+    uint32_t frames = 0;
+    r.Read("indications_count", frames);
+    if (frames > kMaxIndications) r.Reject("[VMCU] too many ordered indications");
+    for (uint32_t i = 0; i < frames; ++i) {
+        uint32_t fields = 0;
+        r.Read("fields_count", fields);
+        if (fields == 0 || fields > 11) r.Reject("[VMCU] invalid indication size");
+        Indication frame(fields);
+        for (auto& field : frame) {
+            r.Read("signal_id", field.id); r.Read("signal_value", field.value);
+        }
+        if (!QueueIndications({frame})) r.Reject("[VMCU] invalid ordered indication");
+    }
     for (const auto& device : devices_) device.reset();
     uint32_t count = 0;
     r.Read("devices_count", count);

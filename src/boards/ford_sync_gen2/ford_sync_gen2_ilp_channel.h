@@ -1,6 +1,7 @@
 #pragma once
 #include <cerfcore/core/service.h>
 #include <atomic>
+#include <deque>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -29,6 +30,9 @@ public:
         std::function<void()> reset;
     };
     void RegisterDevice(Device device);
+    using Indication = std::vector<Write>;
+    // Emulation thread only. Reserve every reply before committing a controller request.
+    bool QueueIndications(const std::vector<Indication>& frames);
     struct ParseError { const char* reason = nullptr; std::size_t offset = 0; uint32_t id = 0; };
     struct Counters { uint64_t accepted, unsupported, invalid, unavailable, malformed, received, sent; };
     bool ShouldRegister() override;
@@ -43,6 +47,9 @@ public:
 
 private:
     void Refresh(bool force = false);
+    void PublishOrdered();
+    static constexpr std::size_t kMaxIndications = 48;
+    std::deque<Indication> indications_;
     std::vector<Device> devices_;
     void Send(const uint8_t* data, std::size_t n);
     void Complete(uint8_t type, uint16_t tid, bool accepted);

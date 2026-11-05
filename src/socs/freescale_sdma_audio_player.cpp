@@ -13,6 +13,7 @@
 #include <cerfcore/socs/guest_cpu_reset.h>
 
 #include <algorithm>
+#include <cerfcore/host/audio_output_filter.h>
 
 namespace cerfcore {
 
@@ -128,6 +129,8 @@ void FreescaleSdmaAudioPlayer::QueueSamples(uint32_t buf_pa, uint32_t bytes) {
         for (uint32_t i = mem.TryCopyOut(buf_pa + off, chunk, n); i < n; ++i) {
             chunk[i] = mem.ReadByte(buf_pa + off + i);
         }
+        if (format_.bits == 16)
+            if (auto* filter = emu_.TryGet<AudioOutputFilter>()) filter->ProcessPcm16({chunk, n});
         out_.QueueOutput(chunk, n);
         off += n;
     }
