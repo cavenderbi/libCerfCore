@@ -123,11 +123,13 @@ int AlsaWaveOutBackend::WriteBlock(snd_pcm_t* pcm, const Block& block, uint32_t 
             if (abort_ || shutdown_) return 0;
             const int recovered = snd_pcm_recover(pcm, ready, 1);
             if (recovered < 0) return recovered;
+            if (ready == -EPIPE || ready == -ESTRPIPE) ++generation_;
             continue;
         }
         const int err = n == -EBADFD ? snd_pcm_prepare(pcm)
                                      : snd_pcm_recover(pcm, static_cast<int>(n), 1);
         if (err < 0) return err;
+        if (n == -EPIPE || n == -ESTRPIPE || n == -EBADFD) ++generation_;
     }
     return 0;
 }

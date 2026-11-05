@@ -266,7 +266,7 @@ DevicePosition PacedWaveOut::DevicePositionLocked() const {
 }
 
 void PacedWaveOut::RefreshPositionLocked() {
-    if (pending_count_ == 0) ++unfed_total_;
+    if (pending_count_ == 0 && outstanding_ == 0) ++unfed_total_;
     position_unfed_ = unfed_total_;
     position_valid_ = false;
     uint32_t samples    = 0;
@@ -369,7 +369,7 @@ bool PacedWaveOut::QueueOutput(const void* host_bytes, uint32_t length) {
         return true;
     }
 
-    ++unfed_total_;
+    if (outstanding_ == 0) ++unfed_total_;
     PlayLocked(static_cast<const uint8_t*>(host_bytes), length);
     return true;
 }

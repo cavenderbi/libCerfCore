@@ -30,3 +30,12 @@ target_compile_features(imx51_ipu_blend_test PRIVATE cxx_std_20)
 target_compile_options(imx51_ipu_blend_test PRIVATE -Wall -Wextra -Werror)
 target_include_directories(imx51_ipu_blend_test PRIVATE "${core}/include" "${core}/libCerfEngine/include")
 add_test(NAME imx51_ipu_blend COMMAND imx51_ipu_blend_test)
+add_executable(audio_pacing_test audio_pacing_test.cpp
+    "${core}/src/host/paced_wave_out.cpp" "${core}/src/host/dynamic_rate_resampler.cpp"
+    "${core}/src/platform/wave_pcm_format.cpp")
+target_compile_features(audio_pacing_test PRIVATE cxx_std_20)
+target_compile_options(audio_pacing_test PRIVATE -Wall -Wextra -Werror)
+target_include_directories(audio_pacing_test PRIVATE "${core}/include"
+    "${core}/libCerfEngine/include" "${core}/libCerfEngine/libservicelocator/include")
+target_link_libraries(audio_pacing_test PRIVATE Threads::Threads)
+add_test(NAME audio_pacing COMMAND audio_pacing_test)
