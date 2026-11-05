@@ -18,6 +18,7 @@
 #include "freescale_uart_regs.h"
 #include "freescale_uart_sdma.h"
 #include "freescale_uart_transmitter.h"
+#include "oscillator_ticks.h"
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include "imx51/imx51_id.h"
 #include "uart_endpoint.h"
@@ -51,10 +52,16 @@ public:
         clock_->RegisterIdleExitListener([this] { OnLowPower(); });
         module_clocks_->RegisterGateListener([this] { ApplyBaud(); });
         uart_clocks_->RegisterRateListener([this] { ApplyBaud(); });
-        clock_->RegisterRateListener([this] { escape_.Rescale(); });
+        clock_->RegisterRateListener([this] {
+            escape_.Rescale();
+            rx_clock_.Rescale();
+            Sync();
+        });
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) { HardReset(); });
         emu_.Get<PeripheralDispatcher>().Register(this);
         escape_.Attach();
+        rx_clock_.Attach(1u, 1u);
+        rx_event_ = clock_->Add([this] { Sync(); });
         HardReset();
     }
 
@@ -81,6 +88,7 @@ public:
         w.Write("brm_ubmr", active_ubmr_);
         w.Write<uint8_t>("ubir_written", ubir_written_ ? 1u : 0u);
         w.Write("line_tick", line_tick_);
+        rx_clock_.Save(w, "uart_rx_");
         w.Write<uint8_t>("lp_mode", static_cast<uint8_t>(lp_mode_));
         w.Write<uint8_t>("lp_module_on", module_on_ ? 1u : 0u);
         w.Write<uint8_t>("lp_held", held_ ? 1u : 0u);
@@ -100,6 +108,7 @@ public:
         r.Read("brm_ubmr", active_ubmr_);
         r.Read("ubir_written", written);
         r.Read("line_tick", line_tick_);
+        rx_clock_.Restore(r, "uart_rx_");
         r.Read("lp_mode", mode);
         r.Read("lp_module_on", module_on);
         r.Read("lp_held", held);
@@ -129,7 +138,8 @@ public:
     }
 
     void InjectRx(const uint8_t* data, size_t n) {
-        rx_.Inject(in_sync_ ? reply_tick_ : line_tick_, data, n);
+        if (!in_sync_) Sync();
+        rx_.Inject(rx_clock_.Now(), data, n);
         Sync();
     }
 
@@ -165,6 +175,7 @@ private:
         C(cerf_freescale_uart::kOffUcr2) &= ~cerf_freescale_uart::kUcr2Srst;
         active_ubir_ = active_ubmr_ = 0u;
         ubir_written_ = false;
+        rx_clock_.Rebase();
         line_tick_    = 0u;
         lp_mode_      = FreescaleLowPowerMode::kRun;
         tx_.Reset();
@@ -220,6 +231,12 @@ private:
         const GuestCycleClock::Rate module = uart_clocks_->ModuleClockRate();
         module_on_ = ModuleOn();
         const bool run = module_on_ && module.num != 0u;
+        if (run) {
+            const auto rate = module.Scaled(uint64_t{active_ubir_} + 1u,
+                uint64_t{RefDivider(C(kOffUfcr))} * (uint64_t{active_ubmr_} + 1u)).Reduced();
+            rx_clock_.SetOscRate(rate.num, rate.den);
+        }
+        rx_clock_.SetCounting(run);
         escape_.SetReference(module, RefDivider(C(kOffUfcr)), run);
         if (run == brm_running_) return;
         brm_running_ = run;
@@ -256,7 +273,6 @@ private:
                     if (loops) rx_.LoopChar(e.tick, e.byte, e.parity_error, rx_events_);
                     break;
                 case Kind::kFinished:
-                    reply_tick_ = e.tick;
                     if (!cerf_freescale_uart::IrMode(ctrl_)) EmitTx(e.byte);
                     break;
                 case Kind::kBreak:
@@ -310,24 +326,23 @@ private:
         return en;
     }
 
-    uint64_t NextTick() const {
-        const uint64_t tx = tx_.NextTick(), rx = rx_.NextTick();
-        return tx < rx ? tx : rx;
-    }
-
     uint64_t RunnableTick() const {
-        return brm_running_ ? NextTick() : FreescaleUartReceiver::kNever;
+        return brm_running_ ? rx_.NextTick() : FreescaleUartReceiver::kNever;
     }
 
     void Sync() {
         if (in_sync_) return;
         in_sync_ = true;
+        const uint64_t now = rx_clock_.Now();
+        line_tick_ = now;
         for (;;) {
-            const uint64_t next = RunnableTick();
-            if (next != FreescaleUartReceiver::kNever) {
-                line_tick_ = next;
-                tx_.Advance(next, events_);
+            const uint64_t tx = brm_running_ ? tx_.NextTick() : FreescaleUartTransmitter::kNever;
+            if (tx != FreescaleUartTransmitter::kNever) {
+                tx_.Advance(tx, events_);
                 Handle();
+            }
+            const uint64_t next = RunnableTick();
+            if (next != FreescaleUartReceiver::kNever && next <= now) {
                 rx_.Advance(next, rx_events_);
                 HandleRx();
             }
@@ -336,11 +351,14 @@ private:
                 ApplyBrm();
             }
             sdma_.Service(line_tick_, Enables());
-            if (next == FreescaleUartReceiver::kNever && RunnableTick() == FreescaleUartReceiver::kNever)
-                break;
+            if (RunnableTick() > now &&
+                (!brm_running_ || tx_.NextTick() == FreescaleUartTransmitter::kNever)) break;
         }
         in_sync_ = false;
         Settle();
+        const uint64_t next = RunnableTick();
+        if (next == FreescaleUartReceiver::kNever) clock_->Disarm(rx_event_);
+        else rx_clock_.ArmAt(rx_event_, next);
     }
 
     void Settle() {
@@ -370,6 +388,7 @@ private:
 
     uint32_t Reg(uint32_t off) {
         using namespace cerf_freescale_uart;
+        Sync();
         if (off == kOffUrxd) {
             if (!module_clocks_->Running(kIpgModule)) return 0u;
             const uint16_t v = rx_.Pop(line_tick_);
@@ -398,6 +417,7 @@ private:
 
     void Wr(uint32_t off, uint32_t v, uint32_t shift, uint32_t vmask) {
         using namespace cerf_freescale_uart;
+        Sync();
         const uint32_t aligned = off & ~3u;
         const uint32_t m       = vmask << shift;
         const uint32_t val     = (v << shift) & m;
@@ -457,12 +477,13 @@ private:
     bool                     brm_running_   = false;
     bool                     held_          = false;
     FreescaleLowPowerMode    lp_mode_       = FreescaleLowPowerMode::kRun;
-    uint64_t                 reply_tick_    = 0;
     std::string              tx_line_;
     std::vector<FreescaleUartTxEvent> events_;
     FreescaleUartReceiver::Events     rx_events_;
     UartEndpoint*            endpoint_      = nullptr;
     GuestCycleClock*         clock_         = nullptr;
+    StoppableOscillatorTicks rx_clock_{emu_, false};
+    GuestCycleClock::Event*  rx_event_      = nullptr;
     FreescaleModuleClocks*   module_clocks_ = nullptr;
     FreescaleTimerClocks*    timer_clocks_  = nullptr;
     FreescaleUartClocks*     uart_clocks_   = nullptr;
