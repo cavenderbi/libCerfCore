@@ -96,3 +96,10 @@ void CERFENGINE_FASTCALL cerfengine::host::ArmAlignmentFault(void* context, uint
                                                              bool is_write) {
     static_cast<cerfcore::ArmCp15Registers*>(context)->RecordAlignmentFault(va, is_write);
 }
+
+void CERFENGINE_FASTCALL cerfengine::host::ArmExternalAbort(void* context, uint32_t va,
+                                                            bool is_write) {
+    static_cast<cerfcore::ArmCp15Registers*>(context)->RaiseAbort(va,
+        cerfcore::ArmFaultStatus::kExternalAbort, 0u,
+        is_write ? cerfengine::ArmMmuAccess::kWrite : cerfengine::ArmMmuAccess::kRead);
+}

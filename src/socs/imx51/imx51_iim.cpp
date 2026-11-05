@@ -20,8 +20,13 @@ public:
     using FreescaleIimBase::FreescaleIimBase;
 
 protected:
-    std::optional<uint32_t> ReadRegister(uint32_t /*off*/) const override {
-        return std::nullopt;  /* no ID/control register read by the guest yet */
+    std::optional<uint32_t> ReadRegister(uint32_t off) const override {
+        switch (off) {
+        case 0x20u: return 0u;
+        case 0x24u: return 0x10u;
+        case 0x54u: throw cerfengine::MmioExternalAbort{};
+        default: return std::nullopt;
+        }
     }
     bool IsFuseShadow(uint32_t off) const override {
         for (uint32_t bank = 0; bank < kFuseBankCount; ++bank) {
