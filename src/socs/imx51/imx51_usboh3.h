@@ -50,8 +50,10 @@ public:
     std::unique_lock<std::mutex> LockHostPort() { return std::unique_lock(async_schedule_mtx_); }
 
     void OnPortConnectChanged(int port_index) override;
+    void OnPortResumeRequested(int port_index) override;
 
 private:
+    friend struct Imx51Usboh3TestAccess;
     static constexpr uint32_t kSize        = 0x00004000u;   /* AIPS 16 KB slot */
     static constexpr uint32_t kCoreSpan    = 0x00000200u;   /* per-core EHCI block */
     static constexpr uint32_t kNonCore     = 0x00000800u;   /* control block start */
@@ -74,6 +76,10 @@ private:
     void     ExecutePrime(uint32_t prime_bits);
 
     void WriteOtgHostPortsc(uint32_t value);
+    void StartHostResume();
+    void CancelHostResume();
+    void CompleteHostResume();
+    void ArmHostResume();
     void ExecuteAsyncSchedule();
     void ExecutePeriodicSchedule();
     void ExecuteQueueHead(uint32_t qh_addr);
@@ -96,6 +102,9 @@ private:
     GuestCycleClock*        clock_ = nullptr;
     GuestCycleClock::Event* frame_event_ = nullptr;
     GuestCycleClock::Event* irq_event_   = nullptr;
+    GuestCycleClock::Event* resume_event_ = nullptr;
+    int64_t resume_at_ns_ = -1;
+    int64_t resume_remaining_ns_ = -1;
     FreescaleUsbFrameIndex  frame_index_{emu_};
     bool                    frames_running_ = false;
 };

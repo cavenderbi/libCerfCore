@@ -7,6 +7,8 @@
 #include <cerfcore/cpu/emulated_memory.h>
 #include "../../peripherals/usb/usb_device.h"
 #include "../irq_controller.h"
+#include "../freescale_timer_clocks.h"
+#include <algorithm>
 
 namespace cerfcore {
 
@@ -76,8 +78,9 @@ void Imx51Usboh3::OnPortConnectChanged(int port_index) {
     if (otg_host_root_port_.IsConnected()) {
         regs_[idx] |= kPortscCcs | kPortscCsc;
     } else {
-        regs_[idx] &= ~(kPortscCcs | kPortscPed | kPortscSuspend | kPortscPhcd);
+        regs_[idx] &= ~(kPortscCcs | kPortscPed | kPortscSuspend | kPortscPhcd | kPortscFpr);
         regs_[idx] |= kPortscCsc;
+        CancelHostResume();
     }
     regs_[kOffUsbstsRel >> 2] |= kStsPciLocal;
     RefreshDeviceIrq();
@@ -90,10 +93,11 @@ void Imx51Usboh3::WriteOtgHostPortsc(uint32_t value) {
     uint32_t next = old;
 
     if ((value & kPortscPr) && !(old & kPortscPr)) {
+        CancelHostResume();
         /* MCIMX51RM 60.4.5.5.2 Discovery/Port Reset (p60-219): PORTSCx
            auto-completes reset via its own 10ms counter and reports it via
            a Port Enable Change interrupt; software never writes PR back. */
-        next &= ~kPortscPr;
+        next &= ~(kPortscPr | kPortscFpr | kPortscSuspend);
         if (old & kPortscCcs) {
             next |= kPortscPed | kPortscPedc;
             regs_[kOffUsbstsRel >> 2] |= kStsPciLocal;
@@ -104,21 +108,68 @@ void Imx51Usboh3::WriteOtgHostPortsc(uint32_t value) {
     if (value & kPortscCsc)  next &= ~kPortscCsc;
     if (value & kPortscPedc) next &= ~kPortscPedc;
 
-    if (value & kPortscSuspend) next |= kPortscSuspend;
-    /* MCIMX51RM Table 60-52, FPR: host resume auto-completes; a write of zero
-       has no effect, unlike EHCI. */
-    if (value & kPortscFpr) {
-        next &= ~(kPortscFpr | kPortscSuspend);
-    }
-
+    if ((value & kPortscSuspend) && !(value & kPortscPr)) next |= kPortscSuspend;
     if (value & kPortscPhcd) next |= kPortscPhcd;
     else                     next &= ~kPortscPhcd;
 
     regs_[idx] = next;
+    if (auto* device = otg_host_root_port_.Device())
+        device->SetSuspended((next & kPortscSuspend) != 0u);
+    if ((value & kPortscFpr) && !(value & kPortscPr)) StartHostResume();
+    RefreshDeviceIrq();
+}
+
+void Imx51Usboh3::OnPortResumeRequested(int port_index) {
+    if (port_index != 0 || Core0IsDevice()) return;
+    const uint32_t port = regs_[kOffPortscRel >> 2];
+    if ((port & (kPortscPed | kPortscSuspend)) != (kPortscPed | kPortscSuspend)) return;
+    if (port & kPortscFpr) return;
+    StartHostResume();
+    regs_[kOffUsbstsRel >> 2] |= kStsPciLocal;
+    RefreshDeviceIrq();
+}
+
+void Imx51Usboh3::StartHostResume() {
+    auto& port = regs_[kOffPortscRel >> 2];
+    if (!(port & kPortscSuspend) || resume_at_ns_ >= 0) return;
+    port |= kPortscFpr;
+    resume_at_ns_ = clock_->NowNs() + 20000000;
+    ArmHostResume();
+}
+
+void Imx51Usboh3::ArmHostResume() {
+    if (resume_at_ns_ < 0) return;
+    const int64_t remaining = std::max(int64_t{0}, resume_at_ns_ - clock_->NowNs());
+    uint64_t cycles = clock_->NsToCycles(remaining);
+    if (clock_->CyclesToNs(cycles) < remaining) ++cycles;
+    clock_->Arm(resume_event_, clock_->Cycles() + cycles);
+}
+
+void Imx51Usboh3::CancelHostResume() {
+    regs_[kOffPortscRel >> 2] &= ~(kPortscFpr | kPortscSuspend);
+    resume_at_ns_ = -1;
+    resume_remaining_ns_ = -1;
+    clock_->Disarm(resume_event_);
+    if (auto* device = otg_host_root_port_.Device()) device->SetSuspended(false);
+}
+
+void Imx51Usboh3::CompleteHostResume() {
+    std::lock_guard<std::mutex> lock(async_schedule_mtx_);
+    if (resume_at_ns_ < 0) return;
+    if (clock_->NowNs() < resume_at_ns_) {
+        ArmHostResume();
+        return;
+    }
+    regs_[kOffPortscRel >> 2] &= ~(kPortscFpr | kPortscSuspend);
+    resume_at_ns_ = -1;
+    if (auto* device = otg_host_root_port_.Device()) device->SetSuspended(false);
+    RefreshTransceiverClocks(FreescaleLowPowerMode::kRun);
+    UpdateScheduleTimer();
     RefreshDeviceIrq();
 }
 
 void Imx51Usboh3::ExecuteAsyncSchedule() {
+    if (regs_[kOffPortscRel >> 2] & kPortscSuspend) return;
     const uint32_t cmd = regs_[kOffUsbcmdRel >> 2];
     constexpr uint32_t kCmdRsLocal  = 1u << 0;
     constexpr uint32_t kCmdAseLocal = 1u << 5;
@@ -143,6 +194,7 @@ void Imx51Usboh3::ExecuteAsyncSchedule() {
 }
 
 void Imx51Usboh3::ExecutePeriodicSchedule() {
+    if (regs_[kOffPortscRel >> 2] & kPortscSuspend) return;
     const uint32_t cmd = regs_[kOffUsbcmdRel >> 2];
     if (!(cmd & 1u) || !(cmd & kCmdPseLocal)) return;
 

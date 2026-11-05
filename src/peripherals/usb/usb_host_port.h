@@ -15,6 +15,7 @@ class UsbHostPortHost {
 public:
     virtual ~UsbHostPortHost() = default;
     virtual void OnPortConnectChanged(int port_index) = 0;
+    virtual void OnPortResumeRequested(int port_index) = 0;
 };
 
 class UsbHostPort {

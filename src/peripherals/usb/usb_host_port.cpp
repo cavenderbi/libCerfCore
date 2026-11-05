@@ -7,6 +7,7 @@ namespace cerfcore {
 
 void UsbHostPort::Attach(std::unique_ptr<UsbDevice> device) {
     device_ = std::move(device);
+    if (device_) device_->SetResumeHandler([this] { host_.OnPortResumeRequested(port_index_); });
     host_.OnPortConnectChanged(port_index_);
 }
 
@@ -36,6 +37,7 @@ void UsbHostPort::RestoreState(StateReader& r) {
     }
     r.LeaveFrame();
     device_ = std::move(restored);
+    if (device_) device_->SetResumeHandler([this] { host_.OnPortResumeRequested(port_index_); });
 }
 
 void UsbHostPort::PostRestore() {

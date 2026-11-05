@@ -9,6 +9,7 @@
 #include <cerfcore/host/file_chooser.h>
 #include <cerfcore/host/host_widget_registry.h>
 #include <cerfcore/host/user_alert.h>
+#include <cerfcore/host/emulation_pause.h>
 #include <cerfcore/core/fatal.h>
 #include "ford_sync_gen2_media_hub.h"
 #include "ford_sync_gen2_media_hub_sd_reader.h"
@@ -96,6 +97,12 @@ private:
         return device->ImageName();
     }
     void Apply(int slot, uint64_t generation, const BundledUsbMedia* media) {
+        auto& pause = emu_.Get<EmulationPause>();
+        pause.BeginStateOperation();
+        struct ReleasePause {
+            EmulationPause& pause;
+            ~ReleasePause() { pause.EndStateOperation(false); }
+        } release{pause};
         const std::string path = media
             ? ResolveDeviceFile(emu_.Get<DeviceConfig>().device_name, media->file) : std::string();
         {
