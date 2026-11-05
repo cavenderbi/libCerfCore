@@ -10,3 +10,6 @@ function(cerfcore_test name)
 endfunction()
 
 cerfcore_test(utf16_test)
+if(UNIX AND NOT ANDROID)
+    add_subdirectory(usb)
+endif()

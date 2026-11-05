@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <vector>
+#include <functional>
 
 namespace cerfcore {
 
@@ -61,6 +62,7 @@ public:
 
     /* USB 2.0 Spec Table 9-6 (p252): Standard Feature Selectors. */
     static constexpr uint16_t kFeatureEndpointHalt = 0u;
+    static constexpr uint16_t kFeatureRemoteWakeup = 1u;
 
     static std::vector<uint8_t> StandardDeviceDescriptor(uint8_t device_class, uint8_t subclass,
                                                          uint8_t protocol, uint16_t id_vendor,
@@ -97,6 +99,8 @@ public:
     virtual void SaveState(StateWriter&);
     virtual void RestoreState(StateReader&);
     virtual void PostRestore() {}
+    virtual void SetSuspended(bool suspended) { suspended_ = suspended; }
+    void SetResumeHandler(std::function<void()> handler) { resume_handler_ = std::move(handler); }
 
     uint8_t Address()             const { return address_; }
     uint8_t ConfigurationValue()  const { return configuration_; }
@@ -110,6 +114,8 @@ public:
     virtual void ResetToDefault() {
         address_ = 0u;
         configuration_ = 0u;
+        remote_wakeup_enabled_ = false;
+        suspended_ = false;
         for (bool& s : stalled_) s = false;
         FinishControlTransfer();
     }
@@ -119,6 +125,10 @@ public:
     }
 
 protected:
+    virtual bool SelfPowered() const { return false; }
+    virtual bool SupportsRemoteWakeup() const { return false; }
+    void RequestRemoteWakeup();
+    void PropagateResume();
     virtual void SetEndpointStalled(uint8_t ep, bool stalled) {
         if (ep < kMaxEndpoints) stalled_[ep] = stalled;
     }
@@ -127,12 +137,15 @@ protected:
 
     uint8_t address_       = 0u;
     uint8_t configuration_ = 0u;
+    bool remote_wakeup_enabled_ = false;
+    bool suspended_ = false;
 
 private:
     static constexpr uint8_t kMaxEndpoints = 16u;
     bool stalled_[kMaxEndpoints] = {};
     std::vector<uint8_t> control_reply_;
     uint32_t control_reply_offset_ = 0;
+    std::function<void()> resume_handler_;
 };
 
 }

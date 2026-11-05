@@ -10,9 +10,6 @@ namespace cerfcore {
 
 namespace {
 
-/* USB 2.0 Spec Figure 9-4 (p254): D0 Self Powered, D1 Remote Wakeup. */
-uint16_t DeviceStatusBits() { return 0u; }
-
 constexpr size_t kSetupOffRequestType = 0u;
 constexpr size_t kSetupOffRequest     = 1u;
 constexpr size_t kSetupOffValue       = 2u;
@@ -108,6 +105,7 @@ bool UsbDevice::HandleSetup(const SetupPacket& setup,
     case kReqSetConfiguration:
         if (dev2host || setup.wValue > ConfigurationCount()) return false;
         configuration_ = static_cast<uint8_t>(setup.wValue);
+        remote_wakeup_enabled_ = false;
         return true;
     case kReqGetConfiguration:
         if (!dev2host) return false;
@@ -117,7 +115,7 @@ bool UsbDevice::HandleSetup(const SetupPacket& setup,
         if (!dev2host) return false;
         uint16_t status = 0u;
         if (recip == kReqRecipDevice) {
-            status = DeviceStatusBits();
+            status = (SelfPowered() ? 1u : 0u) | (remote_wakeup_enabled_ ? 2u : 0u);
         } else if (recip == kReqRecipEndpoint) {
             const uint8_t ep = static_cast<uint8_t>(setup.wIndex & 0x0Fu);
             status = IsEndpointStalled(ep) ? 1u : 0u;
@@ -126,9 +124,17 @@ bool UsbDevice::HandleSetup(const SetupPacket& setup,
         cerf::le::Append16(data_stage, status);
         return true;
     }
+    case kReqSetFeature:
     case kReqClearFeature:
         if (dev2host) return false;
-        if (recip == kReqRecipEndpoint && setup.wValue == kFeatureEndpointHalt) {
+        if (setup.bmRequestType == 0u && setup.wValue == kFeatureRemoteWakeup &&
+            setup.wIndex == 0u && setup.wLength == 0u && configuration_ != 0u &&
+            SupportsRemoteWakeup()) {
+            remote_wakeup_enabled_ = setup.bRequest == kReqSetFeature;
+            return true;
+        }
+        if (setup.bRequest == kReqClearFeature && recip == kReqRecipEndpoint &&
+            setup.wValue == kFeatureEndpointHalt) {
             SetEndpointStalled(static_cast<uint8_t>(setup.wIndex & 0x0Fu), false);
             return true;
         }
@@ -146,12 +152,16 @@ bool UsbDevice::HandleSetup(const SetupPacket& setup,
 
 void UsbDevice::SaveState(StateWriter& w) {
     w.Write("address", address_); w.Write("configuration", configuration_);
+    w.Write("remote_wakeup_enabled", remote_wakeup_enabled_);
+    w.Write("suspended", suspended_);
     for (bool stalled : stalled_) w.Write<uint8_t>("stalled", stalled ? 1 : 0);
     UsbState::WriteBuffer(w, "control_reply_size", "control_reply", control_reply_);
     w.Write("control_reply_offset", control_reply_offset_);
 }
 void UsbDevice::RestoreState(StateReader& r) {
     r.Read("address", address_); r.Read("configuration", configuration_);
+    r.Read("remote_wakeup_enabled", remote_wakeup_enabled_);
+    r.Read("suspended", suspended_);
     UsbState::Require(r, address_ <= 127 && configuration_ <= ConfigurationCount(),
                       "invalid USB address/configuration");
     for (auto& stalled : stalled_) {
@@ -162,6 +172,14 @@ void UsbDevice::RestoreState(StateReader& r) {
     UsbState::ReadBuffer(r, "control_reply_size", "control_reply", control_reply_, 65535);
     r.Read("control_reply_offset", control_reply_offset_);
     UsbState::Require(r, control_reply_offset_ <= control_reply_.size(), "invalid control reply");
+}
+
+void UsbDevice::RequestRemoteWakeup() {
+    if (remote_wakeup_enabled_ && configuration_ != 0u) PropagateResume();
+}
+
+void UsbDevice::PropagateResume() {
+    if (suspended_ && resume_handler_) resume_handler_();
 }
 
 }

@@ -82,6 +82,12 @@ bool UsbHub::HandleClassRequest(const SetupPacket& setup,
                                 std::vector<uint8_t>& data_stage) {
     const uint8_t recip = setup.bmRequestType & kReqRecipMask;
 
+    if (setup.bRequest == kHubReqGetStatus && recip == kReqRecipDevice) {
+        if (setup.bmRequestType != 0xA0u || setup.wValue != 0u ||
+            setup.wIndex != 0u || setup.wLength != 4u) return false;
+        data_stage.assign(4u, 0u);
+        return true;
+    }
     if (setup.bRequest == kHubReqGetDescriptor) {
         return GetDescriptor(kHubDescriptorType, 0u, 0u, data_stage);
     }
@@ -159,6 +165,18 @@ void UsbHub::OnPortConnectChanged(int port_index) {
         status &= ~(kPortStatusConnection | kPortStatusEnable);
     }
     change |= kPortChangeConnection;
+    RequestRemoteWakeup();
+}
+
+void UsbHub::OnPortResumeRequested(int port_index) {
+    if (port_index < 0 || port_index >= NumPorts()) return;
+    PropagateResume();
+}
+
+void UsbHub::SetSuspended(bool suspended) {
+    UsbDevice::SetSuspended(suspended);
+    for (auto& port : ports_)
+        if (auto* device = port.Device()) device->SetSuspended(suspended);
 }
 
 UsbDevice* UsbHub::FindByAddress(uint8_t addr) {

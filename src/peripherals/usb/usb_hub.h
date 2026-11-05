@@ -46,10 +46,14 @@ public:
     void PostRestore() override;
 
     void OnPortConnectChanged(int port_index) override;
+    void OnPortResumeRequested(int port_index) override;
+    void SetSuspended(bool suspended) override;
 
     UsbDevice* FindByAddress(uint8_t addr) override;
 
 private:
+    bool SelfPowered() const override { return true; }
+    bool SupportsRemoteWakeup() const override { return true; }
     /* USB 2.0 Spec Table 11-21 (p427): Port Status Field, wPortStatus. */
     static constexpr uint16_t kPortStatusConnection = 1u << 0;
     static constexpr uint16_t kPortStatusEnable     = 1u << 1;

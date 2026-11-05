@@ -14,6 +14,7 @@
 #include "../irq_controller.h"
 
 #include <array>
+#include <algorithm>
 #include <cstdint>
 
 namespace cerfcore {
@@ -113,6 +114,7 @@ void Imx51Usboh3::OnReady() {
     clock_       = &emu_.Get<GuestCycleClock>();
     frame_event_ = clock_->Add([this] { OnScheduleTimer(); });
     irq_event_   = clock_->Add([this] { OnFrameIrqEvent(); });
+    resume_event_ = clock_->Add([this] { CompleteHostResume(); });
     frame_index_.Attach();
     transceiver_clocks_ = &emu_.Get<Imx51UsbTransceiverClocks>();
     transceiver_clocks_->RegisterChangeListener([this](FreescaleLowPowerMode mode) {
@@ -141,6 +143,7 @@ void Imx51Usboh3::ResetController() {
     regs_[kOffHcsparams >> 2] = kHcsparamsOnePort;
     regs_[kOffPhyCtrl0 >> 2]  = kPhyCtrl0Born;
     reset_seen_ = false;
+    CancelHostResume();
     frame_index_.ResetAll();
     clock_->Disarm(irq_event_);
     frames_running_ = false;
@@ -194,6 +197,7 @@ void Imx51Usboh3::OnScheduleTimer() {
 void Imx51Usboh3::OnCpuRateChanged() {
     std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     frame_index_.Rescale();
+    ArmHostResume();
     ArmFrameIrq();
     if (!frames_running_) return;
     const uint64_t now = clock_->Cycles();
@@ -253,6 +257,7 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
         WriteCoreFrameReg(off, value);
         if (coff == kOffFrindex) return;
         if (coff == kOffUsbcmd) {
+            if (off < kCoreSpan && (value & kUsbcmdReset)) CancelHostResume();
             if ((value & kUsbcmdReset) != 0u) frame_index_.Reset(off / kCoreSpan);
             value &= ~kUsbcmdReset;   /* RST self-clears at reset completion */
             const uint32_t old = regs_[off >> 2];
@@ -318,6 +323,8 @@ void Imx51Usboh3::WriteWord(uint32_t addr, uint32_t value) {
             return;
         }
     }
+    if (off == kOffUsbmode && (value & kUsbmodeCmMask) != (regs_[off >> 2] & kUsbmodeCmMask))
+        CancelHostResume();
     regs_[off >> 2] = value;
     if (off == kOffUsbmode) {
         ApplyFrameRole(0u);
@@ -336,6 +343,8 @@ void Imx51Usboh3::SaveState(StateWriter& w) {
     w.WriteBytes("regs", regs_.data(), sizeof(regs_));
     w.WriteBytes("phy", phy_.data(), sizeof(phy_));
     w.Write<uint8_t>("reset_seen", reset_seen_ ? 1 : 0);
+    w.Write("resume_remaining_ns", resume_at_ns_ < 0 ? int64_t{-1}
+        : std::max(int64_t{0}, resume_at_ns_ - clock_->NowNs()));
     frame_index_.Save(w);
     if (UsbDeviceHost* host = transfers_->Host()) host->SaveState(w);
     otg_host_root_port_.SaveState(w);
@@ -345,6 +354,9 @@ void Imx51Usboh3::RestoreState(StateReader& r) {
     r.ReadBytes("regs", regs_.data(), sizeof(regs_));
     r.ReadBytes("phy", phy_.data(), sizeof(phy_));
     uint8_t b = 0; r.Read("reset_seen", b); reset_seen_ = b != 0;
+    r.Read("resume_remaining_ns", resume_remaining_ns_);
+    resume_at_ns_ = -1;
+    clock_->Disarm(resume_event_);
     frame_index_.Restore(r);
     if (UsbDeviceHost* host = transfers_->Host()) host->RestoreState(r);
     otg_host_root_port_.RestoreState(r);
@@ -355,6 +367,11 @@ void Imx51Usboh3::RestoreState(StateReader& r) {
 void Imx51Usboh3::PostRestore() {
     std::lock_guard<std::mutex> lk(async_schedule_mtx_);
     otg_host_root_port_.PostRestore();
+    if (resume_remaining_ns_ >= 0) {
+        resume_at_ns_ = clock_->NowNs() + resume_remaining_ns_;
+        resume_remaining_ns_ = -1;
+        ArmHostResume();
+    }
     RefreshTransceiverClocks(FreescaleLowPowerMode::kRun);
     RefreshDeviceIrq();
     frames_running_ = false;
