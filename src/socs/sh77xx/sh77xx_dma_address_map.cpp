@@ -3,6 +3,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include "sh77xx_adc.h"
+#include "sh77xx_area1.h"
 #include "sh77xx_dac.h"
 #include "sh77xx_pfc.h"
 #include "sh77xx_port_data.h"
@@ -17,8 +18,6 @@ namespace {
 constexpr uint32_t kPhysicalMask  = 0x1FFFFFFFu;
 constexpr uint32_t kAreaShift     = 29u;
 constexpr uint32_t kNoShadow      = 7u;
-constexpr uint32_t kArea1First    = 0x04000000u;
-constexpr uint32_t kArea1End      = 0x08000000u;
 constexpr uint32_t kArea7         = 0x1C000000u;
 constexpr uint32_t kDaModuleBytes = 6u;
 
@@ -59,7 +58,8 @@ uint32_t Sh77xxDmaAddressMap::BusAddress(uint32_t channel, uint32_t addr, uint32
         emu_.Get<Fatal>().Die("Sh77xxDmac: channel %u %s address 0x%08X is in no area of the physical map", channel,
                               side, addr);
     }
-    if (pa >= kArea1First && pa < kArea1End && !DmaReachable(pa, bytes) && !ReachesChipModule(pa, bytes)) {
+    const bool in_area1 = pa >= kSh77xxArea1PaBase && pa - kSh77xxArea1PaBase < kSh77xxArea1Bytes;
+    if (in_area1 && !DmaReachable(pa, bytes) && !ReachesChipModule(pa, bytes)) {
         emu_.Get<Fatal>().Die("Sh77xxDmac: channel %u %s address 0x%08X is an on-chip register the DMAC may not access",
                               channel, side, addr);
     }

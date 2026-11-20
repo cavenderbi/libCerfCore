@@ -10,6 +10,7 @@
 #include <cerfengine/sh/sh_interrupt_host.h>
 #include "../../execution/engine_bridge.h"
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "sh77xx_area1.h"
 #include "sh77xx_intc.h"
 #include "sh77xx_intc_absent_inputs.h"
 #include "sh77xx_intc_input_pins.h"
@@ -49,7 +50,7 @@ public:
         });
     }
 
-    uint32_t MmioBase() const override { return M.area1_registers ? kArea1Base : kSh77xxIntcArea7Base; }
+    uint32_t MmioBase() const override { return M.area1_registers ? kSh77xxArea1PaBase : kSh77xxIntcArea7Base; }
     uint32_t MmioSize() const override {
         if (!M.area1_registers) return kSh77xxIntcArea7Size + (M.area7_extra_ipr ? kArea7ExtraIprBytes : 0u);
         return kArea1Size;
@@ -138,7 +139,7 @@ public:
 
     uint8_t ReadByte(uint32_t addr) override {
         std::lock_guard<std::mutex> lk(mtx_);
-        switch (addr - kArea1Base) {
+        switch (addr - kSh77xxArea1PaBase) {
         case kOffIrr0: return ReadIrr0Locked(addr);
         case kOffIrr1: return static_cast<uint8_t>(requests_ & kIrr1Mask);
         case kOffIrr2:
@@ -155,7 +156,7 @@ public:
     }
 
     void WriteByte(uint32_t addr, uint8_t value) override {
-        const uint32_t off = addr - kArea1Base;
+        const uint32_t off = addr - kSh77xxArea1PaBase;
         if (off == kOffIrr1 || off == kOffIrr2) return;
         if (off != kOffIrr0) this->HaltUnsupportedAccess("WriteByte", addr, value);
         std::lock_guard<std::mutex> lk(mtx_);
@@ -166,7 +167,7 @@ public:
     uint16_t ReadHalf(uint32_t addr) override {
         if (!M.area1_registers) return ReadArea7Half(addr);
         std::lock_guard<std::mutex> lk(mtx_);
-        switch (addr - kArea1Base) {
+        switch (addr - kSh77xxArea1PaBase) {
         case kOffIrr1:
         case kOffIrr2:   return 0u;
         case kOffIcr1:   return icr1_;
@@ -186,7 +187,7 @@ public:
     void WriteHalf(uint32_t addr, uint16_t value) override {
         if (!M.area1_registers) return WriteArea7Half(addr, value);
         std::lock_guard<std::mutex> lk(mtx_);
-        switch (addr - kArea1Base) {
+        switch (addr - kSh77xxArea1PaBase) {
         case kOffIrr1:
         case kOffIrr2:   return;
         case kOffIcr1:   WriteIcr1Locked(addr, value); break;
@@ -210,7 +211,7 @@ public:
     }
 
     uint32_t ReadWord(uint32_t addr) override {
-        if (addr - kArea1Base != kOffIntevt2) this->HaltUnsupportedAccess("ReadWord", addr, 0u);
+        if (addr - kSh77xxArea1PaBase != kOffIntevt2) this->HaltUnsupportedAccess("ReadWord", addr, 0u);
         std::lock_guard<std::mutex> lk(mtx_);
         return intevt2_;
     }

@@ -26,7 +26,6 @@ struct Model {
     uint16_t IprfHaltBits() const;
 };
 
-inline constexpr uint32_t kArea1Base = 0x04000000u;
 inline constexpr uint32_t kArea1Size = 0x1Eu;
 
 inline constexpr uint32_t kOffIntevt2 = 0x00u;

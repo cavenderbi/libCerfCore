@@ -2,6 +2,6 @@
   "id": "ce_dictionary",
   "name": "Dictionary Dump",
   "optional": true,
-  "board_family_ids": ["casio_tomcat", "casio_jx670"],
+  "board_family_ids": ["casio_tomcat", "casio_jx670", "casio_cassiopeia_a10"],
   "formats": ["bin"]
 }
