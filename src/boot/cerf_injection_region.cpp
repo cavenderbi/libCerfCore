@@ -30,8 +30,9 @@ uint32_t CerfInjectionRegion::BandSize() const {
 uint32_t CerfInjectionRegion::BandVaBase() {
     if (va_base_) return va_base_;
 
-    const uint32_t va =
-        emu_.Get<PageTableBuilder>().StaticWindowHole(CerfVirt::kInjectionBandSize);
+    const PageTableBuilder& pages  = emu_.Get<PageTableBuilder>();
+    const uint32_t          direct = pages.UnmappedWindowVa(BandPaBase(), CerfVirt::kInjectionBandSize);
+    const uint32_t va = direct != 0u ? direct : pages.StaticWindowHole(CerfVirt::kInjectionBandSize);
     if (!va) {
         emu_.Get<Fatal>().Die("guest-additions injection band: this board's OAT fills the "
                               "kernel static window [0x80000000,0xA0000000) with no 0x%X-byte "
@@ -42,7 +43,9 @@ uint32_t CerfInjectionRegion::BandVaBase() {
     emu_.Get<EmulatedMemory>().AddRegion(BandPaBase(),
                                          CerfVirt::kInjectionBandSize,
                                          MemoryKind::kRam);
-    emu_.Get<EngineBridge>().MapInjectionBand(va, BandPaBase(), CerfVirt::kInjectionBandSize);
+    if (direct == 0u) {
+        emu_.Get<EngineBridge>().MapInjectionBand(va, BandPaBase(), CerfVirt::kInjectionBandSize);
+    }
     va_base_ = va;
     LOG(GuestAdditions, "injection band: VA 0x%08X -> PA 0x%08X size 0x%X\n",
         va, BandPaBase(), CerfVirt::kInjectionBandSize);

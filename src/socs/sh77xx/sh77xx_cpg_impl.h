@@ -18,9 +18,15 @@ struct Sh77xxFrqcrSetting {
     uint8_t  ckio_per_pclk;
 };
 
+struct Sh77xxFrqcrModeTable {
+    const Sh77xxFrqcrSetting* settings;
+    uint32_t                  count;
+    uint16_t                  rate_bits;
+};
+
 struct Sh77xxCpgModel {
-    const Sh77xxFrqcrSetting* modes34;
-    uint32_t                  modes34_count;
+    Sh77xxFrqcrModeTable pll1_switchable;
+    Sh77xxFrqcrModeTable pll1_always_on;
 };
 
 inline constexpr uint16_t kSh77xxFrqcrReset = 0x0102u;
@@ -37,22 +43,22 @@ public:
     GuestCycleClock::Rate ResetCpuRate() const override { return CpuRate(kSh77xxFrqcrReset); }
 
     GuestCycleClock::Rate CpuRate(uint16_t frqcr) const override {
-        return GuestCycleClock::Rate{emu_.Get<ShBoardClock>().CkioHz() * Setting(frqcr).cpu_per_ckio, 1u};
+        return GuestCycleClock::Rate{BoardCkioHz() * Setting(frqcr).cpu_per_ckio, 1u};
     }
 
     GuestCycleClock::Rate PeripheralRate(uint16_t frqcr) const override {
-        return GuestCycleClock::Rate{emu_.Get<ShBoardClock>().CkioHz(), Setting(frqcr).ckio_per_pclk};
+        return GuestCycleClock::Rate{BoardCkioHz(), Setting(frqcr).ckio_per_pclk};
     }
 
 private:
     const Sh77xxFrqcrSetting& Setting(uint16_t frqcr) const {
-        if (!emu_.Get<ShBoardClock>().Pll1Switchable()) {
-            emu_.Get<Fatal>().Die("Sh77xxCpg: FRQCR 0x%04X in clock mode 0, 1, 2 or 7", frqcr);
+        const bool                  switchable = emu_.Get<ShBoardClock>().Pll1Switchable();
+        const Sh77xxFrqcrModeTable& modes      = switchable ? M.pll1_switchable : M.pll1_always_on;
+        for (uint32_t i = 0; i < modes.count; ++i) {
+            if (((modes.settings[i].frqcr ^ frqcr) & modes.rate_bits) == 0u) return modes.settings[i];
         }
-        for (uint32_t i = 0; i < M.modes34_count; ++i) {
-            if (M.modes34[i].frqcr == frqcr) return M.modes34[i];
-        }
-        emu_.Get<Fatal>().Die("Sh77xxCpg: FRQCR 0x%04X is not a clock mode 3/4 setting", frqcr);
+        emu_.Get<Fatal>().Die("Sh77xxCpg: FRQCR 0x%04X has no setting row, PLL circuit 1 %s", frqcr,
+                              switchable ? "switchable" : "always on");
     }
 };
 

@@ -18,9 +18,6 @@ constexpr char kPcCardSlotLabel[] = "PC Card slot";
 constexpr char kCfSlotId[]        = "cf_slot";
 constexpr char kCfSlotLabel[]     = "CompactFlash slot";
 
-/* Socket status word (PA 0x181E0800), decoded from pcmcia.dll sub_12A148C: per
-   socket nCD is active-low (bit clear = card present), RDY high = ready,
-   WP high = write-protected, BVD1/BVD2 high = battery good. */
 constexpr uint32_t kS0Ncd = 0x4u,    kS0Rdy = 0x1u,
                    kS0Bvd1 = 0x400u, kS0Bvd2 = 0x800u;
 constexpr uint32_t kS1Ncd = 0x8u,    kS1Rdy = 0x2u,
@@ -55,7 +52,9 @@ void HpJornada820Pcmcia::OnShutdown() {
 }
 
 uint32_t HpJornada820Pcmcia::ReadSocketStatus() const {
-    uint32_t s = kS0Bvd1 | kS0Bvd2 | kS1Bvd1 | kS1Bvd2;   /* batteries good */
+    uint32_t s = kS0Bvd2 | kS1Bvd2;
+    if (!slot0_.StatusChangeLow()) s |= kS0Bvd1;
+    if (!slot1_.StatusChangeLow()) s |= kS1Bvd1;
     s |= slot0_.HasCard() ? kS0Rdy : kS0Ncd;
     s |= slot1_.HasCard() ? kS1Rdy : kS1Ncd;
     return s;
@@ -79,6 +78,11 @@ void HpJornada820Pcmcia::OnReadyIreqLow(PcmciaSlot& slot) {
     emu_.Get<HpJornada820CompanionAsic>().RaisePcmciaCardIrq(socket);
 }
 void HpJornada820Pcmcia::OnReadyIreqHigh(PcmciaSlot&) {}
+
+void HpJornada820Pcmcia::OnStatusChange(PcmciaSlot& slot, bool low) {
+    if (!low) return;
+    emu_.Get<HpJornada820CompanionAsic>().RaisePcmciaStatusChange(&slot == &slot1_ ? 1 : 0);
+}
 
 REGISTER_SERVICE(HpJornada820Pcmcia);
 

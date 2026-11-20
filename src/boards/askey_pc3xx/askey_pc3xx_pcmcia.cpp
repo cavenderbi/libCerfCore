@@ -59,6 +59,7 @@ public:
     void OnReadyIreqHigh(PcmciaSlot&) override {
         emu_.Get<Pxa255Gpio>().SetInputLevel(kGpioReady, true);
     }
+    void OnStatusChange(PcmciaSlot&, bool) override {}
     uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
 private:

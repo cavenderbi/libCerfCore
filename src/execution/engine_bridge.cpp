@@ -69,6 +69,12 @@ void EngineBridge::OnResetDelivered() {
     emu_.Get<GuestCpuReset>().OnResetDelivered();
 }
 
+void EngineBridge::OnCpuReset() {
+    auto& notifier = emu_.Get<GuestPowerNotifier>();
+    notifier.NotifyReboot();
+    notifier.NotifyResetReleased();
+}
+
 void EngineBridge::OnPowerDownRequest() {
     emu_.Get<GuestDeepSleep>().Enter();
 }

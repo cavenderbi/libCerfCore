@@ -89,7 +89,8 @@ public:
             if (imgfs.ReplaceVictim(victim.c_str(), stub_path)) ++matched;
         }
         if (matched == 0) {
-            emu_.Get<Fatal>().Die("no display-driver victim matched");
+            LOG(GuestAdditions, "no display-driver victim matched\n");
+            emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
         }
         LOG(GuestAdditions, "%d victim(s) replaced\n", matched);
     }
@@ -117,10 +118,12 @@ private:
 uint32_t GuestAdditionsInjector::DetectCeMajor() {
     uint16_t major = 0, minor = 0;
     if (!emu_.Get<RomParserQueries>().KernelSubsystemVersion(major, minor)) {
-        emu_.Get<Fatal>().Die("nk.exe e32_rom subsystem version not locatable");
+        LOG(GuestAdditions, "nk.exe e32_rom subsystem version not locatable\n");
+        emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
     }
     if (major < 2 || major > 8) {
-        emu_.Get<Fatal>().Die("nk.exe e32_subsysmajor=%u outside CE range 2..8", major);
+        LOG(GuestAdditions, "nk.exe e32_subsysmajor=%u outside CE range 2..8\n", major);
+        emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
     }
     ce_minor_ = minor;
     return major;
@@ -221,22 +224,22 @@ bool GuestAdditionsInjector::Replace(const char* victim_name,
 
     std::vector<uint8_t> pe_bytes;
     if (!TryReadHostFileBytes(source_path, pe_bytes)) {
-        emu_.Get<Fatal>().Die("cannot open %s - cerf_guest_stub.dll must be built and "
-                              "staged before injecting %s", source_path.c_str(), victim_name);
+        LOG(GuestAdditions, "cannot open the stub %s for victim %s\n", source_path.c_str(), victim_name);
+        emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
     }
     const size_t pe_bytes_size = pe_bytes.size();
 
     PeImage pe(std::move(pe_bytes));
     if (!pe.Parsed()) {
-        emu_.Get<Fatal>().Die("PE parse failed for %s - stub is corrupt; injection of "
-                              "%s aborted", source_path.c_str(), victim_name);
+        LOG(GuestAdditions, "PE parse failed for the stub %s, victim %s\n", source_path.c_str(), victim_name);
+        emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
     }
 
     auto& parser = emu_.Get<RomParserService>();
     const auto& rom = parser.Primary();
     if (rom.xips.empty()) {
-        emu_.Get<Fatal>().Die("primary ROM has no XIP regions - FindVictim matched %s "
-                              "but the TOC vanished", victim_name);
+        LOG(GuestAdditions, "primary ROM has no XIP regions, victim %s\n", victim_name);
+        emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
     }
     const auto& primary_toc = rom.xips[0].toc;
     auto& pt  = emu_.Get<PageTableBuilder>();
@@ -253,8 +256,8 @@ bool GuestAdditionsInjector::Replace(const char* victim_name,
     const uint16_t orig_subsysmaj = mem.ReadHalf(orig_e32_pa + L.off_subsysmajor);
     const uint16_t orig_subsysmin = mem.ReadHalf(orig_e32_pa + L.off_subsysminor);
     if (orig_objcnt == 0) {
-        emu_.Get<Fatal>().Die("%s victim has zero sections - no footprint to reuse for "
-                              "the stub", victim_name);
+        LOG(GuestAdditions, "%s victim has zero sections\n", victim_name);
+        emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
     }
     LOG(GuestAdditions, "orig %s e32 @KVA 0x%08X imageflags=0x%04X objcnt=%u "
               "subsysver=%u.%02u o32 @KVA 0x%08X\n",
@@ -295,11 +298,12 @@ bool GuestAdditionsInjector::Replace(const char* victim_name,
         vbase_ok = in_dll_region || xip_codebase;
     }
     if (!vbase_ok) {
-        emu_.Get<Fatal>().Die("%s original vbase 0x%08X fails sanity (CE major=%u, "
-                              "codebase=0x%08X, dllfirst=0x%08X dlllast=0x%08X) - probable "
-                              "ROMHDR corruption or unsupported CE version",
-                              victim_name, orig_vbase, ce_major_, codebase,
-                              primary_toc.romhdr.dllfirst, primary_toc.romhdr.dlllast);
+        LOG(GuestAdditions,
+            "%s original vbase 0x%08X fails the vbase check (CE major=%u, codebase=0x%08X, dllfirst=0x%08X "
+            "dlllast=0x%08X)\n",
+            victim_name, orig_vbase, ce_major_, codebase, primary_toc.romhdr.dllfirst,
+            primary_toc.romhdr.dlllast);
+        emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
     }
 
     const size_t   nsec       = pe.Sections().size();
@@ -345,10 +349,8 @@ bool GuestAdditionsInjector::Replace(const char* victim_name,
     LOG(GuestAdditions, "%s reloc code_delta=0x%08X patched=%u unhandled=%u\n",
         victim_name, uint32_t(code_delta), reloc_count, unhandled_relocs);
     if (unhandled_relocs > 0) {
-        emu_.Get<Fatal>().Die("%s has %u unhandled relocation entries (likely "
-                              "ARM_MOV32/THUMB_MOV32) - the stub would jump to unrelocated "
-                              "addresses; rebuild it without MOVW/MOVT or extend "
-                              "ce_image_relocator", victim_name, unhandled_relocs);
+        LOG(GuestAdditions, "%s stub has %u unhandled relocation entries\n", victim_name, unhandled_relocs);
+        emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
     }
 
     emu_.Get<GuestAdditionsBinaries>().StampWindowBase(patched_bytes);

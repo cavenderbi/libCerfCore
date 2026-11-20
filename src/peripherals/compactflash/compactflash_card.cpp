@@ -1,6 +1,7 @@
 #include "compactflash_card.h"
 
 #include "compactflash_cis.h"
+#include "compactflash_image.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include "../pcmcia/pcmcia_slot.h"
@@ -14,8 +15,13 @@ namespace cerfcore {
 namespace {
 
 constexpr uint64_t kSectorsPerMegabyte    = 2048u;
+constexpr int64_t  kNsPerSecond           = 1'000'000'000;
+constexpr int64_t  kFlashBytesPerSecond   = 20'000'000;
+constexpr int64_t  kPhaseBusyNs           = CompactFlashImage::kSectorBytes * kNsPerSecond / kFlashBytesPerSecond;
 constexpr uint8_t  kDriveAddressUnknownBit = 0x80u;
 constexpr char     kImageNameFormat[]      = "CompactFlash (%s)";
+constexpr uint32_t kCisRomEnd              = 0x200u;
+constexpr uint8_t  kCisRomBlank            = 0x00u;
 
 }
 
@@ -50,7 +56,7 @@ void CompactFlashCard::PowerOn() {
 void CompactFlashCard::PowerOff() {
     std::lock_guard<std::mutex> lk(mtx_);
     ata_.PowerOff();
-    UpdateIreqLocked();
+    UpdateLinesLocked();
 }
 
 uint8_t CompactFlashCard::ReadAttribute8(uint32_t offset) {
@@ -58,12 +64,14 @@ uint8_t CompactFlashCard::ReadAttribute8(uint32_t offset) {
     if (CompactFlashConfigRegisters::Decodes(offset))
         return config_.Read(offset, ata_.InterruptRequest(), ata_.Ready());
     if (offset < kCompactFlashCisSize * 2u) return kCompactFlashCis[offset / 2u];
+    if (offset < kCisRomEnd) return kCisRomBlank;
     emu_.Get<Fatal>().Die("[CF] attribute read at 0x%X decodes to neither the CIS nor a configuration register",
                           offset);
 }
 
 void CompactFlashCard::WriteAttribute8(uint32_t offset, uint8_t value) {
     std::lock_guard<std::mutex> lk(mtx_);
+    if (offset < kCisRomEnd) return;
     if (!CompactFlashConfigRegisters::Decodes(offset))
         emu_.Get<Fatal>().Die("[CF] attribute write 0x%02X at 0x%X decodes to no configuration register",
                               value, offset);
@@ -78,59 +86,59 @@ void CompactFlashCard::WriteAttribute8(uint32_t offset, uint8_t value) {
     if (config_.PowerDownRequested() != was_power_down)
         ata_.SetPowerDown(config_.PowerDownRequested());
     ata_.SetCardNumber(config_.DriveNumber());
-    UpdateIreqLocked();
+    UpdateLinesLocked();
 }
 
 uint8_t CompactFlashCard::ReadCommon8(uint32_t offset) {
     std::lock_guard<std::mutex> lk(mtx_);
     const uint8_t v = ReadRegisterLocked(CompactFlashSpace::kCommonMemory, offset);
-    UpdateIreqLocked();
+    UpdateLinesLocked();
     return v;
 }
 
 uint16_t CompactFlashCard::ReadCommon16(uint32_t offset) {
     std::lock_guard<std::mutex> lk(mtx_);
     const uint16_t v = ReadWordLocked(CompactFlashSpace::kCommonMemory, offset);
-    UpdateIreqLocked();
+    UpdateLinesLocked();
     return v;
 }
 
 void CompactFlashCard::WriteCommon8(uint32_t offset, uint8_t value) {
     std::lock_guard<std::mutex> lk(mtx_);
     WriteRegisterLocked(CompactFlashSpace::kCommonMemory, offset, value);
-    UpdateIreqLocked();
+    UpdateLinesLocked();
 }
 
 void CompactFlashCard::WriteCommon16(uint32_t offset, uint16_t value) {
     std::lock_guard<std::mutex> lk(mtx_);
     WriteWordLocked(CompactFlashSpace::kCommonMemory, offset, value);
-    UpdateIreqLocked();
+    UpdateLinesLocked();
 }
 
 uint8_t CompactFlashCard::ReadIo8(uint32_t offset) {
     std::lock_guard<std::mutex> lk(mtx_);
     const uint8_t v = ReadRegisterLocked(CompactFlashSpace::kIo, offset);
-    UpdateIreqLocked();
+    UpdateLinesLocked();
     return v;
 }
 
 uint16_t CompactFlashCard::ReadIo16(uint32_t offset) {
     std::lock_guard<std::mutex> lk(mtx_);
     const uint16_t v = ReadWordLocked(CompactFlashSpace::kIo, offset);
-    UpdateIreqLocked();
+    UpdateLinesLocked();
     return v;
 }
 
 void CompactFlashCard::WriteIo8(uint32_t offset, uint8_t value) {
     std::lock_guard<std::mutex> lk(mtx_);
     WriteRegisterLocked(CompactFlashSpace::kIo, offset, value);
-    UpdateIreqLocked();
+    UpdateLinesLocked();
 }
 
 void CompactFlashCard::WriteIo16(uint32_t offset, uint16_t value) {
     std::lock_guard<std::mutex> lk(mtx_);
     WriteWordLocked(CompactFlashSpace::kIo, offset, value);
-    UpdateIreqLocked();
+    UpdateLinesLocked();
 }
 
 bool CompactFlashCard::Iois16(uint32_t offset) {
@@ -249,20 +257,24 @@ void CompactFlashCard::WriteRegisterLocked(CompactFlashSpace space, uint32_t off
     }
 }
 
-void CompactFlashCard::UpdateIreqLocked() {
+bool CompactFlashCard::PinLowLocked() const {
+    if (!config_.IoInterface()) return !ata_.Ready();
+    return ata_.InterruptRequest() && config_.LevelInterrupts();
+}
+
+void CompactFlashCard::UpdateLinesLocked() {
+    if (ata_.TakeBusyStart()) slot_->ArmCardTimer(kPhaseBusyNs);
     const bool ready = ata_.Ready();
     if (ready != last_ready_) {
         last_ready_ = ready;
         config_.NoteReadyChange();
     }
-    if (config_.StatusChangeAsserted())
-        emu_.Get<Fatal>().Die("[CF] STSCHG# asserted (configuration %u)",
-                              static_cast<unsigned>(config_.ConfigIndex()));
+    slot_->DriveStatusChange(config_.StatusChangeAsserted());
     const bool request = ata_.InterruptRequest() && config_.IoInterface();
     const bool level   = config_.LevelInterrupts();
     const bool pulse   = !level && request && !pulse_request_;
     pulse_request_ = request && !level;
-    const bool drive = request && level;
+    const bool drive = PinLowLocked();
     if (drive != ireq_driven_) {
         ireq_driven_ = drive;
         if (drive) slot_->RaiseIrq();
@@ -290,11 +302,18 @@ void CompactFlashCard::RestoreState(StateReader& r) {
 void CompactFlashCard::PostRestore() {
     std::lock_guard<std::mutex> lk(mtx_);
     const bool request = ata_.InterruptRequest() && config_.IoInterface();
-    ireq_driven_   = request && config_.LevelInterrupts();
+    ireq_driven_   = PinLowLocked();
     pulse_request_ = request && !config_.LevelInterrupts();
     last_ready_    = ata_.Ready();
     if (ireq_driven_) slot_->RaiseIrq();
     else              slot_->ClearIrq();
+    slot_->DriveStatusChange(config_.StatusChangeAsserted());
+}
+
+void CompactFlashCard::OnSlotTimer() {
+    std::lock_guard<std::mutex> lk(mtx_);
+    ata_.EndBusy();
+    UpdateLinesLocked();
 }
 
 }

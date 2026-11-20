@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../serial/uart_frame.h"
 #include "rcvdl56dpfl_frame_check.h"
 
 #include <cstdint>
@@ -32,7 +33,7 @@ struct Rcvdl56dpflLineConfig {
     bool     rx_timeout        = false;
     uint8_t  rx_timeout_bits   = 9u;
 
-    uint32_t AsyncCharBits() const { return 1u + data_bits + (parity ? 1u : 0u) + stop_bits; }
+    uint32_t AsyncCharBits() const { return UartFrameBits(data_bits, parity, stop_bits); }
 };
 
 }

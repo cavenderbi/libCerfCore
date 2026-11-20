@@ -1,8 +1,7 @@
 #pragma once
 
-#include "vr41xx_aiu_dma.h"
+#include "vr41xx_aiu_dma_window.h"
 #include "vr41xx_dmaau.h"
-#include "../reg_window_impl.h"
 
 #include <cstdint>
 #include <string_view>
@@ -10,21 +9,9 @@
 namespace cerfcore {
 
 template <const std::string_view& Soc, const cerf_reg_window_detail::RegWindowModel& M>
-class Vr41xxDmaauImpl
-    : public cerf_reg_window_detail::RegWindowBase<Soc, M, Vr41xxDmaau> {
-    using Window = cerf_reg_window_detail::RegWindowBase<Soc, M, Vr41xxDmaau>;
-
+class Vr41xxDmaauImpl : public Vr41xxAiuDmaWindow<Soc, M, Vr41xxDmaau> {
 public:
-    using Window::Window;
-
-    uint16_t ReadHalf(uint32_t addr) override {
-        this->emu_.template Get<Vr41xxAiuDma>().SyncDma();
-        return Window::ReadHalf(addr);
-    }
-
-    void WriteHalf(uint32_t addr, uint16_t value) override {
-        this->emu_.template Get<Vr41xxAiuDma>().WriteDmaRegister([&] { Window::WriteHalf(addr, value); });
-    }
+    using Vr41xxAiuDmaWindow<Soc, M, Vr41xxDmaau>::Vr41xxAiuDmaWindow;
 
     uint32_t Base(Vr41xxAiuChannel channel) const override { return Pair(BaseIndex(channel)); }
 

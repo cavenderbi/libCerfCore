@@ -24,6 +24,7 @@ public:
 
     bool InterruptRequest() const;
     void IrqAssert();
+    void RaiseIntrq();
     void IrqClear() { intrq = false; }
 
     void Complete();
@@ -44,6 +45,7 @@ public:
 
     uint32_t sectors_left = 0;
     bool     intrq        = false;
+    bool     phase_done   = false;
     bool     multiple     = false;
     uint8_t  sense        = 0;
     bool     soft_reset_restores_defaults = true;

@@ -2,6 +2,7 @@
 
 #include <cerfcore/boards/board_context.h>
 #include "casio_jx670_family_id.h"
+#include "casio_jx670_guest_writes.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
@@ -20,6 +21,9 @@ constexpr uint32_t kOffCtrl8600 = 0x8600u;
    sub_F56D10 @0xF56D2A/sub_F56D60 @0xF56DF6; 0xA1C4 bit1 sub_F56D60 @0xF56DEA. */
 constexpr uint32_t kOffSocketA1C0 = 0xA1C0u;
 constexpr uint32_t kOffSocketA1C4 = 0xA1C4u;
+constexpr uint32_t kSocketA1C0Written = 0x4u;
+constexpr uint32_t kSocketA1C4Written = 0x2u;
+constexpr uint32_t kCtrl8600Written   = 0x81u;
 
 /* nk_main_kernel.exe sub_9F08EE0C @0x9F08EF04 case 19 (SYSINTR 19): word RMW
    `MEMORY[0xAA008684] |= 8` sets 16550 IER bit3 (EDSSI). 0x8684 = 16550 reg 1
@@ -31,8 +35,7 @@ constexpr uint32_t kOffIer8684 = 0x8684u;
 REGISTER_SERVICE(CasioJx670Modem);
 
 bool CasioJx670Modem::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::CasioJx670;
+    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CasioJx670;
 }
 
 void CasioJx670Modem::OnReady() {
@@ -56,7 +59,7 @@ bool CasioJx670Modem::TryReadByte(uint32_t off, uint8_t& out) {
 
 bool CasioJx670Modem::TryWriteByte(uint32_t off, uint8_t value) {
     if (In16550(off)) { uart_->WriteReg8((off - k16550Base) / 4u, value); return true; }
-    if (off == kOffCtrl8600) { ctrl_8600_ = value; return true; }
+    if (off == kOffCtrl8600 && SetsOnly(value, kCtrl8600Written)) { ctrl_8600_ = value; return true; }
     return false;
 }
 
@@ -67,19 +70,24 @@ bool CasioJx670Modem::TryReadHalf(uint32_t off, uint16_t& out) {
 }
 
 bool CasioJx670Modem::TryWriteHalf(uint32_t off, uint16_t value) {
-    if (off == kOffSocketA1C0) { socket_a1c0_ = value; return true; }
-    if (off == kOffSocketA1C4) { socket_a1c4_ = value; return true; }
+    if (off == kOffSocketA1C0 && SetsOnly(value, kSocketA1C0Written)) { socket_a1c0_ = value; return true; }
+    if (off == kOffSocketA1C4 && SetsOnly(value, kSocketA1C4Written)) { socket_a1c4_ = value; return true; }
     return false;
 }
 
 bool CasioJx670Modem::TryReadWord(uint32_t off, uint32_t& out) {
     if (off == kOffIer8684) { out = uart_->ReadReg8((kOffIer8684 - k16550Base) / 4u); return true; }
+    if (off == kOffSocketA1C0) { out = socket_a1c0_; return true; }
     return false;
 }
 
 bool CasioJx670Modem::TryWriteWord(uint32_t off, uint32_t value) {
     if (off == kOffIer8684) {
         uart_->WriteReg8((kOffIer8684 - k16550Base) / 4u, static_cast<uint8_t>(value));
+        return true;
+    }
+    if (off == kOffSocketA1C0 && SetsOnly(value, kSocketA1C0Written)) {
+        socket_a1c0_ = static_cast<uint16_t>(value);
         return true;
     }
     return false;

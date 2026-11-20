@@ -20,13 +20,13 @@ public:
     uint16_t ReadHalf(uint32_t addr) override;
     void     WriteHalf(uint32_t addr, uint16_t value) override;
 
-    uint8_t  ReadByte (uint32_t addr) override { HaltUnsupportedAccess("VR41xx PIU2 ReadByte", addr, 0); }
-    uint32_t ReadWord (uint32_t addr) override { HaltUnsupportedAccess("VR41xx PIU2 ReadWord", addr, 0); }
-    void WriteByte(uint32_t addr, uint8_t  v) override { HaltUnsupportedAccess("VR41xx PIU2 WriteByte", addr, v); }
-    void WriteWord(uint32_t addr, uint32_t v) override { HaltUnsupportedAccess("VR41xx PIU2 WriteWord", addr, v); }
+    uint32_t ReadWord  (uint32_t addr) override { return ReadWordAsHalves(addr); }
+    uint64_t ReadDword (uint32_t addr) override { return ReadDwordAsHalves(addr); }
+    void     WriteWord (uint32_t addr, uint32_t v) override { WriteWordAsHalves(addr, v); }
+    void     WriteDword(uint32_t addr, uint64_t v) override { WriteDwordAsHalves(addr, v); }
 
-    int  ConvertCoordinates(uint16_t pos_x, uint16_t pos_y);
-    bool ConvertCommand(uint16_t cmd, uint16_t pos_x, uint16_t pos_y);
+    int  ConvertCoordinates(uint16_t pos_x, uint16_t pos_y, bool contact);
+    bool ConvertCommand(uint16_t cmd, uint16_t pos_x, uint16_t pos_y, bool contact);
     bool ScanAdPorts(uint16_t ascn, uint16_t amsk);
 
     void InvalidatePage(int page);

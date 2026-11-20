@@ -153,9 +153,7 @@ private:
        downward-hysteresis midpoint reduction (sub_ED1814) can't drop a bucket. */
     static uint16_t MainAdcForFill(int fill) {
         static const uint16_t kRep[7] = { 500, 560, 615, 635, 647, 660, 700 };
-        if (fill < 0)   fill = 0;
-        if (fill > 100) fill = 100;
-        return kRep[(fill * 6 + 50) / 100];   /* band = round(fill*6/100) */
+        return kRep[(fill * 6 + Battery::kFullPercent / 2) / Battery::kFullPercent];
     }
 
     uint8_t Consume(uint8_t byte) {

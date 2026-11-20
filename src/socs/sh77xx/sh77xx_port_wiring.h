@@ -16,6 +16,8 @@ public:
     virtual void    TrackDrive(const Sh77xxPortData& ports) = 0;
     virtual uint8_t WiredInputs(uint32_t port) const        = 0;
     virtual uint8_t NetLevels(uint32_t port) const          = 0;
+    virtual uint8_t WiredSeparateInputs(uint32_t) const { return 0u; }
+    virtual uint8_t SeparateInputLevels(uint32_t) const { return 0u; }
     virtual void    SaveState(StateWriter& w)               = 0;
     virtual void    RestoreState(StateReader& r)            = 0;
 };

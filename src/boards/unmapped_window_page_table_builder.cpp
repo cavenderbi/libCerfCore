@@ -5,6 +5,8 @@
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
 #include <cerfengine/unmapped_windows.h>
+#include "../core/board_config.h"
+#include "dram_card_param.h"
 
 #include <typeinfo>
 
@@ -24,6 +26,12 @@ const ParsedRom& UnmappedWindowPageTableBuilder::PrimaryRom() const {
         emu_.Get<Fatal>().Die("%s: ROM not parsed", typeid(*this).name());
     }
     return rom.Primary();
+}
+
+UnmappedWindowDram UnmappedWindowPageTableBuilder::DramCardBank(uint32_t pa_base, uint32_t decode_span,
+                                                                uint32_t mapped_span) const {
+    const uint32_t bytes = emu_.Get<BoardConfig>().Enum(BoardConfigParamId::DramCard, kDramCardBytes);
+    return CachedWindowDram(pa_base, bytes, decode_span, mapped_span);
 }
 
 DramRegion UnmappedWindowPageTableBuilder::CachedWindowRomSpan(uint32_t va_first,
@@ -55,6 +63,11 @@ const ParsedROMHDR& UnmappedWindowPageTableBuilder::EntryXipHeader() const {
 DramRegion UnmappedWindowPageTableBuilder::EntryXipRomRegion() const {
     const ParsedROMHDR& hdr = EntryXipHeader();
     return CachedWindowRomSpan(hdr.physfirst, hdr.physlast);
+}
+
+uint32_t UnmappedWindowPageTableBuilder::UnmappedWindowVa(uint32_t pa, uint32_t size) const {
+    if (pa > cerfengine::UnmappedWindows::kPaMask || size > cerfengine::UnmappedWindows::kPaMask - pa + 1u) return 0u;
+    return CachedWindowVa(pa);
 }
 
 DramRegion UnmappedWindowPageTableBuilder::PlaceEntryXipRom(uint32_t dram_va,

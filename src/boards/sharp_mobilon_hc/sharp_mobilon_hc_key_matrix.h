@@ -1,9 +1,8 @@
 #pragma once
 
 #include <cerfcore/peripherals/peripheral_base.h>
+#include "../../peripherals/key_matrix_cells.h"
 
-#include <array>
-#include <atomic>
 #include <cstdint>
 
 namespace cerfcore {
@@ -25,10 +24,14 @@ public:
     void RestoreState(StateReader& r) override;
 
 private:
-    static constexpr uint32_t kBase = 0x6C000000u;
-    static constexpr uint32_t kSize = 0x1000u;
+    static constexpr uint32_t kBase        = 0x6C000000u;
+    static constexpr uint32_t kSize        = 0x1000u;
+    static constexpr uint32_t kColumnCount = 8u;
+    static constexpr uint32_t kAllColumns  = (1u << kColumnCount) - 1u;
 
-    std::array<std::atomic<uint16_t>, 8> rows_{};
+    using Cells = KeyMatrixCells<kColumnCount>;
+
+    Cells cells_;
 };
 
 }

@@ -38,8 +38,8 @@ public:
         config_      = &emu_.Get<DeviceConfig>();
         host_        = &emu_.Get<CalibrationHost>();
         calibration_ = &emu_.Get<AutoCalibration>();
-        calibration_->RegisterFailureListener([this](CalibrationTrigger trigger) {
-            if (trigger == CalibrationTrigger::kGuestAdditions) OfferFallback();
+        calibration_->RegisterResultListener([this](uint64_t, CalibrationTrigger trigger, CalibrationResult result) {
+            if (trigger == CalibrationTrigger::kGuestAdditions && result == CalibrationResult::kFailed) OfferFallback();
         });
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
             if (emu_.Get<GuestCpuReset>().DeliveredResetWasResume()) return;
@@ -142,7 +142,7 @@ private:
             OfferFallback();
             return;
         }
-        calibration_->Request(CalibrationTrigger::kGuestAdditions);
+        calibration_->Request(CalibrationRequest{.trigger = CalibrationTrigger::kGuestAdditions});
     }
 
     void Disappeared() {

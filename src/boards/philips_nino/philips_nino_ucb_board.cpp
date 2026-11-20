@@ -43,10 +43,8 @@ uint16_t Clamp10(int v) { return static_cast<uint16_t>(v < 0 ? 0 : (v > 1023 ? 1
 uint16_t PixelToAdc(int px) { return Clamp10(64 + (px < 0 ? 0 : px) * 3); }
 
 uint16_t MainBatteryAdc(int fill_percent) {
-    if (fill_percent < 0)   fill_percent = 0;
-    if (fill_percent > 100) fill_percent = 100;
     const int raw = kMainAdcEmpty +
-                    fill_percent * (kMainAdcFull - kMainAdcEmpty) / 100;
+                    fill_percent * (kMainAdcFull - kMainAdcEmpty) / Battery::kFullPercent;
     return static_cast<uint16_t>(raw);
 }
 

@@ -24,6 +24,7 @@ void CompactFlashAtaCore::PowerOn() {
     xfer.Stop();
     sectors_left = 0;
     intrq        = false;
+    phase_done   = false;
     multiple     = false;
     sense        = CompactFlashSense::kNone;
     soft_reset_restores_defaults = true;
@@ -32,6 +33,7 @@ void CompactFlashAtaCore::PowerOn() {
 
 void CompactFlashAtaCore::PowerOff() {
     intrq        = false;
+    phase_done   = false;
     tf.status    = 0;
     xfer.Stop();
     sectors_left = 0;
@@ -48,7 +50,7 @@ void CompactFlashAtaCore::SoftResetComplete() {
     tf.status = IdleStatus();
     sense     = CompactFlashSense::kSelfTestOk;
     power.MarkActivity();
-    IrqAssert();
+    RaiseIntrq();
 }
 
 bool CompactFlashAtaCore::InterruptRequest() const {
@@ -56,6 +58,11 @@ bool CompactFlashAtaCore::InterruptRequest() const {
 }
 
 void CompactFlashAtaCore::IrqAssert() {
+    phase_done = true;
+    RaiseIntrq();
+}
+
+void CompactFlashAtaCore::RaiseIntrq() {
     if ((tf.dev_ctrl & Tf::kDevCtlNoIrq) != 0u) return;
     intrq = true;
 }

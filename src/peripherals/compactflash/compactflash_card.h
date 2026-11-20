@@ -46,6 +46,7 @@ public:
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
     void PostRestore() override;
+    void OnSlotTimer() override;
 
 private:
     int      RegisterAtLocked(CompactFlashSpace space, uint32_t offset) const;
@@ -53,7 +54,8 @@ private:
     void     WriteRegisterLocked(CompactFlashSpace space, uint32_t offset, uint8_t value);
     uint16_t ReadWordLocked(CompactFlashSpace space, uint32_t offset);
     void     WriteWordLocked(CompactFlashSpace space, uint32_t offset, uint16_t value);
-    void UpdateIreqLocked();
+    bool     PinLowLocked() const;
+    void     UpdateLinesLocked();
 
     const std::string image_path_;
     const std::string image_name_;

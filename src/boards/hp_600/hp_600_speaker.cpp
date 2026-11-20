@@ -1,117 +1,43 @@
+#include "../sh77xx_dac_speaker.h"
+
 #include <cerfcore/boards/board_context.h>
-#include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/core/fatal.h>
-#include <cerfcore/core/instance_threads.h>
-#include <cerfcore/state/hibernation.h>
-#include "../../execution/guest_cycle_clock.h"
-#include "../../host/audio_activity.h"
-#include "../../host/paced_wave_out.h"
-#include "../../socs/guest_sample_clock.h"
-#include "../../socs/rated_tick_count.h"
-#include "../../socs/sh77xx/sh77xx_dac.h"
 #include "hp_600_audio_switches.h"
 #include "hp_600_family_id.h"
 
 #include <cstdint>
-#include <vector>
+#include <utility>
 
 namespace cerfcore {
 
 namespace {
 
-constexpr uint32_t              kSpeakerChannel  = 1u;
-constexpr uint32_t              kRenderHz        = 44100u;
-constexpr GuestCycleClock::Rate kRenderRate{kRenderHz, 1u};
-constexpr uint16_t              kRenderChannels  = 1u;
-constexpr uint16_t              kRenderBits      = 16u;
-constexpr GuestCycleClock::Rate kFlushRate{100u, 1u};
-constexpr int                   kDacMidpoint     = 0x80;
-constexpr int                   kDacToPcm16      = 256;
+constexpr uint32_t kSpeakerChannel = 1u;
 
-class Hp600Speaker : public Service {
+class Hp600Speaker : public Sh77xxDacSpeaker {
 public:
-    using Service::Service;
+    using Sh77xxDacSpeaker::Sh77xxDacSpeaker;
 
     bool ShouldRegister() override {
         return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
     }
 
     void OnReady() override {
-        clock_    = &emu_.Get<GuestCycleClock>();
-        dac_      = &emu_.Get<Sh77xxDac>();
         switches_ = &emu_.Get<Hp600AudioSwitches>();
-        activity_ = &emu_.Get<AudioActivity>();
-        activity_->NotePresent();
-        paced_.Start(emu_.Get<Fatal>(), emu_.Get<InstanceThreads>(), emu_.TryGet<AudioOutputs>(), "Hp600Speaker", kRenderHz, kRenderChannels,
-                     kRenderBits);
-        samples_.SetRate(clock_->ClockRate(), kRenderRate);
-        clock_->RegisterRateListener([this] { samples_.Rescale(clock_->Cycles(), clock_->ClockRate(), kRenderRate); });
-        flush_.Attach([this] { Flush(); });
-        dac_->AddOutputListener([this] { Update(); });
-        dac_->AddRestoreListener([this] { EndStream(); });
-        switches_->AddListener([this] { Update(); });
-        emu_.Get<Hibernation>().RegisterPostRestoreListener([this] { Update(); });
+        Sh77xxDacSpeaker::OnReady();
     }
 
-    void OnShutdown() override { paced_.Stop(); }
+protected:
+    uint32_t DacChannel() const override { return kSpeakerChannel; }
+
+    bool SpeakerOn() const override { return switches_->SpeakerOn(); }
+
+    void AddSpeakerSwitchListener(std::function<void()> listener) override {
+        switches_->AddListener(std::move(listener));
+    }
 
 private:
-    void Update() {
-        Render();
-        const Sh77xxDac::Output out = dac_->ChannelOutput(kSpeakerChannel);
-        const bool audible = out.enabled && switches_->SpeakerOn();
-        level_             = static_cast<int16_t>((static_cast<int>(out.value) - kDacMidpoint) * kDacToPcm16);
-        if (audible == audible_) return;
-        audible_ = audible;
-        if (audible) {
-            samples_.Start(clock_->Cycles());
-            rendered_ = 0u;
-            paced_.BeginAudioOut();
-            flush_.Start(kFlushRate);
-            return;
-        }
-        Push();
-        flush_.Stop();
-        paced_.FinishAudioOut();
-    }
-
-    void Render() {
-        if (!audible_) return;
-        const uint64_t now = samples_.TicksAt(clock_->Cycles());
-        for (; rendered_ < now; ++rendered_) cerf::le::Append16(out_, static_cast<uint16_t>(level_));
-    }
-
-    void Flush() {
-        Render();
-        Push();
-    }
-
-    void Push() {
-        if (out_.empty()) return;
-        activity_->MarkTx();
-        paced_.QueueOutputInHostBlocks(out_.data(), static_cast<uint32_t>(out_.size()));
-        out_.clear();
-    }
-
-    void EndStream() {
-        flush_.Stop();
-        paced_.StopAudioOut();
-        out_.clear();
-        audible_ = false;
-    }
-
-    GuestCycleClock*     clock_    = nullptr;
-    Sh77xxDac*           dac_      = nullptr;
-    Hp600AudioSwitches*  switches_ = nullptr;
-    AudioActivity* activity_ = nullptr;
-    PacedWaveOut         paced_;
-    RatedTickCount       samples_{emu_};
-    GuestSampleClock     flush_{emu_};
-    std::vector<uint8_t> out_;
-    uint64_t             rendered_ = 0u;
-    int16_t              level_    = 0;
-    bool                 audible_  = false;
+    Hp600AudioSwitches* switches_ = nullptr;
 };
 
 }

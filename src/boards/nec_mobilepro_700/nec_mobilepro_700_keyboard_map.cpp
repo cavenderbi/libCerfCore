@@ -10,6 +10,8 @@ namespace cerfcore {
 
 namespace {
 
+constexpr char kPowerLabel[] = "Power";
+
 class NecMobilepro700KeyboardMap : public KeyboardMap {
 public:
     using KeyboardMap::KeyboardMap;
@@ -95,7 +97,7 @@ public:
             {0x78u, 93u, nullptr, 0u, 0u},
             {0x74u, 94u, nullptr, 0u, 0u},
             {0x70u, 95u, nullptr, 0u, 0u},
-            {0xDFu, kNecVr41xxPowerSwitchCode, "Power", 0u, 0u},
+            {0xDFu, kNecVr41xxPowerSwitchCode, kPowerLabel, 0u, 0u},
         };
         return kBindings;
     }

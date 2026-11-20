@@ -5,8 +5,11 @@
 #include "../../peripherals/serial/serial_endpoint_port.h"
 #include "../../peripherals/serial/serial_line.h"
 #include "sh77xx_intc.h"
+#include "sh77xx_scif_fifo.h"
+#include "sh77xx_scif_modem_lines.h"
 #include "sh77xx_standby_control.h"
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
@@ -21,9 +24,11 @@ inline constexpr uint32_t kSh77xxScifWindowBytes    = 0x10u;
 inline constexpr uint32_t kSh77xxScifTransmitOffset = 0x6u;
 inline constexpr uint32_t kSh77xxScifReceiveOffset  = 0xAu;
 
+class DeferredJobs;
 class Sh77xxCpg;
 class Sh77xxFrqcr;
-class Sh77xxPfc;
+class Sh77xxScifExternalClock;
+class Sh77xxScifPins;
 class Sh77xxSerialWiring;
 
 struct Sh77xxScifChannel {
@@ -36,6 +41,9 @@ struct Sh77xxScifChannel {
     uint8_t          mstp;
     uint32_t         data_pin;
     bool             irda;
+    uint8_t          rts_pins;
+    bool             modem_control;
+    uint32_t         cts_pin;
 };
 
 inline constexpr Sh77xxScifChannel kSh77xxIrdaChannel{kSh77xxIrdaBase,
@@ -46,7 +54,10 @@ inline constexpr Sh77xxScifChannel kSh77xxIrdaChannel{kSh77xxIrdaBase,
                                                       Sh77xxIntcSource::kTxi1,
                                                       0x01u,
                                                       2u,
-                                                      true};
+                                                      true,
+                                                      0x00u,
+                                                      false,
+                                                      0u};
 
 inline constexpr Sh77xxScifChannel kSh77xxScif2Channel{kSh77xxScif2Base,
                                                        "SCIF2",
@@ -56,7 +67,10 @@ inline constexpr Sh77xxScifChannel kSh77xxScif2Channel{kSh77xxScif2Base,
                                                        Sh77xxIntcSource::kTxi2,
                                                        0x02u,
                                                        4u,
-                                                       false};
+                                                       false,
+                                                       0x40u,
+                                                       true,
+                                                       7u};
 
 class Sh77xxScif : public Peripheral, public SerialLine {
 public:
@@ -92,8 +106,6 @@ protected:
     virtual const Sh77xxScifChannel& Channel() const = 0;
 
 private:
-    static constexpr size_t kFifoBytes = 16u;
-
     void       WriteMode(uint8_t value);
     void       WriteBitRate(uint8_t value);
     void       WriteControl(uint8_t value);
@@ -103,45 +115,44 @@ private:
     uint8_t    ReadReceiveData();
     uint16_t   ReadStatus();
     void       RequireRunning(const char* reg, uint32_t value, uint32_t held) const;
-    bool       RxEmptyLocked() const;
-    size_t     RxCountLocked() const;
-    size_t     TxTriggerLocked() const;
-    size_t     RxTriggerLocked() const;
-    void       UpdateRxFlagsLocked();
     void       TakeTransmitLocked(std::vector<uint8_t>& out);
+    void       PostRelease();
+    void       ReleaseHeldTransmit();
+    bool       RtsHigh() const;
     bool       IrdaModeLocked() const;
-    void       DeliverTx(const std::vector<uint8_t>& bytes, bool tx_wired);
+    void       DeliverTx(const std::vector<uint8_t>& bytes, bool powered);
     void       DriveLocked();
     LineConfig LineConfigLocked() const;
     void       FireLineConfig();
     void       RefreshClockStop();
     void       RefreshConnection();
+    void       PublishEnables();
+    SerialControlLines ControlLines();
+    void       RefreshTxLine();
+    void       Resync();
     bool       InitializeLocked();
     void       Initialize();
+    void       EnterStandby();
 
     Sh77xxIntc*         intc_   = nullptr;
-    Sh77xxPfc*          pfc_    = nullptr;
+    Sh77xxScifPins*     pins_   = nullptr;
+    Sh77xxStbcr2*       stbcr2_ = nullptr;
     Sh77xxCpg*          cpg_    = nullptr;
     Sh77xxFrqcr*        frqcr_  = nullptr;
-    Sh77xxStbcr2*       stbcr2_ = nullptr;
-    Sh77xxSerialWiring* wiring_ = nullptr;
+    Sh77xxSerialWiring*      wiring_ = nullptr;
+    Sh77xxScifExternalClock* clock_  = nullptr;
+    DeferredJobs*            jobs_   = nullptr;
+    Sh77xxScifModemLines     modem_;
 
     mutable std::mutex   mu_;
     uint8_t              smr_       = 0u;
     uint8_t              brr_       = 0xFFu;
     uint8_t              scr_       = 0u;
     uint8_t              fcr_       = 0u;
-    uint8_t              read_ones_ = 0u;
-    bool                 tend_      = true;
-    bool                 tdfe_      = true;
-    bool                 rdf_       = false;
-    bool                 dr_        = false;
     bool                 stopped_   = false;
     bool                 powered_   = false;
-    bool                 tx_wired_  = false;
-    std::vector<uint8_t> tx_;
-    std::vector<uint8_t> rx_;
-    size_t               rx_pos_ = 0u;
+    std::atomic<bool>    tx_low_{false};
+    Sh77xxScifFifo       fifo_;
     LineConfig           line_cfg_;
 
     std::string            tx_line_;

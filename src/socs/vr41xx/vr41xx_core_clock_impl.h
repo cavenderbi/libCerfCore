@@ -19,6 +19,7 @@ struct Vr41xxClkselRow {
 inline constexpr uint8_t kVr41xxEcReserved = 0xFFu;
 
 struct Vr41xxCoreClockModel {
+    uint64_t        clkx_hz;
     uint64_t        pclock_mult;
     uint64_t        tclock_per_masterout;
     Vr41xxClkselRow rows[8];
@@ -60,7 +61,7 @@ public:
     void OnReady() override { row_ = &Row(); }
 
     GuestCycleClock::Rate ResetRate() const override {
-        return GuestCycleClock::Rate{kVr41xxClkxHz * M.pclock_mult, row_->clksp};
+        return GuestCycleClock::Rate{M.clkx_hz * M.pclock_mult, row_->clksp};
     }
 
     uint64_t CyclesPerCountTick() const override { return row_->pclock_per_masterout; }

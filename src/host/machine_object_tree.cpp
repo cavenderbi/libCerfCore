@@ -47,6 +47,24 @@ MachineObject* MachineObjectTree::Parent(const MachineObject* object) {
     return ParentLocked(object);
 }
 
+std::vector<std::string> MachineObjectTree::PathOf(const MachineObject* object) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    return PathOfLocked(object);
+}
+
+MachineObject* MachineObjectTree::Find(const std::vector<std::string>& path) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    MachineObject* at = nullptr;
+    for (const std::string& id : path) {
+        const auto child = std::find_if(nodes_.begin(), nodes_.end(), [at, &id](const Node& n) {
+            return n.parent == at && n.object->ObjectId() == id;
+        });
+        if (child == nodes_.end()) return nullptr;
+        at = child->object;
+    }
+    return at;
+}
+
 void MachineObjectTree::Subscribe(Listener listener) {
     std::lock_guard<std::mutex> lk(listeners_mtx_);
     listeners_.push_back(std::move(listener));

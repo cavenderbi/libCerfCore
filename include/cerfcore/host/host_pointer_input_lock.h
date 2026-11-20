@@ -39,9 +39,16 @@ public:
     bool Admits(const Hold& hold) const;
 
     template <class Forward>
-    void RunUnlessHeld(Forward&& forward) {
+    bool AdmitUnlessHeld(Forward&& forward) {
         std::shared_lock<std::shared_mutex> shared(gate_);
-        if (!Held()) forward();
+        if (Held()) return false;
+        forward();
+        return true;
+    }
+
+    template <class Forward>
+    void RunUnlessHeld(Forward&& forward) {
+        if (AdmitUnlessHeld(forward)) Admitted();
     }
 
     template <class Forward>
@@ -54,6 +61,7 @@ public:
 
 private:
     void Release(uint64_t owner);
+    void Admitted();
 
     mutable std::shared_mutex gate_;
     std::atomic<uint64_t>     owner_{0};

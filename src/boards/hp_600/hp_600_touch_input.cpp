@@ -1,6 +1,6 @@
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/host/touch_input.h>
+#include "../../peripherals/touch/host_pen_target_touch_input.h"
 #include "hp_600_family_id.h"
 #include "hp_600_touch_panel.h"
 
@@ -8,23 +8,16 @@ namespace cerfcore {
 
 namespace {
 
-class Hp600TouchInput : public TouchInput {
+class Hp600TouchInput : public HostPenTargetTouchInput {
 public:
-    using TouchInput::TouchInput;
+    using HostPenTargetTouchInput::HostPenTargetTouchInput;
 
     bool ShouldRegister() override {
         return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
     }
 
-    void OnReady() override { panel_ = &emu_.Get<Hp600TouchPanel>(); }
-
-    void PenDown(int x, int y) override { panel_->PenDown(x, y); }
-    void PenMove(int x, int y) override { panel_->PenMove(x, y); }
-    void PenUp(int, int) override { panel_->PenUp(); }
-    void CaptureLost() override { panel_->PenUp(); }
-
-private:
-    Hp600TouchPanel* panel_ = nullptr;
+protected:
+    HostPenTarget& Target() override { return emu_.Get<Hp600TouchPanel>(); }
 };
 
 }

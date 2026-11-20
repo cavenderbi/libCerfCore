@@ -9,6 +9,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "../../peripherals/serial/uart_frame.h"
 #include "pr31x00_reset_line.h"
 #include <cerfcore/state/state_stream.h>
 #include "../../tracing/kernel_debug_sink.h"
@@ -100,11 +101,18 @@ void Pr31x00Uart::OnReady() {
        p16-15). */
     auto& reset_line = emu_.Get<Pr31x00ResetLine>();
     reset_line.RegisterResetListener([this] {
-        { std::lock_guard<std::mutex> lk(mu_); ctl1_ = kCtl1Reset & kCtl1Writable; }
+        {
+            std::lock_guard<std::mutex> lk(mu_);
+            ctl1_     = kCtl1Reset & kCtl1Writable;
+            tx_break_ = false;
+        }
         dma_->ResetLine(dma_port_);
         tx_->ResetLine(tx_port_);
     });
-    reset_line.RegisterReleaseListener([this] { FireLineConfig(); });
+    reset_line.RegisterReleaseListener([this] {
+        FireLineConfig();
+        port_.NotifyControlLines();
+    });
 
     if (auto* wiring = emu_.TryGet<Pr31x00SerialWiring>()) modem_ = wiring->ForUart(MmioBase());
     modem_lines_ = &emu_.Get<Pr31x00UartModemLines>();
@@ -124,13 +132,20 @@ Pr31x00Uart::Pr31x00Uart(CerfEmulator& emu)
       endpoint_timer_(emu, [this] { port_.OnTimer(); }),
       port_(*this, endpoint_timer_, [this] {
           SerialControlLines lines;
-          modem_lines_->Control(modem_port_, lines.dtr, lines.rts);
+          bool               powered = false;
+          modem_lines_->Control(modem_port_, lines.dtr, lines.rts, powered);
+          if (!powered) return SerialControlLines{};
+          std::lock_guard<std::mutex> lk(mu_);
+          lines.in_break = tx_break_ || (ctl1_ & kCtl1DisTxd) != 0u;
           return lines;
       }) {}
 
 Pr31x00Uart::~Pr31x00Uart() = default;
 
-void Pr31x00Uart::OnShutdown() { port_.OnShutdown(); }
+void Pr31x00Uart::OnShutdown() {
+    port_.OnShutdown();
+    emu_.Get<KernelDebugSink>().FlushLine(tx_line_, TxSource());
+}
 
 uint32_t Pr31x00Uart::ReadWord(uint32_t addr) {
     switch (addr - MmioBase()) {
@@ -143,8 +158,9 @@ uint32_t Pr31x00Uart::ReadWord(uint32_t addr) {
             dma_->ReadHolds(dma_port_, rxhold_full, prxhold_full);
             if (prxhold_full) v |= kCtl1PrxHoldFull;
             if (rxhold_full)  v |= kCtl1RxHoldFull;
-            const bool tx_empty = tx_->Empty(tx_port_);
+            bool tx_empty = tx_->Empty(tx_port_);
             std::lock_guard<std::mutex> lk(mu_);
+            tx_empty = tx_empty && !tx_break_;
             v |= ctl1_ & kCtl1Writable;
             if (tx_empty) v |= kCtl1Empty;
             if ((ctl1_ & kCtl1EnUart) || !tx_empty) v |= kCtl1Uarton;
@@ -203,11 +219,14 @@ void Pr31x00Uart::WriteCtl1(uint32_t addr, uint32_t value) {
         HaltUnsupportedAccess("PR31x00 UART TX DMA armed with ENDMALOOP", addr, value);
     }
     bool tx_start;
+    bool line_moved;
     {
         std::lock_guard<std::mutex> lk(mu_);
-        tx_start = (value & kCtl1EnDmaTx) != 0u && (ctl1_ & kCtl1EnDmaTx) == 0u;
-        ctl1_    = value & kCtl1Writable;
+        tx_start   = (value & kCtl1EnDmaTx) != 0u && (ctl1_ & kCtl1EnDmaTx) == 0u;
+        line_moved = ((ctl1_ ^ value) & kCtl1DisTxd) != 0u;
+        ctl1_      = value & kCtl1Writable;
     }
+    if (line_moved) port_.NotifyControlLines();
     if ((value & kCtl1EnDmaTx) == 0u) tx_->CancelDma(tx_port_);
     dma_->SetControl(dma_port_, (value & kCtl1EnUart) != 0u, (value & kCtl1EnDmaRx) != 0u);
     FireLineConfig();
@@ -225,39 +244,62 @@ void Pr31x00Uart::TransmitDma(uint32_t addr, uint32_t control) {
         HaltUnsupportedAccess("PR31x00 UART TX DMA armed with no DMALENGTH programmed",
                               addr, control);
     }
+    bool in_break = false;
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        in_break = tx_break_;
+    }
+    if (in_break) HaltUnsupportedAccess("PR31x00 UART TX DMA armed during a BREAK", addr, control);
     tx_->StartDma(tx_port_);
 }
 
 void Pr31x00Uart::RaiseTxInts(const Pr31x00UartTransmitter::TxInts& ints) {
     uint32_t bits = 0;
-    if (ints.sent)     bits |= TxEmptyIntBit() | TxAvailIntBit();
+    if (ints.sent)      bits |= TxEmptyIntBit() | TxAvailIntBit();
+    if (ints.hold_free) bits |= TxAvailIntBit();
     if (ints.dma_full) bits |= DmaFullIntBit();
     if (ints.dma_half) bits |= DmaHalfIntBit();
     emu_.Get<Pr31x00Intc>().SetPending(1, bits);
 }
 
 void Pr31x00Uart::DeliverTx(const uint8_t* data, size_t n) {
-    if (port_.DeliverTx(data, n, true)) return;
-    auto& sink = emu_.Get<KernelDebugSink>();
-    for (size_t i = 0; i < n; ++i) sink.EmitChar(static_cast<char>(data[i]), tx_line_, TxSource());
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        if ((ctl1_ & kCtl1DisTxd) != 0u) return;
+    }
+    emu_.Get<KernelDebugSink>().DeliverOrEmit(port_, data, n, true, tx_line_, TxSource());
 }
 
 void Pr31x00Uart::WriteTxHold(uint32_t addr, uint32_t value) {
     if (value & kTxHoldReserved) {
         HaltUnsupportedAccess("PR31x00 UART TXHOLD reserved", addr, value);
     }
-    if (value & kTxBreak) {
-        HaltUnsupportedAccess("PR31x00 UART TXHOLD BREAK", addr, value);
+    const bool    brk  = (value & kTxBreak) != 0u;
+    const uint8_t data = static_cast<uint8_t>(value & kTxDataMask);
+    if (brk && data != 0u) {
+        HaltUnsupportedAccess("PR31x00 UART TXHOLD BREAK with TXDATA not $00", addr, value);
     }
 
+    bool in_break = false;
     {
         std::lock_guard<std::mutex> lk(mu_);
-        if ((ctl1_ & kCtl1EnUart) == 0u || (ctl1_ & kCtl1DisTxd) != 0u) {
-            return;
+        in_break = tx_break_;
+        if ((ctl1_ & kCtl1EnUart) == 0u && !in_break) return;
+    }
+    if (in_break && !brk && data != 0u) {
+        HaltUnsupportedAccess("PR31x00 UART TXHOLD data written during a BREAK", addr, value);
+    }
+    if (brk || in_break) {
+        tx_->WriteBreakControl(tx_port_, value, !brk);
+        {
+            std::lock_guard<std::mutex> lk(mu_);
+            tx_break_ = brk;
         }
+        port_.NotifyControlLines();
+        return;
     }
 
-    tx_->WriteHold(tx_port_, static_cast<uint8_t>(value & kTxDataMask));
+    tx_->WriteHold(tx_port_, data);
 }
 
 void Pr31x00Uart::PushRx(const uint8_t* data, size_t n) {
@@ -317,8 +359,8 @@ Pr31x00UartDma::LineTiming Pr31x00Uart::FrameTimingLocked() const {
     const LineConfig c = FramingLocked();
     Pr31x00UartDma::LineTiming t;
     t.uart_clocks_per_bit = kClocksPerBaud * (static_cast<uint64_t>(ctl2_baud_) + 1u);
-    t.transfer_bits = 1u + c.data_bits + (c.parity != LineConfig::Parity::None ? 1u : 0u) + 1u;
-    t.frame_bits    = t.transfer_bits + (c.stop == LineConfig::Stop::Two ? 1u : 0u);
+    t.transfer_bits = UartBitsBeforeStop(c) + 1u;
+    t.frame_bits    = UartFrameBits(c);
     return t;
 }
 
@@ -366,13 +408,16 @@ void Pr31x00Uart::DisarmEndpointTimer() { port_.DisarmTimer(); }
 void Pr31x00Uart::SaveState(StateWriter& w) {
     port_.SaveCradleState(w);
     uint32_t ctl1_v, baud;
+    uint8_t  tx_break;
     {
         std::lock_guard<std::mutex> lk(mu_);
-        ctl1_v = ctl1_;
-        baud   = ctl2_baud_;
+        ctl1_v   = ctl1_;
+        baud     = ctl2_baud_;
+        tx_break = tx_break_ ? 1u : 0u;
     }
     w.Write("ctl1_v", ctl1_v);
     w.Write("baud", baud);
+    w.Write("tx_break", tx_break);
     modem_lines_->SaveState(modem_port_, w);
     dma_->SaveState(dma_port_, w);
     tx_->SaveState(tx_port_, w);
@@ -381,13 +426,17 @@ void Pr31x00Uart::SaveState(StateWriter& w) {
 }
 
 void Pr31x00Uart::RestoreState(StateReader& r) {
+    emu_.Get<KernelDebugSink>().FlushLine(tx_line_, TxSource());
     port_.RestoreCradleState(r);
     Pr31x00UartDma::LineTiming framing;
     {
         std::lock_guard<std::mutex> lk(mu_);
         r.Read("ctl1_v", ctl1_);
         r.Read("baud", ctl2_baud_);
-        framing = FrameTimingLocked();
+        uint8_t tx_break = 0u;
+        r.Read("tx_break", tx_break);
+        tx_break_ = tx_break != 0u;
+        framing   = FrameTimingLocked();
     }
     modem_lines_->RestoreState(modem_port_, r);
     dma_->RestoreState(dma_port_, r, framing);

@@ -38,6 +38,40 @@ bool UartRxLine::WireEmpty() const {
     return wire_.empty();
 }
 
+UartRxLine::Intake UartRxLine::TakeIn(bool clocked, GuestCycleClock::Rate cpu, GuestCycleClock::Rate bit,
+                                      const Frame& frame, uint64_t now) {
+    const std::vector<uint8_t> bytes = TakeWire();
+    return Admit(bytes.data(), bytes.size(), clocked, cpu, bit, frame, now);
+}
+
+UartRxLine::Intake UartRxLine::Admit(const uint8_t* data, size_t n, bool clocked, GuestCycleClock::Rate cpu,
+                                     GuestCycleClock::Rate bit, const Frame& frame, uint64_t now) {
+    if (n == 0u) return Intake::kNone;
+    if (!clocked) {
+        LogNoClock(n);
+        return Intake::kNoClock;
+    }
+    if (!Receive(data, n, cpu, bit, frame, now)) return Intake::kOverflow;
+    return Intake::kQueued;
+}
+
+bool UartRxLine::Retime(const Frame& from, const Frame& to, GuestCycleClock::Rate cpu, GuestCycleClock::Rate bit,
+                        uint64_t now, bool& moved) {
+    const bool reframed = Reframe(from, to);
+    bool       rerated  = false;
+    const bool fits     = SetBitRate(cpu, bit, now, rerated);
+    moved               = reframed || rerated;
+    return fits;
+}
+
+void UartRxLine::ArmEvent(GuestCycleClock& clock, GuestCycleClock::Event* event, uint64_t now, bool wanted) const {
+    if (!wanted || entries_.empty()) {
+        clock.Disarm(event);
+        return;
+    }
+    clock.Arm(event, FrontLandCycle(now));
+}
+
 bool UartRxLine::StartClock(GuestCycleClock::Rate cpu, GuestCycleClock::Rate bit, uint64_t now) {
     if (timed_ && (!entries_.empty() || next_start_ > half_.TicksAt(now))) return true;
     half_rate_ = bit.Scaled(2u, 1u);

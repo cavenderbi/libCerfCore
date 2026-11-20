@@ -62,8 +62,7 @@ uint16_t AdcY(int hy) { return InverseTouch(hy, TouchY, 16, 37, 80); }
    With HKLM\SOFTWARE\Version "Version" starting 'S' (sub_AB9D0) it shows 0..100%
    across 7200..8200 mV and powers off below 7200. */
 uint16_t BatteryAdc(int pct) {
-    if (pct < 0) pct = 0; else if (pct > 100) pct = 100;
-    const int mv = 7200 + pct * 10;
+    const int mv = 7200 + pct * (8200 - 7200) / Battery::kFullPercent;
     return Clamp10((mv - 170) * 860 / 12600 - 21);
 }
 
@@ -81,8 +80,7 @@ public:
         if (channel == kAuxAd1) return BatteryAdc(batt.FillPercent());
         if (channel == kAuxAd2) return batt.IsOnBattery() ? 0u : kAcOnlineAdc;
         if (channel == kAuxAd3) {
-            const bool charging = !batt.IsOnBattery() && batt.FillPercent() < 100;
-            return charging ? kChargeSenseActive : 0u;
+            return batt.Charging() ? kChargeSenseActive : 0u;
         }
         emu_.Get<Fatal>().Die("simpad: UCB AD%u conversion; nothing on this board is "
                               "modelled on that input", channel);

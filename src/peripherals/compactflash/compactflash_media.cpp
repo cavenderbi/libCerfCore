@@ -1,9 +1,13 @@
 #include "compactflash_media.h"
 
+#include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/crc32.h>
 #include <cerfcore/core/fatal.h>
+#include <cerfcore/core/log.h>
 
 #include <array>
+#include <cstdio>
 #include <cstring>
 
 namespace cerfcore {
@@ -22,11 +26,24 @@ constexpr std::size_t kTranslateLbaMid      = 0x05u;
 constexpr std::size_t kTranslateLbaLsb      = 0x06u;
 constexpr std::size_t kTranslateErased      = 0x13u;
 constexpr uint8_t     kTranslateNotErased   = 0x00u;
+constexpr char        kSerialFormat[]       = "CERF%08X";
+
+std::string CardSerial(const CompactFlashImage& image) {
+    host_platform::HostFileIdentity identity;
+    const bool known = image.Identity(identity);
+    std::array<uint8_t, 2 * sizeof(uint64_t)> bytes{};
+    cerf::le::Put64(bytes.data(), identity.volume);
+    cerf::le::Put64(bytes.data() + sizeof(uint64_t), identity.file);
+    char text[16];
+    std::snprintf(text, sizeof text, kSerialFormat, Crc32::Update(0u, bytes.data(), bytes.size()));
+    if (!known && image.IsOpen()) LOG(Pcmcia, "[CF] the host gives no identity of the image file, serial %s\n", text);
+    return text;
+}
 
 }
 
 CompactFlashMedia::CompactFlashMedia(CerfEmulator& emu, const std::string& image_path)
-    : emu_(emu), image_(image_path) {}
+    : emu_(emu), image_(image_path), serial_(CardSerial(image_)) {}
 
 void CompactFlashMedia::ReadSector(uint64_t lba, uint8_t* out) {
     if (!image_.ReadSector(lba, out))

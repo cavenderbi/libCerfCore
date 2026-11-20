@@ -5,6 +5,7 @@
 #include <cerfcore/cpu/emulated_memory.h>
 #include <cerfcore/state/state_stream.h>
 #include "vr41xx_dcu.h"
+#include "vr41xx_dma_page_interrupts.h"
 
 #include <string>
 
@@ -166,12 +167,10 @@ uint32_t Vr41xxAiuPath::TakeDmaAddress() {
 }
 
 void Vr41xxAiuPath::PageBoundary() {
-    const bool unserviced = host_.AiuIntPending(config_.one_page_int);
-    host_.RaiseAiuInt(config_.one_page_int);
-    if (unserviced) {
-        host_.RaiseAiuInt(config_.two_page_int);
-        stop_full_ = true;
-    }
+    const Vr41xxDmaPageInterrupts pages{config_.one_page_int, config_.two_page_int};
+    const uint16_t raised = pages.AtBoundary(host_.AiuIntPending(config_.one_page_int) ? config_.one_page_int : 0u);
+    host_.RaiseAiuInt(raised);
+    if (raised & config_.two_page_int) stop_full_ = true;
     if (host_.StopAfterOnePage(config_.channel)) stop_one_page_ = true;
 }
 

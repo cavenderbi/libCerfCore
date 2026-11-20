@@ -8,9 +8,8 @@ namespace cerfcore {
 
 namespace {
 
-constexpr uint32_t kIndexOnA2         = 2u;
-constexpr uint8_t  kGpioInputsLow     = 0x00u;
-constexpr uint8_t  kHostHandshakeIdle = 0x0Fu;
+constexpr uint8_t kGpioInputsLow     = 0x00u;
+constexpr uint8_t kHostHandshakeIdle = 0x0Fu;
 
 class HpDebugBoardCd1284 : public Cd1284 {
 public:
@@ -21,19 +20,22 @@ public:
     }
 
     void OnReady() override {
-        base_pa_ = emu_.Get<HpDebugBoardPlacement>().BasePa();
+        const HpDebugBoardPlacement& placement = emu_.Get<HpDebugBoardPlacement>();
+        base_pa_        = placement.BasePa();
+        register_shift_ = placement.Cd1284RegisterShift();
         Cd1284::OnReady();
     }
 
     uint32_t MmioBase() const override { return base_pa_; }
 
 protected:
-    uint32_t RegisterShift() const override { return kIndexOnA2; }
+    uint32_t RegisterShift() const override { return register_shift_; }
     uint8_t  GpioInputLevels() const override { return kGpioInputsLow; }
     uint8_t  HostHandshakeLevels() const override { return kHostHandshakeIdle; }
 
 private:
-    uint32_t base_pa_ = 0u;
+    uint32_t base_pa_        = 0u;
+    uint32_t register_shift_ = 0u;
 };
 
 }

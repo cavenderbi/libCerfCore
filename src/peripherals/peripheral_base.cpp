@@ -49,6 +49,18 @@ void Peripheral::WriteWordAsHalves(uint32_t addr, uint32_t value) {
     WriteHalf(addr + 2u, static_cast<uint16_t>(value >> 16));
 }
 
+uint64_t Peripheral::ReadDwordAsHalves(uint32_t addr) {
+    uint64_t value = 0u;
+    for (uint32_t lane = 0; lane < 4u; ++lane)
+        value |= static_cast<uint64_t>(ReadHalf(addr + 2u * lane)) << (16u * lane);
+    return value;
+}
+
+void Peripheral::WriteDwordAsHalves(uint32_t addr, uint64_t value) {
+    for (uint32_t lane = 0; lane < 4u; ++lane)
+        WriteHalf(addr + 2u * lane, static_cast<uint16_t>(value >> (16u * lane)));
+}
+
 uint32_t Peripheral::SplitWordRead(void* ctx, uint32_t off, uint32_t width) {
     if (width != 4u) return AutoFastRead(ctx, off, width);
     auto* p = static_cast<Peripheral*>(ctx);

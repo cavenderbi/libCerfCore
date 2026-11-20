@@ -5,7 +5,7 @@
 #include <cerfcore/host/keyboard_router.h>
 #include "hp_600_family_id.h"
 #include "hp_600_input_nets.h"
-#include "hp_600_key_matrix.h"
+#include "../sh77xx_port_key_matrix.h"
 
 #include <cstdint>
 
@@ -23,7 +23,7 @@ public:
 
     void OnReady() override {
         map_    = &emu_.Get<KeyboardMap>();
-        matrix_ = &emu_.Get<Hp600KeyMatrix>();
+        matrix_ = &emu_.Get<Sh77xxPortKeyMatrix>();
         nets_   = &emu_.Get<Hp600InputNets>();
         emu_.Get<KeyboardRouter>().Register(this);
     }
@@ -39,9 +39,9 @@ public:
     }
 
 private:
-    KeyboardMap*    map_    = nullptr;
-    Hp600KeyMatrix* matrix_ = nullptr;
-    Hp600InputNets* nets_   = nullptr;
+    KeyboardMap*         map_    = nullptr;
+    Sh77xxPortKeyMatrix* matrix_ = nullptr;
+    Hp600InputNets*      nets_   = nullptr;
 };
 
 }

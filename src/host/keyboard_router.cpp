@@ -3,6 +3,7 @@
 #include "../core/deferred_jobs.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/host/host_input_activity.h>
 #include <cerfcore/host/keyboard_input.h>
 #include <cerfcore/host/machine_object_tree.h>
 #include <cerfcore/host/virtual_keys.h>
@@ -55,7 +56,9 @@ void KeyboardRouter::Route(uint8_t vk, bool key_up, bool stock) {
     }
     auto& jobs = emu_.Get<DeferredJobs>();
     if (released) jobs.PostToGuestThread([released, vk] { released->OnHostKey(vk, true); });
-    if (target) jobs.PostToGuestThread([target, vk, key_up] { target->OnHostKey(vk, key_up); });
+    if (!target) return;
+    jobs.PostToGuestThread([target, vk, key_up] { target->OnHostKey(vk, key_up); });
+    emu_.Get<HostInputActivity>().Delivered();
 }
 
 bool KeyboardRouter::Held(uint8_t vk) const {

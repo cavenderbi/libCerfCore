@@ -40,7 +40,6 @@ constexpr int64_t  kProgramBusyNs      = 500000000;
 constexpr uint16_t kPowerUpTemperature = 2930u;
 constexpr uint16_t kNotDischarging     = 0xFFFFu;
 constexpr uint8_t  kManufacturerDataLen = 5u;
-constexpr int      kFullChargePercent  = 100;
 
 constexpr uint16_t kStatusOverChargedAlarm     = 0x8000u;
 constexpr uint16_t kStatusTerminateChargeAlarm = 0x4000u;
@@ -128,7 +127,7 @@ void IbmWorkpadZ50BatteryGauge::LatchRead() {
 }
 
 uint16_t IbmWorkpadZ50BatteryGauge::RemainingMah() const {
-    return static_cast<uint16_t>(fcc_ * battery_->FillPercent() / 100);
+    return static_cast<uint16_t>(fcc_ * battery_->FillPercent() / Battery::kFullPercent);
 }
 
 uint16_t IbmWorkpadZ50BatteryGauge::Word(uint8_t cmd) const {
@@ -161,7 +160,7 @@ uint16_t IbmWorkpadZ50BatteryGauge::Word(uint8_t cmd) const {
 uint16_t IbmWorkpadZ50BatteryGauge::BatteryStatus() const {
     uint16_t s = kStatusInitialized;
     if (!battery_->Charging()) s |= kStatusDischarging;
-    if (battery_->FillPercent() >= kFullChargePercent) s |= kStatusFullyCharged;
+    if (battery_->FillPercent() >= Battery::kFullPercent) s |= kStatusFullyCharged;
     if (battery_->ChargeComplete()) s |= kStatusOverChargedAlarm | kStatusTerminateChargeAlarm;
     if (RemainingMah() < rca_) s |= kStatusRemCapAlarm;
     if (battery_->CurrentMa() < 0 && Word(kCmdRunTimeToEmpty) < rta_) s |= kStatusRemTimeAlarm;
@@ -185,7 +184,7 @@ void IbmWorkpadZ50BatteryGauge::TrackValidDischarge() {
     const int fill = battery_->FillPercent();
     if (battery_->Charging()) {
         vdq_ = false;
-    } else if (battery_->Discharging() && fill >= kFullChargePercent) {
+    } else if (battery_->Discharging() && fill >= Battery::kFullPercent) {
         vdq_ = true;
     } else if (fill > vdq_fill_) {
         vdq_ = false;

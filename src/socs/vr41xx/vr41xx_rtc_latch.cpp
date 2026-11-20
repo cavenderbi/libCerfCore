@@ -4,10 +4,16 @@
 
 namespace cerfcore {
 
-bool Vr41xxRtcLatch::Write(uint32_t half, uint16_t value) {
+void Vr41xxRtcLatch::WriteNow(uint32_t half, uint16_t value) {
     const uint32_t shift = half * 16u;
-    value_    = ((value_ & ~(0xFFFFull << shift)) | (uint64_t{value} << shift)) & mask_;
-    written_ |= static_cast<uint8_t>(1u << half);
+    value_   = ((value_ & ~(0xFFFFull << shift)) | (uint64_t{value} << shift)) & mask_;
+    written_ = 0u;
+}
+
+bool Vr41xxRtcLatch::Write(uint32_t half, uint16_t value) {
+    const uint8_t written = written_;
+    WriteNow(half, value);
+    written_ = static_cast<uint8_t>(written | (1u << half));
     if (written_ != (1u << halves_) - 1u) return false;
     written_ = 0u;
     return true;

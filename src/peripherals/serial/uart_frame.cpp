@@ -19,10 +19,25 @@ bool UartParityBit(Parity parity, uint8_t data, uint8_t data_bits) {
     return true;
 }
 
+uint32_t UartBitsBeforeStop(uint32_t data_bits, bool parity) { return 1u + data_bits + (parity ? 1u : 0u); }
+
+uint32_t UartFrameBits(uint32_t data_bits, bool parity, uint32_t stop_bits) {
+    return UartBitsBeforeStop(data_bits, parity) + stop_bits;
+}
+
+uint32_t UartBitsBeforeStop(const SerialLine::LineConfig& format) {
+    return UartBitsBeforeStop(format.data_bits, format.parity != Parity::None);
+}
+
 uint32_t UartFrameBits(const SerialLine::LineConfig& format) {
-    const uint32_t parity = format.parity != Parity::None ? 1u : 0u;
-    const uint32_t stop   = format.stop == SerialLine::LineConfig::Stop::One ? 1u : 2u;
-    return 1u + format.data_bits + parity + stop;
+    const uint32_t stop = format.stop == SerialLine::LineConfig::Stop::One ? 1u : 2u;
+    return UartFrameBits(format.data_bits, format.parity != Parity::None, stop);
+}
+
+double UartCharBitTimes(const SerialLine::LineConfig& format) {
+    using Stop             = SerialLine::LineConfig::Stop;
+    const double stop_bits = format.stop == Stop::Two ? 2.0 : format.stop == Stop::OnePointFive ? 1.5 : 1.0;
+    return UartBitsBeforeStop(format) + stop_bits;
 }
 
 uint32_t UartFrameLevels(const SerialLine::LineConfig& format, uint8_t data) {

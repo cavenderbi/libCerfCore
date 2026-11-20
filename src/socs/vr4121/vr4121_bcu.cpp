@@ -92,8 +92,7 @@ const char* RfuEncoding(uint32_t off, uint16_t value) {
     if (off == vr4121_bcu::kOffCnt3 && !ExtRomcsDefined(value)) {
         return "BCUCNTREG3 write with the RFU EXT_ROMCS encoding 01";
     }
-    if (off == vr41xx_bcu::kOffSpeed) return vr41xx_bcu::SpeedRfuEncoding(value);
-    return nullptr;
+    return vr41xx_bcu::SpeedWriteRfuEncoding(off, value);
 }
 
 using namespace vr4121_bcu;

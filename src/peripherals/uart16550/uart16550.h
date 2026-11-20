@@ -22,7 +22,7 @@ public:
           Serial16550([this](bool pending) { SetInterruptLine(pending); }, cfg, clock, *this) {}
 
     void OnReady() override;
-    void OnShutdown() override { Port().OnShutdown(); }
+    void OnShutdown() override;
 
     uint32_t MmioSize() const override { return 0x00001000u; }
 

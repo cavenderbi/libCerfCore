@@ -17,12 +17,10 @@ constexpr uint32_t kOffCmcsr = 2u;
 constexpr uint32_t kOffCmcnt = 4u;
 constexpr uint32_t kOffCmcor = 6u;
 
-constexpr uint16_t kCmstrStr0     = 0x0001u;
-constexpr uint16_t kCmstrReserved = 0x0002u;
-constexpr uint16_t kCmcsrCmf      = 0x0080u;
-constexpr uint16_t kCmcsrReserved = 0x0040u;
-constexpr uint16_t kCmcsrCks      = 0x0003u;
-constexpr uint16_t kCmcorReset    = 0xFFFFu;
+constexpr uint16_t kCmstrStr0  = 0x0001u;
+constexpr uint16_t kCmcsrCmf   = 0x0080u;
+constexpr uint16_t kCmcsrCks   = 0x0003u;
+constexpr uint16_t kCmcorReset = 0xFFFFu;
 
 constexpr uint32_t kCksShift[4] = {2u, 3u, 4u, 6u};
 constexpr uint64_t kCounterSpan = 0x10000u;
@@ -112,8 +110,9 @@ uint16_t Sh77xxCmt::ReadHalf(uint32_t addr) {
 void Sh77xxCmt::WriteHalf(uint32_t addr, uint16_t value) {
     switch (addr - MmioBase()) {
         case kOffCmstr:
-            if ((value & kCmstrReserved) != 0u) {
-                emu_.Get<Fatal>().Die("Sh77xxCmt: CMSTR write 0x%04X sets reserved bit 1", value);
+            if ((value & CmstrWriteZeroBits()) != 0u) {
+                emu_.Get<Fatal>().Die("Sh77xxCmt: CMSTR write 0x%04X sets reserved bits 0x%04X", value,
+                                      CmstrWriteZeroBits());
             }
             cmstr_ = value & kCmstrStr0;
             UpdateCounting();
@@ -144,8 +143,8 @@ void Sh77xxCmt::WriteHalf(uint32_t addr, uint16_t value) {
 }
 
 void Sh77xxCmt::WriteControl(uint16_t value) {
-    if ((value & kCmcsrReserved) != 0u) {
-        emu_.Get<Fatal>().Die("Sh77xxCmt: CMCSR write 0x%04X sets reserved bit 6", value);
+    if ((value & CmcsrWriteZeroBits()) != 0u) {
+        emu_.Get<Fatal>().Die("Sh77xxCmt: CMCSR write 0x%04X sets reserved bits 0x%04X", value, CmcsrWriteZeroBits());
     }
     Sync();
     const uint16_t count = Count();

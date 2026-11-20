@@ -43,8 +43,10 @@ public:
     bool     Retime(uint32_t port, const Control& old_ctl, const Control& ctl, uint64_t now);
 
     bool     FrontDue(uint32_t port, uint64_t now) const { return line_[port]->rx.FrontDue(now); }
-    uint16_t Front(uint32_t port) const { return line_[port]->rx.Front(); }
-    void     PopFront(uint32_t port, uint64_t now) { line_[port]->rx.PopFront(now); }
+    template <typename Land>
+    bool LandDue(uint32_t port, uint64_t now, Land&& land) {
+        return line_[port]->rx.LandDue(now, land);
+    }
     /* §11.11.1.3 (printed 11-110): "If the receive FIFO contains valid data and three frame periods
        elapse without the reception of data on RXD3, the receiver idle interrupt is generated." */
     bool Quiet(uint32_t port, const Control& ctl, uint64_t now) {

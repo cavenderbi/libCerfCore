@@ -169,7 +169,7 @@ inline FreescaleUartFrame FrameOf(uint32_t ucr2) {
     f.data_bits = (ucr2 & kUcr2Ws) != 0u ? 8u : 7u;
     f.parity    = (ucr2 & kUcr2Pren) != 0u;
     f.odd       = (ucr2 & kUcr2Proe) != 0u;
-    f.bits      = 1u + f.data_bits + (f.parity ? 1u : 0u) + ((ucr2 & kUcr2Stpb) != 0u ? 2u : 1u);
+    f.bits      = UartFrameBits(f.data_bits, f.parity, (ucr2 & kUcr2Stpb) != 0u ? 2u : 1u);
     return f;
 }
 
@@ -179,7 +179,7 @@ inline SerialLine::LineConfig LineFormat(const FreescaleUartFrame& f) {
     c.parity    = !f.parity ? SerialLine::LineConfig::Parity::None
                 : f.odd     ? SerialLine::LineConfig::Parity::Odd
                             : SerialLine::LineConfig::Parity::Even;
-    c.stop      = f.bits - 1u - f.data_bits - (f.parity ? 1u : 0u) == 2u
+    c.stop      = f.bits - UartBitsBeforeStop(f.data_bits, f.parity) == 2u
                       ? SerialLine::LineConfig::Stop::Two
                       : SerialLine::LineConfig::Stop::One;
     return c;

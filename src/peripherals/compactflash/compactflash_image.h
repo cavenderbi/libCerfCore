@@ -15,6 +15,7 @@ public:
 
     bool     IsOpen() const { return file_.IsOpen(); }
     uint64_t TotalSectors() const { return total_sectors_; }
+    bool     Identity(host_platform::HostFileIdentity& identity) const { return file_.Identity(identity); }
 
     bool ReadSector(uint64_t lba, uint8_t* out);
     bool WriteSector(uint64_t lba, const uint8_t* in);

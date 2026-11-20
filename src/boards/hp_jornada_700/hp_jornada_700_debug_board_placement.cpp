@@ -17,6 +17,8 @@ public:
     }
 
     uint32_t BasePa() const override { return 0x1A000000u; }
+    uint32_t Cd1284RegisterShift() const override { return 2u; }
+    uint32_t PostLatchOffset() const override { return 0x400u; }
 };
 
 }

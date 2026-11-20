@@ -7,9 +7,12 @@ namespace cerfcore {
 
 namespace {
 
-class NecVrc4171aMemWindow : public IsaExcaMemWindow<NecVrc4171a, NecVrc4171aBoard, 0x04000000u> {
+class NecVrc4171aMemWindow : public IsaExcaMemWindow<NecVrc4171a, 0x04000000u> {
 public:
     using IsaExcaMemWindow::IsaExcaMemWindow;
+
+protected:
+    uint32_t AreaBase() override { return emu_.Get<NecVrc4171aBoard>().IsaMemBase(); }
 };
 
 }

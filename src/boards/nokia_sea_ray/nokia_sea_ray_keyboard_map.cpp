@@ -9,11 +9,14 @@ namespace cerfcore {
 
 namespace {
 
+constexpr char kF20Label[] = "F20";
+constexpr char kF19Label[] = "F19";
+
 const std::vector<KeyBinding> kBindings = {
-    { 0x75, 0x0000, nullptr, 0, 0 },
-    { 0x76, 0x0001, nullptr, 0, 0 },
-    { 0x77, 0x0002, "F20",  0, 0 },
-    { 0x78, 0x0004, "F19",  0, 0 },
+    { 0x75, 0x0000, nullptr,   0, 0 },
+    { 0x76, 0x0001, nullptr,   0, 0 },
+    { 0x77, 0x0002, kF20Label, 0, 0 },
+    { 0x78, 0x0004, kF19Label, 0, 0 },
 };
 
 class NokiaSeaRayKeyboardMap : public KeyboardMap {

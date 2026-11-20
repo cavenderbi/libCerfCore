@@ -13,7 +13,11 @@ struct UartDecodedFrame {
 };
 
 bool     UartParityBit(SerialLine::LineConfig::Parity parity, uint8_t data, uint8_t data_bits);
+uint32_t UartBitsBeforeStop(uint32_t data_bits, bool parity);
+uint32_t UartFrameBits(uint32_t data_bits, bool parity, uint32_t stop_bits);
+uint32_t UartBitsBeforeStop(const SerialLine::LineConfig& format);
 uint32_t UartFrameBits(const SerialLine::LineConfig& format);
+double   UartCharBitTimes(const SerialLine::LineConfig& format);
 uint32_t UartFrameLevels(const SerialLine::LineConfig& format, uint8_t data);
 
 UartDecodedFrame DecodeUartFrame(const SerialLine::LineConfig& sent, uint8_t data,

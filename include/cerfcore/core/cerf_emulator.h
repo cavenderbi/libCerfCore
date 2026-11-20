@@ -13,8 +13,8 @@ namespace cerfcore {
 
 class Fatal;
 
-class CerfEmulator : public servicelocator::ServiceLocator<CerfEmulator, 2048> {
-    using Locator = servicelocator::ServiceLocator<CerfEmulator, 2048>;
+class CerfEmulator : public servicelocator::ServiceLocator<CerfEmulator, 4096> {
+    using Locator = servicelocator::ServiceLocator<CerfEmulator, 4096>;
 
 public:
     CerfEmulator(const CerfConfig& config, int argc, char** argv);
@@ -55,6 +55,8 @@ private:
 #define REGISTER_SERVICE(Type) SERVICELOCATOR_REGISTER(::cerfcore::CerfEmulator, Type)
 #define REGISTER_SERVICE_AS(Type, Base) \
     SERVICELOCATOR_REGISTER_AS(::cerfcore::CerfEmulator, Type, Base)
+#define REGISTER_SERVICE_AS_ALSO(Type, Base, ...) \
+    SERVICELOCATOR_REGISTER_AS_ALSO(::cerfcore::CerfEmulator, Type, Base, __VA_ARGS__)
 #define REGISTER_SERVICE_AS_FALLBACK(Type, Base) \
     SERVICELOCATOR_REGISTER_AS_FALLBACK(::cerfcore::CerfEmulator, Type, Base)
 

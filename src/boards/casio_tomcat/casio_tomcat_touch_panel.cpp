@@ -2,7 +2,6 @@
 #include "../../socs/vr41xx/vr41xx_piu_regs.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/core/fatal.h>
 #include <cerfcore/boards/board_context.h>
 #include "casio_tomcat_family_id.h"
 
@@ -13,7 +12,7 @@ namespace cerfcore {
 
 namespace {
 
-using cerf_vr41xx_piu_detail::kAdcmdTpx0;
+using cerf_vr41xx_piu_detail::kUndrivenPortSample;
 
 class CasioTomcatTouchPanel : public Vr41xxPiuPanel {
 public:
@@ -23,29 +22,17 @@ public:
         return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CasioTomcat;
     }
 
-    std::optional<uint16_t> ConvertCommandPort(uint16_t adcmd,
-                                               uint16_t /*pos_x*/,
-                                               uint16_t /*pos_y*/) override {
-        if (adcmd != kAdcmdTpx0) {
-            emu_.Get<Fatal>().Die("CasioTomcatTouchPanel: PIUCMDREG ADCMD=0x%X selects "
-                                  "an A/D port this board's panel does not drive", adcmd);
-        }
-        return std::nullopt;
-    }
-
     /* casio_cassiopeia_e55 touch.dll sub_14D05DC writes PIUCNTREG 14, 0x100, 0x200 and 4; none
        carries D5 PADSCANTYPE, which VR4111 UM 20.3.1 p426 defines as "0: Prohibit". */
-    std::optional<uint16_t> PressureSample() override { return std::nullopt; }
+    std::optional<uint16_t> PressureSample(bool) override { return std::nullopt; }
 
-    /* casio_cassiopeia_e55 touch.dll writes neither PIUASCNREG nor PIUAMSKREG. */
-    std::optional<uint16_t> AdPortScanSample(uint16_t port) override {
-        emu_.Get<Fatal>().Die("CasioTomcatTouchPanel: ADPortScan A/D port 0x%X this "
-                              "board does not drive", port);
-    }
+    uint16_t ReleasedPlateSample() override { return kUndrivenPortSample; }
+
+    std::optional<uint16_t> PortSample(uint16_t) override { return kUndrivenPortSample; }
 };
 
 }  /* namespace */
 
-REGISTER_SERVICE_AS(CasioTomcatTouchPanel, Vr41xxPiuPanel);
+REGISTER_SERVICE_AS_ALSO(CasioTomcatTouchPanel, Vr41xxPiuScreen, Vr41xxPiuPanel);
 
 }

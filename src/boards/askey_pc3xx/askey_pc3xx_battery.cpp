@@ -133,10 +133,9 @@ private:
        = telemetry charge a4 (sub_17F1EF4); zero deltas keep empty v13=210. */
     void BuildResponse() {
         for (auto& b : resp_) b = 0u;
-        int fill = battery_.ChargePercent();
-        if (fill < 0) fill = 0;
-        if (fill > 100) fill = 100;
-        const uint32_t a4  = kVEmpty + static_cast<uint32_t>(fill) * (kVFull - kVEmpty) / 100u;
+        const int      fill = battery_.ChargePercent();
+        const uint32_t a4   = kVEmpty + static_cast<uint32_t>(fill) * (kVFull - kVEmpty) /
+                                         static_cast<uint32_t>(Battery::kFullPercent);
         const uint32_t enc = a4 << 2;
         cerf::be::Put16(resp_ + 0, static_cast<uint16_t>(kVFull));
         cerf::be::Put16(resp_ + 4, static_cast<uint16_t>(enc & 0x7FFFu));

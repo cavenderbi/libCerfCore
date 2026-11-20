@@ -13,6 +13,9 @@ public:
     using Sh77xxTmu::Sh77xxTmu;
 
     bool ShouldRegister() override { return emu_.Get<BoardContext>().GetSocId() == SocId::Sh7709; }
+
+protected:
+    bool StandbyInitializesFlags() const override { return false; }
 };
 
 }

@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include <cerfcore/boards/board_context.h>
+#include "../../socs/vr4101/vr4101_id.h"
 #include "../../socs/vr4102/vr4102_id.h"
 #include "../../socs/vr4111/vr4111_id.h"
 #include "../../socs/vr4121/vr4121_id.h"
@@ -60,8 +61,8 @@ public:
 
     bool ShouldRegister() override {
         const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
-        return soc == SocId::Vr4102 || soc == SocId::Vr4111 || soc == SocId::Vr4121 ||
-               soc == SocId::Vr4122 || soc == SocId::Vr5500;
+        return soc == SocId::Vr4101 || soc == SocId::Vr4102 || soc == SocId::Vr4111 ||
+               soc == SocId::Vr4121 || soc == SocId::Vr4122 || soc == SocId::Vr5500;
     }
 
     void OnReady() override {
@@ -103,12 +104,14 @@ public:
             d.write_context = ops_;
         }
         if (rd == cerfengine::MipsCp0::kStatus) {
-            d.write_mask = config_->StatusWritable();
-            d.zero_only  = config_->StatusZeroOnly();
+            d.write_mask  = config_->StatusWritable();
+            d.fixed_mask  = config_->StatusFixed().mask;
+            d.fixed_value = config_->StatusFixed().value;
         }
         if (rd == cerfengine::MipsCp0::kConfig) {
-            d.write_mask = config_->ConfigWritable();
-            d.zero_only  = config_->ConfigZeroOnly();
+            d.write_mask  = config_->ConfigWritable();
+            d.fixed_mask  = config_->ConfigFixed().mask;
+            d.fixed_value = config_->ConfigFixed().value;
         }
         if (rd == cerfengine::MipsCp0::kCause) {
             d.write_mask = kMipsCauseSoftwareIp;

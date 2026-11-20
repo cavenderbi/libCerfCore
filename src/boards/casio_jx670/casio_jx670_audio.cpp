@@ -1,13 +1,13 @@
 #include "casio_jx670_audio.h"
 
 #include "casio_jx670_capture.h"
+#include "casio_jx670_dma_block.h"
 #include "casio_jx670_rate_ladder.h"
 #include "casio_jx670_speaker.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
-#include "../../host/paced_wave_out.h"
 #include <cerfcore/host/audio_format.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
@@ -30,6 +30,7 @@ void CasioJx670Audio::Init(CerfEmulator& emu,
     speaker_ = &emu.Get<CasioJx670Speaker>();
     mic_     = &emu.Get<CasioJx670Capture>();
     ladder_  = &emu.Get<CasioJx670RateLadder>();
+    dma_block_ = &emu.Get<CasioJx670DmaBlock>();
 }
 
 void CasioJx670Audio::OnResetLine() {
@@ -300,6 +301,8 @@ void CasioJx670Audio::QueueDescriptor(uint32_t start_index) {
     uint32_t start_va = 0;
     uint32_t end_va = 0;
     uint32_t frame_bytes = 0;
+    uint32_t rate_hz = 0;
+    uint16_t channels = 0;
     bool     capture = false;
     bool     dry = false;
     {
@@ -308,6 +311,8 @@ void CasioJx670Audio::QueueDescriptor(uint32_t start_index) {
         start_va = desc_[start_index];
         end_va = desc_[start_index + 1u];
         frame_bytes = FrameBytes();
+        rate_hz = rate_hz_;
+        channels = channels_;
         capture = capture_;
         dry = ran_dry_;
     }
@@ -315,17 +320,7 @@ void CasioJx670Audio::QueueDescriptor(uint32_t start_index) {
         emu_->Get<Fatal>().Die("EM-500 audio: DMA descriptor 0x%08X..0x%08X queued after the "
                                "stream ran dry; not modeled", start_va, end_va);
     }
-    const uint64_t span = static_cast<uint64_t>(end_va) -
-                          static_cast<uint64_t>(start_va) + 1ull;
-    if (end_va < start_va || span > PacedWaveOut::kMaxBlock) {
-        emu_->Get<Fatal>().Die("EM-500 audio DMA descriptor 0x%08X..0x%08X is not a block of "
-                               "at most %u bytes", start_va, end_va, PacedWaveOut::kMaxBlock);
-    }
-    const uint32_t length = static_cast<uint32_t>(span);
-    if (length % frame_bytes != 0u) {
-        emu_->Get<Fatal>().Die("EM-500 audio: DMA descriptor 0x%08X..0x%08X is not a whole "
-                               "number of %u-byte frames", start_va, end_va, frame_bytes);
-    }
+    const uint32_t length = dma_block_->RequireBlock(start_va, end_va, rate_hz, channels, capture);
     {
         std::lock_guard<std::mutex> lk(mtx_);
         const uint64_t start = queued_ != 0u ? blocks_[queued_ - 1u].end

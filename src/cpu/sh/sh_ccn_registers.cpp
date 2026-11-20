@@ -41,6 +41,8 @@ public:
 
     void ReportOnlyWarmReset() override { cpu_->ReportResetKind(cerfengine::ShResetKind::kManual); }
 
+    bool CpuTookPowerOnReset() const override { return state_->expevt == cerfengine::kShPowerOnResetExpevt; }
+
     uint32_t MmioBase() const override { return kTraPa; }
     uint32_t MmioSize() const override { return kCcrPa - kTraPa; }
 

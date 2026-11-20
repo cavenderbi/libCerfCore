@@ -1,28 +1,22 @@
 #pragma once
 
-#include "../../peripherals/open_bus_window.h"
+#include "../dram_bank_open_bus.h"
 
 #include <cstdint>
 #include <string_view>
 
 namespace cerfcore {
 
-class Hp600DramBankOpenBus : public OpenBusWindow {
+class Hp600DramBankOpenBus : public DramBankOpenBus {
 public:
-    using OpenBusWindow::OpenBusWindow;
-
-    uint32_t MmioBase() const override;
-    uint32_t MmioSize() const override;
+    using DramBankOpenBus::DramBankOpenBus;
 
 protected:
-    virtual uint32_t         BankPaBase() const = 0;
     virtual std::string_view ProbingSocId() const = 0;
 
+    uint32_t         BankBytes() const override;
     std::string_view WindowBoardFamilyId() const override;
     bool             WindowOnBoard(const BoardContext& bd) const override;
-
-private:
-    uint32_t BackedBytes() const;
 };
 
 }

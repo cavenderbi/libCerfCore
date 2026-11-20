@@ -5,6 +5,7 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
+#include <cerfcore/core/log.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
 #include <cerfengine/sh/sh_cpu.h>
@@ -63,9 +64,9 @@ constexpr RegWindowModel WindowOf() {
 
 inline constexpr RegWindowModel kWindow = WindowOf();
 
-template <const std::string_view& Soc>
-class Sh77xxWdtBase : public RegWindowBase<Soc, kWindow, Sh77xxWdt> {
-    using Base = RegWindowBase<Soc, kWindow, Sh77xxWdt>;
+template <const std::string_view& Soc, bool kCountsAfterStandbyResume = true>
+class Sh77xxWdtBase : public RegWindowBase<Soc, kWindow, Sh77xxWdt, true> {
+    using Base = RegWindowBase<Soc, kWindow, Sh77xxWdt, true>;
 
 public:
     using Base::Base;
@@ -89,22 +90,29 @@ public:
     void WriteHalf(uint32_t addr, uint16_t value) override {
         const uint32_t reg = (addr - kBase) / 2u;
         const uint16_t key = reg == kWtcnt ? kWtcntKey : kWtcsrKey;
-        if ((value >> 8) != key) this->HaltUnsupportedAccess("WriteHalf without the register key", addr, value);
+        if ((value >> 8) != key) {
+            LOG(SocWdt, "Sh77xxWdt: write of 0x%04X at 0x%08X without the register key is not performed\n", value, addr);
+            return;
+        }
         if (count_ == Count::kStandbyExit) {
             this->emu_.template Get<Fatal>().Die("Sh77xxWdt: write of 0x%04X at 0x%08X while the WDT counts after a standby exit",
                                                  value, addr);
         }
         const uint16_t data = static_cast<uint16_t>(value & kData);
-        if (reg == kWtcsr && (data & kWtcsrIovf) != 0u) {
-            this->emu_.template Get<Fatal>().Die("Sh77xxWdt: WTCSR write of 0x%02X sets IOVF", data);
-        }
         if (Counting()) {
             WriteWhileCounting(addr, reg, data);
             DriveIti();
             return;
         }
         Base::WriteHalf(addr, data);
-        if (reg == kWtcsr && (data & kWtcsrTme) != 0u) StartTimer(this->StoredReg(kWtcnt));
+        if (reg == kWtcnt) settling_count_ran_ = false;
+        if (reg == kWtcsr && (data & kWtcsrTme) != 0u) {
+            if (settling_count_ran_) {
+                this->emu_.template Get<Fatal>().Die(
+                    "Sh77xxWdt: WTCSR write of 0x%02X starts the timer from the WTCNT of a clock settling count", data);
+            }
+            StartTimer(this->StoredReg(kWtcnt));
+        }
         DriveIti();
     }
 
@@ -113,7 +121,11 @@ public:
             this->emu_.template Get<Fatal>().Die("Sh77xxWdt: a standby exit while WTCSR 0x%02X has TME set",
                                                  this->StoredReg(kWtcsr));
         }
-        StartCount(Count::kStandbyExit, 0u);
+        if constexpr (kCountsAfterStandbyResume) {
+            StartCount(Count::kStandbyExit, 0u);
+        } else {
+            settling_count_ran_ = true;
+        }
     }
 
     void StopStandbyCount() override {
@@ -125,6 +137,7 @@ public:
         if (frqcr_ != nullptr) pclk_.Save(w);
         w.Write("count_kind", static_cast<uint8_t>(count_));
         w.Write("live_count", count_ == Count::kNone ? uint16_t{0u} : CurrentCount());
+        w.Write("settling_count_ran", settling_count_ran_);
     }
 
     void RestoreState(StateReader& r) override {
@@ -134,6 +147,7 @@ public:
         r.Read("count_kind", count);
         count_ = static_cast<Count>(count);
         r.Read("live_count", restored_count_);
+        r.Read("settling_count_ran", settling_count_ran_);
     }
 
     void PostRestore() override {
@@ -207,13 +221,20 @@ private:
     }
 
     void OnFrequencyChange(uint16_t from, uint16_t to) {
-        if (count_ == Count::kNone || from == to) return;
-        this->emu_.template Get<Fatal>().Die("Sh77xxWdt: FRQCR changed from 0x%04X to 0x%04X while the WDT counts", from,
-                                             to);
+        if (from == to) return;
+        if (count_ != Count::kNone) {
+            this->emu_.template Get<Fatal>().Die("Sh77xxWdt: FRQCR changed from 0x%04X to 0x%04X while the WDT counts",
+                                                 from, to);
+        }
+        if (((from ^ to) & kSh77xxFrqcrPllCircuit1) != 0u && !this->emu_.template Get<GuestCpuReset>().Delivering()) {
+            settling_count_ran_ = true;
+        }
     }
 
     void OnReset(ResetLineKind kind) {
-        if (count_ == Count::kStandbyExit || kind == ResetLineKind::Rtc) Disarm();
+        const bool power_on = this->IsPowerOnReset(kind);
+        if (count_ == Count::kStandbyExit || power_on) Disarm();
+        if (power_on) settling_count_ran_ = false;
     }
 
     void OnCountEnd() {
@@ -229,14 +250,11 @@ private:
             DriveIti();
             return;
         }
-        if ((csr & kWtcsrRsts) == 0u) {
-            this->emu_.template Get<Fatal>().Die(
-                "Sh77xxWdt: WTCNT overflow in watchdog timer mode selects a power-on reset (WTCSR 0x%02X)", csr);
-        }
         this->SetStoredReg(kWtcsr, static_cast<uint16_t>(csr | kWtcsrWovf));
         counter_.Anchor(EndTick(), 0u);
         Arm();
-        cpu_->SetPendingResetKind(cerfengine::ShResetKind::kManual);
+        cpu_->SetPendingResetKind((csr & kWtcsrRsts) != 0u ? cerfengine::ShResetKind::kManual
+                                                           : cerfengine::ShResetKind::kPowerOn);
         this->emu_.template Get<GuestCpuReset>().ResetWithLatchedCause(ResetLineKind::Watchdog);
     }
 
@@ -249,6 +267,7 @@ private:
     TickAnchoredCounter        counter_;
     uint16_t                   restored_count_ = 0u;
     Count                      count_          = Count::kNone;
+    bool                       settling_count_ran_ = false;
 };
 
 }

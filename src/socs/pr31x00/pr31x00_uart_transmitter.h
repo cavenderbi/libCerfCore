@@ -20,7 +20,8 @@ public:
     /* TMPR3911 Table 16.2.2 (page 16-3): UARTnTXINT "transmit holding register becomes empty",
        UARTnEMPTYINT, and UARTnDMAFULLINT / UARTnDMAHALFINT. */
     struct TxInts {
-        bool sent     = false;
+        bool sent      = false;
+        bool hold_free = false;
         bool dma_half = false;
         bool dma_full = false;
     };
@@ -35,6 +36,7 @@ public:
     uint32_t Attach(uint32_t dma_port, DeliverFn deliver, TxIntFn raise_ints);
 
     void WriteHold(uint32_t port, uint8_t byte);
+    void WriteBreakControl(uint32_t port, uint32_t value, bool ends_break);
     void StartDma(uint32_t port);
     void CancelDma(uint32_t port);
     void SetClockRunning(uint32_t port, bool running);

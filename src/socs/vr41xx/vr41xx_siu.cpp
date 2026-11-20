@@ -66,12 +66,13 @@ void Vr41xxSiu::DeliverTx(uint8_t byte) {
     if (TransmitsOnTxd()) EmitDebugTx(byte);
 }
 
-bool Vr41xxSiu::TransmitsOnTxd() {
-    return (irsel_.load(std::memory_order_acquire) & kIrselSirsel) == 0u &&
-           clocks_.load(std::memory_order_acquire) == kSiuClocks;
-}
+bool Vr41xxSiu::Rs232Routed() { return (irsel_.load(std::memory_order_acquire) & kIrselSirsel) == 0u; }
+
+bool Vr41xxSiu::TransmitsOnTxd() { return Rs232Routed() && clocks_.load(std::memory_order_acquire) == kSiuClocks; }
 
 bool Vr41xxSiu::ControlOutputsDriven() { return Rs232PinsLive(); }
+
+bool Vr41xxSiu::SerialOutputOnLine() { return Rs232Routed() && Rs232PinsLive(); }
 
 uint32_t Vr41xxSiu::ReadExtReg(uint32_t idx) {
     if (idx == kIrselIndex) return irsel_.load(std::memory_order_acquire);
@@ -81,6 +82,7 @@ uint32_t Vr41xxSiu::ReadExtReg(uint32_t idx) {
 void Vr41xxSiu::WriteExtReg(uint32_t idx, uint32_t value) {
     if (idx == kIrselIndex) {
         irsel_.store(static_cast<uint8_t>(value & kIrselWritable), std::memory_order_release);
+        Port().NotifyControlLines();
         return;
     }
     WriteChipExtReg(idx, value);
@@ -148,8 +150,10 @@ void Vr41xxSiu::ApplyModemInputs() {
 
 void Vr41xxSiu::ApplyModemInputsLocked() {
     const bool powered = SupplyOn();
-    Uart16550::SetModemInputs(powered && connector_cts_, powered && connector_dsr_, false,
-                              DcdLevel());
+    const bool cts     = powered && connector_cts_;
+    const bool dsr     = powered && connector_dsr_;
+    if (emu_.Get<GuestCpuReset>().Delivering()) Uart16550::LoadModemInputs(cts, dsr, false, DcdLevel());
+    else                                        Uart16550::SetModemInputs(cts, dsr, false, DcdLevel());
 }
 
 }

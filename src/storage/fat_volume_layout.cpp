@@ -2,6 +2,7 @@
 
 #include <cerfcore/core/byte_order.h>
 
+#include <chrono>
 #include <cstring>
 
 namespace cerfcore {
@@ -44,6 +45,20 @@ void WriteBpb(uint8_t* bs, const Bpb& b) {
     cerf::le::Put32(bs + kBpbTotSec32, b.total_sectors32);
 }
 
+namespace {
+
+void WriteVolumeInfo(uint8_t* info, const VolumeInfo& v) {
+    info[kVolDrvNum]  = v.drive_number;
+    info[kVolBootSig] = kExtBootSignature;
+    cerf::le::Put32(info + kVolId, v.volume_id);
+    std::memcpy(info + kVolLab, v.volume_label, 11);
+    std::memcpy(info + kVolFilSysType, v.fs_type, 8);
+}
+
+}
+
+void WriteFat16VolumeInfo(uint8_t* bs, const VolumeInfo& v) { WriteVolumeInfo(bs + kBs16VolumeInfo, v); }
+
 void WriteFat32Extension(uint8_t* bs, const Fat32Extension& e) {
     cerf::le::Put32(bs + kBpb32FatSz32, e.fat_size32);
     cerf::le::Put16(bs + kBpb32ExtFlags, 0);
@@ -51,11 +66,14 @@ void WriteFat32Extension(uint8_t* bs, const Fat32Extension& e) {
     cerf::le::Put32(bs + kBpb32RootClus, e.root_cluster);
     cerf::le::Put16(bs + kBpb32FsInfo, e.fsinfo_sector);
     cerf::le::Put16(bs + kBpb32BkBootSec, e.backup_boot_sector);
-    bs[kBs32DrvNum] = e.drive_number;
-    bs[kBs32BootSig] = e.boot_signature;
-    cerf::le::Put32(bs + kBs32VolId, e.volume_id);
-    if (e.volume_label) std::memcpy(bs + kBs32VolLab, e.volume_label, 11);
-    if (e.fs_type) std::memcpy(bs + kBs32FilSysType, e.fs_type, 8);
+    WriteVolumeInfo(bs + kBs32VolumeInfo, e.volume);
+}
+
+uint32_t NewVolumeId() {
+    const uint64_t us = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+                                                  std::chrono::system_clock::now().time_since_epoch())
+                                                  .count());
+    return static_cast<uint32_t>(us) ^ static_cast<uint32_t>(us >> 32);
 }
 
 void WriteFsInfo(uint8_t* fsi, uint32_t free_count, uint32_t next_free) {

@@ -1,4 +1,4 @@
-#include "../vr41xx/vr41xx_cmu.h"
+#include "../vr41xx/vr41xx_cmu_window.h"
 #include "../reg_window_impl.h"
 
 #include <cstdint>
@@ -9,7 +9,6 @@ namespace cerfcore {
 namespace {
 
 using cerf_reg_window_detail::ReadKind;
-using cerf_reg_window_detail::RegWindowBase;
 using cerf_reg_window_detail::RegWindowModel;
 using cerf_reg_window_detail::WriteKind;
 
@@ -27,13 +26,9 @@ constexpr RegWindowModel kModel = {
     },
 };
 
-class Vr4102Cmu : public RegWindowBase<SocId::Vr4102, kModel, Vr41xxCmu> {
+class Vr4102Cmu : public Vr41xxCmuWindow<SocId::Vr4102, kModel> {
 public:
-    using RegWindowBase::RegWindowBase;
-
-protected:
-    uint16_t ClockMask() const override { return StoredReg(0); }
-    void BeforeStore(uint32_t, uint16_t value) override { ClockMaskWriting(value); }
+    using Vr41xxCmuWindow::Vr41xxCmuWindow;
 };
 
 }

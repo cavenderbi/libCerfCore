@@ -34,7 +34,7 @@ void Wm97xxCodec::OnReady() {
 void Wm97xxCodec::SetPenPosition(uint16_t raw_x, uint16_t raw_y) { pens_.Track(raw_x, raw_y); }
 
 void Wm97xxCodec::QueuePenEdge(bool down) {
-    pens_.Queue(HostPenInput::Pen{down ? HostPenInput::kPenDown : HostPenInput::kPenUp, 0, 0});
+    pens_.QueueEdge(down, 0, 0);
 }
 
 uint16_t Wm97xxCodec::RawX() const { return static_cast<uint16_t>(pens_.Latest().x); }

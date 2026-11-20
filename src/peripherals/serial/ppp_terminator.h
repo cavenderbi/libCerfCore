@@ -25,6 +25,7 @@ public:
     void Stop();    /* carrier down / hangup: remove RX callback, reset state */
 
     void OnGuestData(const uint8_t* data, size_t n);   /* online-mode guest TX */
+    void OnGuestBreak();
     void SetRts(bool on);                              /* guest RTS flow control */
 
 private:

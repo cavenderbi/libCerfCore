@@ -4,7 +4,6 @@
 
 namespace cerfcore {
 
-class CerfEmulator;
 class GuestCycleClock;
 class StateReader;
 class StateWriter;
@@ -13,8 +12,6 @@ class Vr41xxRtcxTicks;
 class Vr41xxPiuScanTiming {
 public:
     static constexpr uint16_t kIdle = 0, kData = 1, kCmd = 2, kAdPort = 3;
-
-    explicit Vr41xxPiuScanTiming(CerfEmulator& emu) : emu_(emu) {}
 
     void Attach(GuestCycleClock* clock, Vr41xxRtcxTicks* rtcx);
 
@@ -26,14 +23,18 @@ public:
     uint16_t Kind() const { return kind_; }
     uint64_t ReadyAt() const { return ready_cycle_; }
 
+    uint64_t DataScanCycles(uint16_t stable) const;
+    uint64_t SettleCycles(uint16_t stable) const;
+    uint64_t AdPortScanCycles() const;
+
     void Save(StateWriter& w, uint64_t now) const;
     void Restore(StateReader& r, uint64_t now);
 
 private:
     uint64_t ReadyCycle(uint16_t kind, uint16_t stable, uint64_t start_tick, uint64_t start_cycle);
     void     SetReady(uint64_t cycle);
+    uint64_t TicksToCycles(uint64_t ticks) const;
 
-    CerfEmulator&    emu_;
     GuestCycleClock* clock_       = nullptr;
     Vr41xxRtcxTicks* rtcx_        = nullptr;
     uint16_t         kind_        = kIdle;

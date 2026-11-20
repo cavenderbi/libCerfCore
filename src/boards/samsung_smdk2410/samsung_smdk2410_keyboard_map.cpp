@@ -11,6 +11,20 @@ namespace cerfcore {
 
 namespace {
 
+constexpr char kLeftSoftKeyLabel[]  = "LSK";
+constexpr char kRightSoftKeyLabel[] = "RSK";
+constexpr char kDialLabel[]         = "Dial";
+constexpr char kHangLabel[]         = "Hang";
+constexpr char kVolumeUpLabel[]     = "Vol+";
+constexpr char kVolumeDownLabel[]   = "Vol-";
+constexpr char kStarLabel[]         = "*";
+constexpr char kHashLabel[]         = "#";
+constexpr char kApp1Label[]         = "App 1";
+constexpr char kApp2Label[]         = "App 2";
+constexpr char kApp3Label[]         = "App 3";
+constexpr char kApp4Label[]         = "App 4";
+constexpr char kFnLabel[]           = "Fn";
+
 /* device_code = guest_vk << 8 | scancode; inverse of the matrix scancode->VK
    table at 0x014D7140 in devemu_wm5 kbdmouse.dll, highest scancode 0x6F
    declared at 0x014D7124, layout descriptor published by Matrix 0x014D1A90
@@ -85,17 +99,17 @@ const std::vector<KeyBinding> kBindings = {
     { 0xA3, 0x1119, nullptr, 0, 0 },
     { 0xA4, 0x1201, nullptr, 0, 0 },
     { 0xA5, 0x1201, nullptr, 0, 0 },
-    { 0x70, kSmdk2410FnChord | 0x7031, "LSK",  0, 0 },
-    { 0x71, kSmdk2410FnChord | 0x7139, "RSK",  0, 0 },
-    { 0x72, kSmdk2410FnChord | 0x722F, "Dial", 0, 0 },
-    { 0x73, kSmdk2410FnChord | 0x7337, "Hang", 0, 0 },
-    { 0x75, kSmdk2410FnChord | 0x7547, "Vol+", 0, 0 },
-    { 0x76, kSmdk2410FnChord | 0x764F, "Vol-", 0, 0 },
-    { 0x77, kSmdk2410FnChord | 0x7757, "*",    0, 0 },
-    { 0x78, kSmdk2410FnChord | 0x7841, "#",    0, 0 },
-    { 0x71, 0xC265, "App 2", kSmdk2410WinLayer, 0 },
-    { 0x72, 0xC366, "App 3", kSmdk2410WinLayer, 0 },
-    { 0x73, 0xC467, "App 4", kSmdk2410WinLayer, 0 },
+    { 0x70, kSmdk2410FnChord | 0x7031, kLeftSoftKeyLabel,  0, 0 },
+    { 0x71, kSmdk2410FnChord | 0x7139, kRightSoftKeyLabel, 0, 0 },
+    { 0x72, kSmdk2410FnChord | 0x722F, kDialLabel,         0, 0 },
+    { 0x73, kSmdk2410FnChord | 0x7337, kHangLabel,         0, 0 },
+    { 0x75, kSmdk2410FnChord | 0x7547, kVolumeUpLabel,     0, 0 },
+    { 0x76, kSmdk2410FnChord | 0x764F, kVolumeDownLabel,   0, 0 },
+    { 0x77, kSmdk2410FnChord | 0x7757, kStarLabel,         0, 0 },
+    { 0x78, kSmdk2410FnChord | 0x7841, kHashLabel,         0, 0 },
+    { 0x71, 0xC265, kApp2Label, kSmdk2410WinLayer, 0 },
+    { 0x72, 0xC366, kApp3Label, kSmdk2410WinLayer, 0 },
+    { 0x73, 0xC467, kApp4Label, kSmdk2410WinLayer, 0 },
 };
 
 class SamsungSmdk2410KeyboardMap : public KeyboardMap {
@@ -110,8 +124,8 @@ public:
     void OnReady() override {
         const auto& fn = emu_.Get<SamsungSmdk2410FnKey>();
         bindings_ = kBindings;
-        bindings_.push_back({ 0x74, 0xC100u | fn.Scancode(), "Fn", 0, 0 });
-        if (fn.HasApp1Key()) bindings_.push_back({ 0x70, 0xC164, "App 1", kSmdk2410WinLayer, 0 });
+        bindings_.push_back({ 0x74, 0xC100u | fn.Scancode(), kFnLabel, 0, 0 });
+        if (fn.HasApp1Key()) bindings_.push_back({ 0x70, 0xC164, kApp1Label, kSmdk2410WinLayer, 0 });
     }
 
     const std::vector<KeyBinding>& Bindings() const override { return bindings_; }

@@ -21,8 +21,16 @@ public:
     std::string       ObjectName() const override { return kObjectName; }
     MachineObjectKind ObjectKind() const override { return MachineObjectKind::kBattery; }
 
+    static constexpr int kFullPercent = 100;
+
+    static bool ChargingAt(bool on_external_power, int percent) {
+        return on_external_power && percent < kFullPercent;
+    }
+
     int  ChargePercent() const;
     bool OnBattery() const;
+    bool OnExternalPower() const;
+    bool Charging() const;
     void SetChargePercent(int percent);
     void SetOnBattery(bool on_battery);
 
@@ -39,7 +47,7 @@ private:
     mutable std::mutex    mtx_;
     CallbackList<>        on_change_;
     bool                  on_battery_     = false;
-    int                   charge_percent_ = 100;
+    int                   charge_percent_ = kFullPercent;
 };
 
 }

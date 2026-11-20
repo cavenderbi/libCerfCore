@@ -79,17 +79,17 @@ struct RegAccessNames {
 
 inline constexpr RegAccessNames kByteAccessNames{
     "ReadByte", "WriteByte", "ReadByte of bits the Other-resets row leaves Undefined",
-    "WriteByte sets an unmodeled trigger bit", "WriteByte sets a write-0 RFU bit"};
+    "WriteByte sets an unmodeled trigger bit", "WriteByte sets a bit outside the writable mask"};
 
 inline constexpr RegAccessNames kHalfAccessNames{
     "ReadHalf", "WriteHalf", "ReadHalf of bits the Other-resets row leaves Undefined",
-    "WriteHalf sets an unmodeled trigger bit", "WriteHalf sets a write-0 RFU bit"};
+    "WriteHalf sets an unmodeled trigger bit", "WriteHalf sets a bit outside the writable mask"};
 
 inline constexpr RegAccessNames kWordAccessNames{
     "ReadWord", "WriteWord", "ReadWord of bits the Other-resets row leaves Undefined",
-    "WriteWord sets an unmodeled trigger bit", "WriteWord sets a write-0 RFU bit"};
+    "WriteWord sets an unmodeled trigger bit", "WriteWord sets a bit outside the writable mask"};
 
-template <const RegWindowModel& M, class Base = Peripheral, class Lock = NoLock>
+template <const RegWindowModel& M, class Base = Peripheral, class Lock = NoLock, bool kPinResetOnly = true>
 class RegWindow : public Base {
 public:
     using Base::Base;
@@ -99,7 +99,7 @@ public:
         this->emu_.template Get<PeripheralDispatcher>().Register(this);
         this->emu_.template Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
             std::lock_guard<Lock> lk(lock_);
-            ResetRegisterFile(kind == ResetLineKind::Rtc);
+            ResetRegisterFile(IsPowerOnReset(kind));
             AfterReset();
         });
     }
@@ -202,12 +202,20 @@ protected:
         (void)rtc;
         return M.reg[i].reset;
     }
+    bool IsPowerOnReset(ResetLineKind kind) {
+        if constexpr (kPinResetOnly) return kind == ResetLineKind::Rtc;
+        else return this->emu_.template Get<GuestCpuReset>().PowerOnReset(kind);
+    }
     virtual void AfterReset() {}
     virtual void BeforeStore(uint32_t i, uint16_t value) {
         (void)i;
         (void)value;
     }
     virtual void AfterStore(uint32_t i) { (void)i; }
+    virtual void BeforeClear(uint32_t i, uint16_t value) {
+        (void)i;
+        (void)value;
+    }
     virtual uint16_t SampleRegister(uint32_t i, uint32_t addr) {
         (void)i;
         this->HaltUnsupportedAccess(kNames.read, addr, 0);
@@ -305,6 +313,7 @@ private:
                 AfterStore(i);
                 return;
             case WriteKind::kClear:
+                BeforeClear(i, static_cast<uint16_t>(value & M.reg[i].wmask));
                 reg_[i] = static_cast<uint16_t>(reg_[i] & ~(value & M.reg[i].wmask & guest.lanes));
                 return;
             case WriteKind::kDrop:
@@ -339,10 +348,10 @@ private:
     uint16_t undefined_[kMaxRegs] = {};
 };
 
-template <const std::string_view& Soc, const RegWindowModel& M, class Base = Peripheral>
-class RegWindowBase : public RegWindow<M, Base> {
+template <const std::string_view& Soc, const RegWindowModel& M, class Base = Peripheral, bool kPinResetOnly = false>
+class RegWindowBase : public RegWindow<M, Base, NoLock, kPinResetOnly> {
 public:
-    using RegWindow<M, Base>::RegWindow;
+    using RegWindow<M, Base, NoLock, kPinResetOnly>::RegWindow;
 
     bool ShouldRegister() override {
         return this->emu_.template Get<BoardContext>().GetSocId() == Soc;

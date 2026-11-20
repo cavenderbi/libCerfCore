@@ -33,6 +33,7 @@ public:
     void OnReady() override;
 
     void OnGuestTx(const uint8_t* data, size_t n) override;
+    void OnBreak(bool on) override;
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;

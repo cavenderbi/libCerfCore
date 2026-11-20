@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cerfcore/peripherals/peripheral_base.h>
+#include "../../peripherals/key_matrix_cells.h"
 
 #include <cstdint>
 #include <mutex>
@@ -82,7 +83,10 @@ private:
        a new scan is initiated only once all keys are released. */
     bool imkp_latched_ = false;
 
-    uint8_t matrix_col_rows_[8] = {};
+    static constexpr uint32_t kMatrixColumns    = 8u;
+    static constexpr uint32_t kAllMatrixColumns = (1u << kMatrixColumns) - 1u;
+
+    KeyMatrixCells<kMatrixColumns> matrix_;
 };
 
 }

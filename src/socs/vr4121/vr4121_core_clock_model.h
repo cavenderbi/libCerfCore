@@ -5,6 +5,7 @@
 namespace cerfcore {
 
 inline constexpr Vr41xxCoreClockModel kVr4121CoreClock{
+    kVr41xxClkxHz,
     64u,
     4u,
     {{15u, 12u, 0x060Du}, {13u, 12u, 0x060Du}, {12u, 12u, 0x060Du}, {10u, 16u, 0x041Du},

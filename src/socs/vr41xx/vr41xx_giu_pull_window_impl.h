@@ -4,7 +4,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/peripherals/peripheral_base.h>
 #include "../../peripherals/peripheral_dispatcher.h"
-#include "vr41xx_giu.h"
+#include "vr41xx_port_giu.h"
 
 #include <cstdint>
 #include <string_view>
@@ -24,7 +24,7 @@ public:
     bool ShouldRegister() override { return emu_.Get<BoardContext>().GetSocId() == Soc; }
 
     void OnReady() override {
-        giu_ = &emu_.Get<Vr41xxGiu>();
+        giu_ = &emu_.Get<Vr41xxPortGiu>();
         emu_.Get<PeripheralDispatcher>().Register(this);
     }
 
@@ -37,7 +37,7 @@ public:
     }
 
 private:
-    Vr41xxGiu* giu_ = nullptr;
+    Vr41xxPortGiu* giu_ = nullptr;
 };
 
 }

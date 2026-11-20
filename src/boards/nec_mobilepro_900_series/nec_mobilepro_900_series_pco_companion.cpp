@@ -162,6 +162,10 @@ void NecMobilepro900SeriesPcoCompanion::OnGuestTx(const uint8_t* data, size_t n)
     for (size_t i = 0; i < n; ++i) OnBtuartTx(data[i]);
 }
 
+void NecMobilepro900SeriesPcoCompanion::OnBreak(bool on) {
+    emu_.Get<Fatal>().Die("[PCO] break %s on the BTUART: not modelled", on ? "on" : "off");
+}
+
 /* Microchip DS30292D (PIC16F87X) Table 12-6 (page 126): RCSTA after an MCLR Reset is
    0000 000x, SPEN clear. */
 void NecMobilepro900SeriesPcoCompanion::OnBtuartTx(uint8_t b) {

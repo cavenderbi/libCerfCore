@@ -18,6 +18,7 @@ constexpr uint8_t  kNoCapturedSample = 0u;
 constexpr size_t   kMicFifoBytes     = 65536u;
 constexpr uint16_t kChannels         = 1u;
 constexpr uint16_t kBitsPerSample    = 16u;
+constexpr uint32_t kSampleBytes      = kBitsPerSample / 8u;
 
 }
 
@@ -41,14 +42,8 @@ void CasioJx670Capture::Request(uint32_t rate_hz) {
 void CasioJx670Capture::Clear() { mic_.Clear(); }
 
 void CasioJx670Capture::WriteBlock(uint32_t va, uint32_t length) {
-    const uint32_t       slots = length / kFrameBytes;
-    std::vector<uint8_t> pcm(static_cast<size_t>(slots) * 2u);
-    const bool           heard = mic_.Take(pcm.data(), pcm.size()) != 0u;
     std::vector<uint8_t> block(length, kNoCapturedSample);
-    for (uint32_t i = 0; i < slots; ++i) {
-        block[i * kFrameBytes]      = pcm[i * 2u];
-        block[i * kFrameBytes + 1u] = pcm[i * 2u + 1u];
-    }
+    const bool heard = mic_.TakeIntoSlots(block.data(), length / kFrameBytes, kSampleBytes, kFrameBytes) != 0u;
     mem_->CopyIn(cerfengine::MipsSeg::UnmappedPa(va), block.data(), length);
     if (heard) activity_->MarkRx();
 }

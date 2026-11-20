@@ -64,6 +64,14 @@ bool HostFile::Size(uint64_t& size) const {
     return true;
 }
 
+bool HostFile::Identity(HostFileIdentity& identity) const {
+    BY_HANDLE_FILE_INFORMATION info{};
+    if (!GetFileInformationByHandle(static_cast<HANDLE>(handle_), &info)) return false;
+    identity.volume = info.dwVolumeSerialNumber;
+    identity.file   = (static_cast<uint64_t>(info.nFileIndexHigh) << 32) | info.nFileIndexLow;
+    return true;
+}
+
 bool HostFile::SeekTo(uint64_t offset) {
     LARGE_INTEGER li;
     li.QuadPart = static_cast<LONGLONG>(offset);

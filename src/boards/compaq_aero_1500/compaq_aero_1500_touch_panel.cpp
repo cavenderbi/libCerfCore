@@ -3,7 +3,6 @@
 #include "../../socs/vr41xx/vr41xx_piu_regs.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/core/fatal.h>
 #include <cerfcore/boards/board_context.h>
 #include "compaq_aero_1500_battery.h"
 #include "compaq_aero_1500_family_id.h"
@@ -18,6 +17,7 @@ namespace {
 using cerf_vr41xx_piu_detail::kAdcmdAdin0;
 using cerf_vr41xx_piu_detail::kAdcmdAdin1;
 using cerf_vr41xx_piu_detail::kAdcmdAdin2;
+using cerf_vr41xx_piu_detail::kUndrivenPortSample;
 
 constexpr int      kAdin0CurrentSelectGpio = 35;
 constexpr uint16_t kAdin1Reference         = 387u;
@@ -36,9 +36,8 @@ public:
         battery_ = &emu_.Get<CompaqAero1500Battery>();
     }
 
-    std::optional<uint16_t> ConvertCommandPort(uint16_t adcmd, uint16_t pos_x,
-                                               uint16_t pos_y) override {
-        switch (adcmd) {
+    std::optional<uint16_t> PortSample(uint16_t port) override {
+        switch (port) {
             case kAdcmdAdin0:
                 return giu_->OutputDrive(kAdin0CurrentSelectGpio) == PinDrive::kHigh
                            ? battery_->ChargeCurrentWord()
@@ -48,16 +47,13 @@ public:
             case kAdcmdAdin2:
                 return kBackupCellWord;
             default:
-                emu_.Get<Fatal>().Die("CompaqAero1500TouchPanel: PIUCMDREG ADCMD=0x%X command "
-                                      "scan (pen %u,%u)", adcmd, pos_x, pos_y);
+                return kUndrivenPortSample;
         }
     }
 
-    std::optional<uint16_t> PressureSample() override { return std::nullopt; }
+    std::optional<uint16_t> PressureSample(bool) override { return std::nullopt; }
 
-    std::optional<uint16_t> AdPortScanSample(uint16_t port) override {
-        emu_.Get<Fatal>().Die("CompaqAero1500TouchPanel: ADPortScan A/D port 0x%X", port);
-    }
+    uint16_t ReleasedPlateSample() override { return kUndrivenPortSample; }
 
 private:
     Vr41xxGiu*             giu_     = nullptr;
@@ -66,6 +62,6 @@ private:
 
 }
 
-REGISTER_SERVICE_AS(CompaqAero1500TouchPanel, Vr41xxPiuPanel);
+REGISTER_SERVICE_AS_ALSO(CompaqAero1500TouchPanel, Vr41xxPiuScreen, Vr41xxPiuPanel);
 
 }

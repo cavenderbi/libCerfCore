@@ -2,7 +2,6 @@
 
 #include "pci1225_legacy_port.h"
 #include "ti_cardbus_board.h"
-#include "../pcmcia/pcmcia_host_cycles.h"
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
@@ -52,7 +51,6 @@ constexpr uint8_t kIfsBvd1          = 0x01u;
 
 constexpr uint32_t kExCaWindowBase   = 0x800u;
 constexpr uint32_t kExCaLastOffset   = 0x44u;
-constexpr uint32_t kZoomVideoCardLines = 0xFu << 22;
 
 }
 
@@ -65,7 +63,8 @@ Pci1225SocketFunction::Pci1225SocketFunction(CerfEmulator& emu, uint8_t function
       sequencer_(sequencer),
       slot_(emu, *this, slot),
       exca_(kExcaRules),
-      config_(function, shared) {}
+      config_(function, shared),
+      cycles_(emu, mtx, config_, exca_, socket_regs_, slot_) {}
 
 void Pci1225SocketFunction::Attach(TiCardbusBoard& board, Pci1225SocketFunction& peer, Pci1225LegacyPort* legacy) {
     board_ = &board;
@@ -107,12 +106,12 @@ void Pci1225SocketFunction::ConfigWrite(uint32_t reg, uint32_t value) {
 }
 
 bool Pci1225SocketFunction::MemClaims(uint32_t addr) const {
-    return SocketBarHit(addr) || CardMemHit(addr);
+    return SocketBarHit(addr) || cycles_.MemHit(addr);
 }
 
 uint32_t Pci1225SocketFunction::MemRead(uint32_t addr, unsigned size) {
-    if (CardMemHit(addr))
-        return CardMemRead(addr, size);
+    if (cycles_.MemHit(addr))
+        return cycles_.MemRead(addr, size);
     uint32_t off = 0u;
     {
         std::lock_guard<std::mutex> lk(mtx_);
@@ -124,8 +123,8 @@ uint32_t Pci1225SocketFunction::MemRead(uint32_t addr, unsigned size) {
 }
 
 void Pci1225SocketFunction::MemWrite(uint32_t addr, uint32_t value, unsigned size) {
-    if (CardMemHit(addr)) {
-        CardMemWrite(addr, value, size);
+    if (cycles_.MemHit(addr)) {
+        cycles_.MemWrite(addr, value, size);
         return;
     }
     uint32_t off = 0u;
@@ -146,9 +145,7 @@ bool Pci1225SocketFunction::LegacyClaimLocked(uint32_t pci_io) const {
 
 bool Pci1225SocketFunction::IoClaims(uint32_t pci_io) const {
     std::lock_guard<std::mutex> lk(mtx_);
-    uint32_t card = 0u;
-    PcmciaIoWidth width = PcmciaIoWidth::kEightBit;
-    return LegacyClaimLocked(pci_io) || (config_.IoSpaceEnabled() && exca_.MapIo(pci_io, &card, &width));
+    return LegacyClaimLocked(pci_io) || cycles_.IoMappedLocked(pci_io);
 }
 
 uint32_t Pci1225SocketFunction::IoRead(uint32_t pci_io, unsigned size) {
@@ -159,11 +156,7 @@ uint32_t Pci1225SocketFunction::IoRead(uint32_t pci_io, unsigned size) {
     }
     if (legacy)
         return legacy_->Read(pci_io, size);
-    uint32_t card = 0u;
-    PcmciaIoWidth width = PcmciaIoWidth::kEightBit;
-    MapClaimedIo(pci_io, &card, &width);
-    RequireIoCycleOrder("I/O read", pci_io, card, width, size);
-    return ReadCardIo(slot_, card, width, size);
+    return cycles_.IoRead(pci_io, size);
 }
 
 void Pci1225SocketFunction::IoWrite(uint32_t pci_io, uint32_t value, unsigned size) {
@@ -176,11 +169,7 @@ void Pci1225SocketFunction::IoWrite(uint32_t pci_io, uint32_t value, unsigned si
         legacy_->Write(pci_io, value, size);
         return;
     }
-    uint32_t card = 0u;
-    PcmciaIoWidth width = PcmciaIoWidth::kEightBit;
-    MapClaimedIo(pci_io, &card, &width);
-    RequireIoCycleOrder("I/O write", pci_io, card, width, size);
-    WriteCardIo(slot_, card, width, size, value);
+    cycles_.IoWrite(pci_io, value, size);
 }
 
 void Pci1225SocketFunction::OnCardDetectChanged(PcmciaSlot&) {
@@ -269,70 +258,6 @@ bool Pci1225SocketFunction::SocketBarHit(uint32_t addr) const {
     return config_.MemorySpaceEnabled() && config_.SocketBarDecodes(addr);
 }
 
-bool Pci1225SocketFunction::CardMemHit(uint32_t addr) const {
-    std::lock_guard<std::mutex> lk(mtx_);
-    uint32_t card = 0u;
-    bool attr = false;
-    bool wr = false;
-    bool sixteen = false;
-    return config_.MemorySpaceEnabled() && exca_.MapMem(addr, &card, &attr, &wr, &sixteen);
-}
-
-void Pci1225SocketFunction::MapClaimedMem(uint32_t addr, uint32_t* card, bool* attr, bool* wr, bool* sixteen) {
-    std::lock_guard<std::mutex> lk(mtx_);
-    exca_.MapMem(addr, card, attr, wr, sixteen);
-    if (config_.ReducedZoomVideo())
-        *card &= ~kZoomVideoCardLines;
-    config_.NoteSocketActivity();
-    socket_regs_.NoteSocketAccess();
-}
-
-void Pci1225SocketFunction::MapClaimedIo(uint32_t pci_io, uint32_t* card, PcmciaIoWidth* width) {
-    std::lock_guard<std::mutex> lk(mtx_);
-    exca_.MapIo(pci_io, card, width);
-    config_.NoteSocketActivity();
-    socket_regs_.NoteSocketAccess();
-}
-
-uint32_t Pci1225SocketFunction::CardMemRead(uint32_t addr, unsigned size) {
-    uint32_t card = 0u;
-    bool attr = false;
-    bool wr = false;
-    bool sixteen = false;
-    MapClaimedMem(addr, &card, &attr, &wr, &sixteen);
-    const unsigned cycles = MemoryCardCycles(sixteen, size);
-    if (cycles > 1u)
-        RefuseCycleOrder("memory read", addr, size, cycles);
-    return ReadCardMemory(slot_, card, attr, sixteen, size);
-}
-
-void Pci1225SocketFunction::CardMemWrite(uint32_t addr, uint32_t value, unsigned size) {
-    uint32_t card = 0u;
-    bool attr = false;
-    bool wr = false;
-    bool sixteen = false;
-    MapClaimedMem(addr, &card, &attr, &wr, &sixteen);
-    if (!wr)
-        return;
-    const unsigned cycles = MemoryCardCycles(sixteen, size);
-    if (cycles > 1u)
-        RefuseCycleOrder("memory write", addr, size, cycles);
-    WriteCardMemory(slot_, card, attr, sixteen, size, value);
-}
-
-void Pci1225SocketFunction::RequireIoCycleOrder(const char* access, uint32_t pci_io, uint32_t card,
-                                                PcmciaIoWidth width, unsigned size) {
-    const unsigned cycles = IoCardCycles(slot_, card, width, size);
-    if (cycles > 1u && !(size == 2u && width == PcmciaIoWidth::kCardIois16))
-        RefuseCycleOrder(access, pci_io, size, cycles);
-}
-
-void Pci1225SocketFunction::RefuseCycleOrder(const char* access, uint32_t addr, unsigned size, unsigned cycles) {
-    emu_.Get<Fatal>().Die("PCI1225 function %u: %u-byte %s at 0x%08X needs %u card cycles; SCPS035B gives "
-                          "the cycle order only for an IOIS16#-sized I/O byte pair",
-                          config_.Function(), size, access, addr, cycles);
-}
-
 void Pci1225SocketFunction::RefuseExCa(const char* access, uint32_t idx) {
     emu_.Get<Fatal>().Die("PCI1225 function %u: ExCA %s at offset 0x%02X, which SCPS035B Table 43 lists as reserved",
                           config_.Function(), access, idx);
@@ -387,6 +312,12 @@ void Pci1225SocketFunction::WriteSocketControl(uint32_t value) {
 void Pci1225SocketFunction::SetReadyIreqLow(bool low) {
     std::lock_guard<std::mutex> lk(mtx_);
     exca_.SetReadyIreqLow(low);
+    UpdateLineLocked(false);
+}
+
+void Pci1225SocketFunction::OnStatusChange(PcmciaSlot&, bool low) {
+    std::lock_guard<std::mutex> lk(mtx_);
+    exca_.SetStatusChangeLow(low);
     UpdateLineLocked(false);
 }
 

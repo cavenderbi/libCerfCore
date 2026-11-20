@@ -57,13 +57,6 @@ struct DbFeatureSupport {
     bool        supported;
 };
 
-struct DbGaPalette {
-    std::string           id;
-    std::string           name;
-    uint32_t              bpp;
-    std::vector<uint32_t> colors;
-};
-
 struct DbBoardConfigParam {
     std::string                  id;
     std::string                  name;
@@ -119,9 +112,6 @@ public:
         return ga_video_driver_names_;
     }
 
-    std::span<const DbGaPalette> GaPalettes() const { return ga_palettes_; }
-    const DbGaPalette*           DefaultGaPalette(uint32_t bpp) const;
-
     const DbBoardConfigParam* FindBoardConfigParam(std::string_view id) const;
 
     const DbBoard*       FindBoard(std::string_view id) const;
@@ -138,7 +128,6 @@ private:
     std::vector<DbBoard>         boards_;
     std::string              ga_shared_folder_mount_point_;
     std::vector<std::string> ga_video_driver_names_;
-    std::vector<DbGaPalette> ga_palettes_;
     std::vector<DbBoardConfigParam> board_config_params_;
 };
 

@@ -24,7 +24,8 @@ uint32_t Pr31x00UartModemLines::Attach(const Pr31x00SerialModem* modem, ControlF
     ch_[port]->on_control = std::move(on_control);
     ++count_;
     if (!modem) return port;
-    ch_[port]->modem = *modem;
+    ch_[port]->modem   = *modem;
+    ch_[port]->powered = PoweredLocked(*ch_[port]);
     auto& io = emu_.Get<Pr31x00Io>();
     io.RegisterMfioOutObserver([this, port](const Pr31x00Pins& p) { OnOut(port, true, p.Low()); });
     io.RegisterIoOutObserver([this, port](const Pr31x00Pins& p) { OnOut(port, false, p.Low()); });
@@ -55,11 +56,12 @@ void Pr31x00UartModemLines::DriveInput(const Pr31x00SerialPin& p, bool asserted)
     else                                        io.DriveIoInput(pin, !asserted);
 }
 
-void Pr31x00UartModemLines::Control(uint32_t port, bool& dtr, bool& rts) const {
+void Pr31x00UartModemLines::Control(uint32_t port, bool& dtr, bool& rts, bool& powered) const {
     const Channel& c = Ch(port);
     std::lock_guard<std::mutex> lk(c.mu);
-    dtr = c.dtr;
-    rts = c.rts;
+    dtr     = c.dtr;
+    rts     = c.rts;
+    powered = c.powered;
 }
 
 bool Pr31x00UartModemLines::AssertedLocked(const Channel& c, const Pr31x00SerialPin& p) {
@@ -68,17 +70,23 @@ bool Pr31x00UartModemLines::AssertedLocked(const Channel& c, const Pr31x00Serial
     return (low & (1u << p.pin)) != 0u;
 }
 
+bool Pr31x00UartModemLines::PoweredLocked(const Channel& c) {
+    return !c.modem.power.Wired() || AssertedLocked(c, c.modem.power);
+}
+
 void Pr31x00UartModemLines::OnOut(uint32_t port, bool mfio, uint32_t low) {
     Channel& c = Ch(port);
     bool     dtr, rts;
     {
         std::lock_guard<std::mutex> lk(c.mu);
         (mfio ? c.mfio_low : c.io_low) = low;
-        dtr = AssertedLocked(c, c.modem.dtr);
-        rts = AssertedLocked(c, c.modem.rts);
-        if (dtr == c.dtr && rts == c.rts) return;
-        c.dtr = dtr;
-        c.rts = rts;
+        dtr                = AssertedLocked(c, c.modem.dtr);
+        rts                = AssertedLocked(c, c.modem.rts);
+        const bool powered = PoweredLocked(c);
+        if (dtr == c.dtr && rts == c.rts && powered == c.powered) return;
+        c.dtr     = dtr;
+        c.rts     = rts;
+        c.powered = powered;
     }
     c.on_control(dtr, rts);
 }
@@ -108,6 +116,7 @@ void Pr31x00UartModemLines::RestoreState(uint32_t port, StateReader& r) {
     uint8_t b = 0;
     r.Read("dtr", b); c.dtr = b != 0;
     r.Read("rts", b); c.rts = b != 0;
+    c.powered = PoweredLocked(c);
 }
 
 REGISTER_SERVICE(Pr31x00UartModemLines);

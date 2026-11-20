@@ -78,11 +78,10 @@ bool CompactFlashFat32Builder::Build(const std::string& out_path,
     ext.root_cluster = kRootClus;
     ext.fsinfo_sector = 1;
     ext.backup_boot_sector = 6;
-    ext.drive_number = 0x80;
-    ext.boot_signature = 0x29;
-    ext.volume_id = 0xCE5FCF01u;
-    ext.volume_label = "CERF CF    ";
-    ext.fs_type = "FAT32   ";
+    ext.volume = {.drive_number = 0x80,
+                  .volume_id    = fat_volume_layout::NewVolumeId(),
+                  .volume_label = "CERF CF    ",
+                  .fs_type      = "FAT32   "};
     fat_volume_layout::WriteFat32Extension(bs, ext);
     fat_volume_layout::WriteBootSignature(bs);
 

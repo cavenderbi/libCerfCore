@@ -54,9 +54,11 @@ public:
        MMIO spans (unlike BackedMemoryRegions): StaticWindowHole picks a band
        VA outside these, and a band VA inside an omitted MMIO span gets shadowed
        by the real peripheral mapping so the stub bytes are never served. */
-    virtual std::vector<DramRegion> MappedVaSpans() const = 0;
+    virtual std::vector<DramRegion> MappedVaSpans() const;
 
     virtual DramRegion EntryXipRomRegion() const;
+
+    virtual uint32_t UnmappedWindowVa(uint32_t pa, uint32_t size) const;
 
     /* True iff `va` lies inside any cached-DRAM band. Default impl
        walks CachedDramRegions(); SoC overrides not needed. */

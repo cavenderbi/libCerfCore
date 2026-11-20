@@ -16,6 +16,15 @@ namespace cerfcore {
 
 class MipsCoreClock;
 
+struct Vr41xxRtcModel {
+    uint32_t rtcl_min_cycle   = 5u;
+    bool     rtcl_pair_commit = true;
+    bool     time_pair_commit = true;
+    uint32_t ecmp_start_ticks = 0u;
+};
+
+inline constexpr Vr41xxRtcModel kVr41xxRtcModel{};
+
 /* NEC VR41xx RTC, VR4102 UM ch.16 == VR4111 UM ch.17 == VR4121 UM ch.17 (VR4102 Table 16-1,
    VR4111 Table 17-1 p372, VR4121 Table 17-1); RTC1 block 0x0B0000C0, RTC2 block 0x0B0001C0. */
 class Vr41xxRtc : public Peripheral {
@@ -42,10 +51,18 @@ public:
     void RestoreState(StateReader& r) override;
     void PostRestore() override;
 
-private:
-    static constexpr uint64_t kMask48    = 0xFFFFFFFFFFFFull;
-    static constexpr uint32_t kMask24    = 0x00FFFFFFu;
-    static constexpr uint32_t kMask25    = 0x01FFFFFFu;
+    virtual const Vr41xxRtcModel& Model() const { return kVr41xxRtcModel; }
+
+    enum : uint32_t {
+        kEtimeL = 0x00, kEtimeM = 0x02, kEtimeH = 0x04,
+        kEcmpL  = 0x08, kEcmpM  = 0x0A, kEcmpH  = 0x0C,
+        kRtcl1L = 0x10, kRtcl1H = 0x12, kRtcl1CntL = 0x14, kRtcl1CntH = 0x16,
+        kRtcl2L = 0x18, kRtcl2H = 0x1A, kRtcl2CntL = 0x1C, kRtcl2CntH = 0x1E,
+    };
+    enum : uint32_t {
+        kTclkL = 0x00, kTclkH = 0x02, kTclkCntL = 0x04, kTclkCntH = 0x06,
+        kRtcIntReg = 0x1E,
+    };
 
     /* RTCINTREG D0-D3 latch bits (VR4102 UM 16.2.9 p353 == VR4111 UM 17.2.9 p389 ==
        VR4121 UM 17.2.9 p437); each comment names the ICU direct source it routes to
@@ -54,6 +71,11 @@ private:
     static constexpr uint16_t kIntLong1   = 1u << 1;    /* RTCINTR1 -> SYSINT1 D2 (RTCL1INTR)  */
     static constexpr uint16_t kIntLong2   = 1u << 2;    /* RTCINTR2 -> SYSINT2 D0 (RTCL2INTR)  */
     static constexpr uint16_t kIntTclk    = 1u << 3;    /* RTCINTR3 -> SYSINT2 D3 (TCLKINTR)   */
+
+private:
+    static constexpr uint64_t kMask48    = 0xFFFFFFFFFFFFull;
+    static constexpr uint32_t kMask24    = 0x00FFFFFFu;
+    static constexpr uint32_t kMask25    = 0x01FFFFFFu;
 
     uint64_t RtcTicksLocked();
     uint64_t TclkCyclesLocked() const;
@@ -92,6 +114,7 @@ private:
     uint64_t ecmp_         = 0;
     bool     ecmp_armed_   = false;
     uint64_t ecmp_match_   = 0;
+    uint64_t ecmp_start_   = 0;
 
     uint32_t rtcl1_reload_      = 0;
     uint32_t rtcl2_reload_      = 0;

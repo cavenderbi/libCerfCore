@@ -76,6 +76,14 @@ bool HostFile::Size(uint64_t& size) const {
     return true;
 }
 
+bool HostFile::Identity(HostFileIdentity& identity) const {
+    struct stat st {};
+    if (::fstat(DescriptorOf(handle_).Fd(), &st) != 0) return false;
+    identity.volume = static_cast<uint64_t>(st.st_dev);
+    identity.file   = static_cast<uint64_t>(st.st_ino);
+    return true;
+}
+
 bool HostFile::SeekTo(uint64_t offset) {
     return ::lseek(DescriptorOf(handle_).Fd(), static_cast<off_t>(offset), SEEK_SET) >= 0;
 }

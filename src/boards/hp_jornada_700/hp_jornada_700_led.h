@@ -27,13 +27,17 @@ public:
 private:
     class Button final : public MachineButton {
     public:
-        explicit Button(HpJornada700Led& owner) : owner_(owner) {}
+        Button(HpJornada700Led& owner, CerfEmulator& emu) : MachineButton(emu), owner_(owner) {}
         std::string ObjectId() const override { return "button"; }
         static constexpr char kObjectName[] = "Notification button";
         std::string ObjectName() const override { return kObjectName; }
-        void        Press() override { owner_.PressButton(); }
 
     private:
+        bool Pressed() override {
+            owner_.PressButton();
+            return true;
+        }
+
         HpJornada700Led& owner_;
     };
 
@@ -42,7 +46,7 @@ private:
 
     mutable std::mutex state_mutex_;
     State              state_ = State::Off;
-    Button             button_{*this};
+    Button             button_{*this, emu_};
 };
 
 }

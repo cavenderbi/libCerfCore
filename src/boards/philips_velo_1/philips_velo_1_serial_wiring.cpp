@@ -38,6 +38,7 @@ public:
         m.rts   = Pr31x00SerialPin::OnMfio(31);
         m.dcd   = Pr31x00SerialPin::OnIo(4);
         m.dtr   = Pr31x00SerialPin::OnIo(3);
+        m.power = Pr31x00SerialPin::OnMfio(16);
         return m;
     }
 };

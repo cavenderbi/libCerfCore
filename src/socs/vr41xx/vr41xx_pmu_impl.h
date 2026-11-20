@@ -3,10 +3,12 @@
 #include "vr41xx_giu.h"
 #include "vr41xx_icu.h"
 #include "vr41xx_pmu.h"
+#include "vr41xx_rtcx_deadline.h"
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
+#include <cerfcore/core/log.h>
 #include <cerfcore/host/guest_deep_sleep.h>
 #include "../../execution/engine_bridge.h"
 #include "../../peripherals/peripheral_dispatcher.h"
@@ -29,8 +31,11 @@ constexpr uint32_t kOffInt2Reg = 0x04u;
 constexpr uint32_t kOffCnt2Reg = 0x06u;
 constexpr uint32_t kOffWaitReg = 0x08u;
 
-constexpr uint16_t kIntRtcIntr = 0x0200u;
-constexpr uint16_t kIntDcdSt   = 0x0400u;
+constexpr uint16_t kIntRtcIntr    = 0x0200u;
+constexpr uint16_t kIntDcdSt      = 0x0400u;
+constexpr uint16_t kIntTimoutRst  = 0x0020u;
+constexpr uint16_t kCntHalTimerRst = 0x0004u;
+constexpr uint64_t kHalTimerTicks = 4u * Vr41xxRtcxTicks::kHz;
 
 constexpr uint16_t kIntPowerSwIntr   = 0x0001u;
 constexpr uint16_t kSysint1PowerIntr = 0x0002u;
@@ -40,19 +45,19 @@ constexpr uint16_t kSysint1PowerIntr = 0x0002u;
 constexpr uint16_t kCntHeldOnReset = 0xFF00u;
 
 struct Vr41xxPmuModel {
-    uint32_t base;
-    uint32_t size;
-    uint16_t int_w1c;
-    uint16_t int_sw_rw;
-    uint16_t int_power_on;
-    uint16_t cnt_writable;
-    uint16_t cnt_fixed_read;
-    uint16_t cnt_power_on;
-    uint16_t wait_wmask;
-    uint16_t wait_power_on;
-    uint16_t int_warm_cause;
-    uint16_t int_cold_cause;
-    uint16_t int_power_wake;
+    uint32_t base           = 0;
+    uint32_t size           = 0;
+    uint16_t int_w1c        = 0;
+    uint16_t int_sw_rw      = 0;
+    uint16_t int_power_on   = 0;
+    uint16_t cnt_writable   = 0;
+    uint16_t cnt_fixed_read = 0;
+    uint16_t cnt_power_on   = 0;
+    uint16_t wait_wmask     = 0;
+    uint16_t wait_power_on  = 0;
+    uint16_t int_warm_cause = 0;
+    uint16_t int_cold_cause = 0;
+    uint16_t int_power_wake = 0;
     uint16_t cnt_write_zero = 0;
     uint16_t cnt_write_one  = 0;
     /* VR4131 UM 12.2.1 p225, PMUINTREG "After reset", Note 1: "Holds the value before
@@ -60,15 +65,18 @@ struct Vr41xxPmuModel {
     uint16_t int_held_on_reset  = 0xFFFFu;
     uint16_t int_watchdog_cause = 0;
     bool     power_holds_wake_factors = false;
+    uint16_t cnt_held_on_reset = kCntHeldOnReset;
+    bool     second_pair       = true;
+    bool     dcd_wake_level    = false;
 };
 
 struct Vr41xxPmu2Model {
-    uint16_t int2_w1c;
-    uint16_t int2_write_zero;
-    uint16_t cnt2_writable;
-    uint16_t cnt2_write_zero;
-    uint16_t cnt2_held_on_reset;
-    uint16_t cnt2_soft_reset;
+    uint16_t int2_w1c           = 0;
+    uint16_t int2_write_zero    = 0;
+    uint16_t cnt2_writable      = 0;
+    uint16_t cnt2_write_zero    = 0;
+    uint16_t cnt2_held_on_reset = 0;
+    uint16_t cnt2_soft_reset    = 0;
 };
 
 template <const std::string_view& Soc, const Vr41xxPmuModel& M, const Vr41xxPmu2Model& M2>
@@ -83,9 +91,12 @@ public:
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);
         emu_.Get<GuestCpuReset>().SetCauseLatch(this);
+        hal_timer_.Attach([this] { ExpireHalTimer(); });
+        hal_timer_.Start(kHalTimerTicks);
         auto& sleep = emu_.Get<GuestDeepSleep>();
         sleep.RegisterWaker(this);
         sleep.RegisterSleepEntryListener([this] {
+            hal_timer_.Stop();
             wake_pending_.store(false, std::memory_order_release);
             hibernating_.store(true, std::memory_order_release);
         });
@@ -103,6 +114,7 @@ public:
             });
         }
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
+            hal_timer_.Start(kHalTimerTicks);
             hibernating_.store(false, std::memory_order_release);
             wake_pending_.store(false, std::memory_order_release);
             const uint16_t cause = pending_cause_.exchange(0u, std::memory_order_acq_rel);
@@ -116,8 +128,8 @@ public:
                 if (!resume) int2reg_.store(0u, std::memory_order_release);
                 cnt2reg_.fetch_and(M2.cnt2_held_on_reset, std::memory_order_acq_rel);
                 PublishPowerIntrLocked();
-                const uint16_t held = cntreg_.load(std::memory_order_acquire) & kCntHeldOnReset;
-                cntreg_.store(static_cast<uint16_t>(held | (M.cnt_power_on & ~kCntHeldOnReset)),
+                const uint16_t held = cntreg_.load(std::memory_order_acquire) & M.cnt_held_on_reset;
+                cntreg_.store(static_cast<uint16_t>(held | (M.cnt_power_on & ~M.cnt_held_on_reset)),
                               std::memory_order_release);
                 return;
             }
@@ -167,7 +179,7 @@ public:
         if (prev == level || !hibernating_.load(std::memory_order_acquire)) return;
         if (PowerHoldsWakeFactors()) return;
         if (pin == Vr41xxGiu::kDcdPin) {
-            if (!level) wake_pending_.store(true, std::memory_order_release);
+            if (level == M.dcd_wake_level) wake_pending_.store(true, std::memory_order_release);
             return;
         }
         uint16_t cnt = 0;
@@ -205,10 +217,21 @@ public:
                 return static_cast<uint16_t>(
                     IntReg() | (emu_.Get<Vr41xxGiu>().GetPinLevel(Vr41xxGiu::kDcdPin) ? kIntDcdSt : 0u));
             case kOffCntReg: return cntreg_.load(std::memory_order_acquire);
-            case kOffInt2Reg: return int2reg_.load(std::memory_order_acquire);
-            case kOffCnt2Reg: return cnt2reg_.load(std::memory_order_acquire);
-            default: return ReadHalfExt(addr);
+            case kOffInt2Reg:
+                if constexpr (M.second_pair) {
+                    return int2reg_.load(std::memory_order_acquire);
+                } else {
+                    break;
+                }
+            case kOffCnt2Reg:
+                if constexpr (M.second_pair) {
+                    return cnt2reg_.load(std::memory_order_acquire);
+                } else {
+                    break;
+                }
+            default: break;
         }
+        return ReadHalfExt(addr);
     }
 
     void WriteHalf(uint32_t addr, uint16_t value) override {
@@ -227,28 +250,35 @@ public:
                 }
                 cntreg_.store(static_cast<uint16_t>((value & M.cnt_writable) | M.cnt_fixed_read),
                               std::memory_order_release);
+                if ((value & kCntHalTimerRst) != 0u) hal_timer_.Stop();
                 return;
             case kOffWaitReg:
                 if (M.wait_wmask == 0u) break;
                 waitreg_ = static_cast<uint16_t>(value & M.wait_wmask);
                 return;
             case kOffInt2Reg:
-                if ((value & M2.int2_write_zero) != 0u) {
-                    emu_.Get<Fatal>().Die("Vr41xxPmu: PMUINT2REG write 0x%04X breaks the "
-                                          "write-0 rule of its reserved bits", value);
+                if constexpr (M.second_pair) {
+                    if ((value & M2.int2_write_zero) != 0u) {
+                        emu_.Get<Fatal>().Die("Vr41xxPmu: PMUINT2REG write 0x%04X breaks the "
+                                              "write-0 rule of its reserved bits", value);
+                    }
+                    int2reg_.fetch_and(static_cast<uint16_t>(~(value & M2.int2_w1c)),
+                                       std::memory_order_acq_rel);
+                    return;
                 }
-                int2reg_.fetch_and(static_cast<uint16_t>(~(value & M2.int2_w1c)),
-                                   std::memory_order_acq_rel);
-                return;
+                break;
             case kOffCnt2Reg:
-                if ((value & M2.cnt2_write_zero) != 0u) {
-                    emu_.Get<Fatal>().Die("Vr41xxPmu: PMUCNT2REG write 0x%04X breaks the "
-                                          "write-0 rule of its reserved bits", value);
+                if constexpr (M.second_pair) {
+                    if ((value & M2.cnt2_write_zero) != 0u) {
+                        emu_.Get<Fatal>().Die("Vr41xxPmu: PMUCNT2REG write 0x%04X breaks the "
+                                              "write-0 rule of its reserved bits", value);
+                    }
+                    cnt2reg_.store(static_cast<uint16_t>(value & M2.cnt2_writable),
+                                   std::memory_order_release);
+                    if ((value & M2.cnt2_soft_reset) != 0u) emu_.Get<GuestCpuReset>().WarmReset();
+                    return;
                 }
-                cnt2reg_.store(static_cast<uint16_t>(value & M2.cnt2_writable),
-                               std::memory_order_release);
-                if ((value & M2.cnt2_soft_reset) != 0u) emu_.Get<GuestCpuReset>().WarmReset();
-                return;
+                break;
             default: break;
         }
         WriteHalfExt(addr, value);
@@ -266,6 +296,8 @@ public:
         w.Write("pending_cause", pending_cause_.load(std::memory_order_acquire));
         w.Write("int2reg", int2reg_.load(std::memory_order_acquire));
         w.Write("cnt2reg", cnt2reg_.load(std::memory_order_acquire));
+        w.Write<uint8_t>("hal_timer_running", hal_timer_.Running() ? 1u : 0u);
+        w.Write("hal_timer_elapsed", hal_timer_.Elapsed());
     }
 
     void RestoreState(StateReader& r) override {
@@ -288,13 +320,18 @@ public:
         }
         uint16_t cause = 0;
         r.Read("pending_cause", cause);
-        if ((cause & ~(M.int_warm_cause | M.int_cold_cause | M.int_watchdog_cause)) != 0u) {
+        if ((cause & ~(M.int_warm_cause | M.int_cold_cause | M.int_watchdog_cause | kIntTimoutRst)) != 0u) {
             r.Reject("Vr41xxPmu: pending reset cause 0x%04X is no reset's cause bits", cause);
         }
         pending_cause_.store(cause, std::memory_order_release);
         uint16_t int2 = 0, cnt2 = 0;
         r.Read("int2reg", int2);
         r.Read("cnt2reg", cnt2);
+        uint8_t  hal_running = 0;
+        uint64_t hal_elapsed = 0;
+        r.Read("hal_timer_running", hal_running);
+        r.Read("hal_timer_elapsed", hal_elapsed);
+        hal_timer_.Restore(hal_running != 0u, kHalTimerTicks, hal_elapsed);
         int2reg_.store(int2, std::memory_order_release);
         cnt2reg_.store(cnt2, std::memory_order_release);
         intreg_.store(v, std::memory_order_release);
@@ -311,6 +348,7 @@ public:
     }
 
     void PostRestore() override {
+        hal_timer_.Rearm();
         std::lock_guard<std::mutex> lk(power_mtx_);
         PublishPowerIntrLocked();
     }
@@ -345,6 +383,13 @@ protected:
 
     void LatchResetCause(uint16_t bits) {
         pending_cause_.fetch_or(bits, std::memory_order_acq_rel);
+    }
+
+    void ExpireHalTimer() {
+        if (emu_.Get<EngineBridge>().Guest().ResetPending()) return;
+        LOG(SocReset, "[VR41XX PMU] HAL timer expired with HALTIMERRST clear, shutdown\n");
+        LatchResetCause(kIntTimoutRst);
+        emu_.Get<GuestDeepSleep>().Enter();
     }
 
     void PublishPowerIntrLocked() {
@@ -401,6 +446,7 @@ protected:
     uint16_t              waitreg_ = M.wait_power_on;
     std::atomic<bool>     hibernating_{false};
     std::atomic<bool>     wake_pending_{false};
+    Vr41xxRtcxDeadline    hal_timer_{emu_};
 };
 
 }

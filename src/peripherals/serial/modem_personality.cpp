@@ -156,6 +156,11 @@ void ModemPersonality::OnDtrLoss() {
     else                 SetCarrier(false);
 }
 
+void ModemPersonality::OnBreak(bool on) {
+    if (!on || !data_mode_) return;
+    terminator_->OnGuestBreak();
+}
+
 void ModemPersonality::OnGuestTx(const uint8_t* data, size_t n) {
     if (!data_mode_) {
         for (size_t i = 0; i < n; ++i) HandleCommandByte(data[i]);
@@ -453,13 +458,15 @@ void ModemPersonality::SaveState(StateWriter& w) {
     w.Write("modem_dtr_mode", dtr_mode_);
     w.Write<uint8_t>("modem_prefix", static_cast<uint8_t>(prefix_));
     w.Write<uint8_t>("modem_line_overflow", line_overflow_ ? 1u : 0u);
+    w.Write<uint8_t>("modem_dtr", dtr_ ? 1u : 0u);
+    w.Write<uint8_t>("modem_rts", rts_ ? 1u : 0u);
     WriteText(w, "modem_line_count", "modem_line", line_);
     WriteText(w, "modem_last_body_count", "modem_last_body", last_body_);
 }
 
 void ModemPersonality::RestoreState(StateReader& r) {
     r.ReadBytes("modem_s_registers", s_.data(), s_.size());
-    uint8_t echo = 0u, quiet = 0u, verbose = 0u, prefix = 0u, overflow = 0u;
+    uint8_t echo = 0u, quiet = 0u, verbose = 0u, prefix = 0u, overflow = 0u, dtr = 0u, rts = 0u;
     r.Read("modem_echo", echo);
     r.Read("modem_quiet", quiet);
     r.Read("modem_verbose", verbose);
@@ -467,6 +474,10 @@ void ModemPersonality::RestoreState(StateReader& r) {
     r.Read("modem_dtr_mode", dtr_mode_);
     r.Read("modem_prefix", prefix);
     r.Read("modem_line_overflow", overflow);
+    r.Read("modem_dtr", dtr);
+    r.Read("modem_rts", rts);
+    dtr_ = dtr != 0u;
+    rts_ = rts != 0u;
     prefix_ = static_cast<Prefix>(prefix);
     ReadText(r, "modem_line_count", "modem_line", line_);
     ReadText(r, "modem_last_body_count", "modem_last_body", last_body_);

@@ -108,6 +108,7 @@ protected:
     virtual void DeliverTx(uint8_t byte);
 
     virtual bool ControlOutputsDriven();
+    virtual bool SerialOutputOnLine();
     void         LoadModemInputs(bool cts, bool dsr, bool ri, bool dcd);
 
 private:

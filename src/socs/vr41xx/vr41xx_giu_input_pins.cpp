@@ -13,16 +13,29 @@ uint32_t Vr41xxGiuInputPins::Established() const {
     return driven_ | static_cast<uint32_t>(useupdn_);
 }
 
-void Vr41xxGiuInputPins::Drive(int pin, bool level) {
-    const uint32_t bit = 1u << pin;
-    driven_ |= bit;
-    level_ = level ? (level_ | bit) : (level_ & ~bit);
+bool Vr41xxGiuInputPins::Level(int pin) const {
+    return ((Levels() >> pin) & 1u) != 0u;
 }
 
-void Vr41xxGiuInputPins::Release(int pin) {
-    const uint32_t bit = 1u << pin;
+uint32_t Vr41xxGiuInputPins::Merged(uint32_t driven_out, uint32_t outputs) const {
+    return (driven_out & outputs) | (Levels() & ~outputs);
+}
+
+Vr41xxGiuPinEdge Vr41xxGiuInputPins::Drive(int pin, bool level) {
+    const bool     prev = Level(pin);
+    const uint32_t bit  = 1u << pin;
+    driven_ |= bit;
+    level_ = level ? (level_ | bit) : (level_ & ~bit);
+    return {prev, level};
+}
+
+std::optional<Vr41xxGiuPinEdge> Vr41xxGiuInputPins::Release(int pin) {
+    const bool     prev = Level(pin);
+    const uint32_t bit  = 1u << pin;
     driven_ &= ~bit;
     level_  &= ~bit;
+    if ((Established() & bit) == 0u) return std::nullopt;
+    return Vr41xxGiuPinEdge{prev, Level(pin)};
 }
 
 void Vr41xxGiuInputPins::ResetPulls() {

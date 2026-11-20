@@ -32,8 +32,8 @@ constexpr RegWindowModel Window(uint16_t writable, uint16_t write_zero, bool dro
 }
 
 template <const std::string_view& Soc, const RegWindowModel& W>
-class Sh77xxFrqcrBase : public RegWindowBase<Soc, W, Sh77xxFrqcr> {
-    using Base = RegWindowBase<Soc, W, Sh77xxFrqcr>;
+class Sh77xxFrqcrBase : public RegWindowBase<Soc, W, Sh77xxFrqcr, true> {
+    using Base = RegWindowBase<Soc, W, Sh77xxFrqcr, true>;
 
 public:
     using Base::Base;
@@ -57,8 +57,9 @@ public:
 
 protected:
     void BeforeStore(uint32_t, uint16_t value) override {
-        if ((value & kCkoen) == 0u) {
-            this->emu_.template Get<Fatal>().Die("Sh77xxFrqcr: FRQCR write 0x%04X clears CKOEN", value);
+        if ((value & kCkoen) == 0u && this->emu_.template Get<Sh77xxCpg>().CkioPinAttached()) {
+            this->emu_.template Get<Fatal>().Die(
+                "Sh77xxFrqcr: FRQCR write 0x%04X clears CKOEN while a part runs from the CKIO pin", value);
         }
     }
 

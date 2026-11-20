@@ -1,7 +1,6 @@
 #include "../unmapped_window_page_table_builder.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfengine/mips/mips_mmu.h>
 #include <cerfcore/boards/board_context.h>
 #include "nec_sg2_vr5500_dram.h"
 #include "nec_sg2_vr5500_family_id.h"
@@ -13,9 +12,8 @@ namespace cerfcore {
 
 namespace {
 
-constexpr uint32_t kDramPaBase = NecSg2Vr5500Dram::kPaBase;
-constexpr uint32_t kDramSize   = NecSg2Vr5500Dram::kSize;
-constexpr uint32_t kDramVaBase = cerfengine::MipsSeg::kKusegEnd | kDramPaBase;
+constexpr UnmappedWindowDram kDram = UnmappedWindowPageTableBuilder::CachedWindowDram(
+    NecSg2Vr5500Dram::kPaBase, NecSg2Vr5500Dram::kSize, 0u, NecSg2Vr5500Dram::kSize);
 
 class NecSg2Vr5500PageTableBuilder : public UnmappedWindowPageTableBuilder {
 public:
@@ -27,15 +25,21 @@ public:
     }
 
     std::vector<DramRegion> CachedDramRegions() const override {
-        return { { kDramVaBase, kDramPaBase, kDramSize } };
+        std::vector<DramRegion> r;
+        kDram.AddCachedTo(r);
+        return r;
     }
 
     std::vector<BackedRegion> BackedMemoryRegions() const override {
-        return { { kDramVaBase, kDramPaBase, kDramSize, MemoryKind::kRam } };
+        std::vector<BackedRegion> r;
+        kDram.AddBackedTo(r);
+        return r;
     }
 
     std::vector<DramRegion> MappedVaSpans() const override {
-        return { { kDramVaBase, kDramPaBase, kDramSize } };
+        std::vector<DramRegion> r;
+        kDram.AddMappedTo(r);
+        return r;
     }
 };
 

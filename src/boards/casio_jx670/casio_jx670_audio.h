@@ -11,6 +11,7 @@
 namespace cerfcore {
 
 class CasioJx670Capture;
+class CasioJx670DmaBlock;
 class CasioJx670RateLadder;
 class CasioJx670Speaker;
 class CerfEmulator;
@@ -140,6 +141,7 @@ private:
     CasioJx670Speaker*          speaker_ = nullptr;
     CasioJx670Capture*          mic_     = nullptr;
     const CasioJx670RateLadder* ladder_  = nullptr;
+    const CasioJx670DmaBlock*   dma_block_ = nullptr;
 
     GuestCycleClock*        clock_ = nullptr;
     GuestCycleClock::Event* event_ = nullptr;

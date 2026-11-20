@@ -27,7 +27,7 @@ constexpr uint8_t kNoSource     = 0xFF;   /* sentinel (IIR_MS is 0x00) */
 
 constexpr uint8_t FCR_ENABLE = 0x01, FCR_RCVR_RESET = 0x02;
 
-constexpr uint8_t LCR_DLAB = 0x80;
+constexpr uint8_t LCR_BREAK = 0x40, LCR_DLAB = 0x80;
 
 constexpr uint8_t MCR_DTR = 0x01, MCR_RTS = 0x02, MCR_OUT1 = 0x04,
                   MCR_OUT2 = 0x08, MCR_LOOP = 0x10;
@@ -74,19 +74,24 @@ void Serial16550::DeliverTx(uint8_t byte) { port_.DeliverTx(&byte, 1, true); }
 
 bool Serial16550::ControlOutputsDriven() { return true; }
 
+bool Serial16550::SerialOutputOnLine() { return true; }
+
 void Serial16550::SetEndpoint(SerialEndpoint* endpoint) { port_.SetEndpoint(endpoint); }
 
 SerialControlLines Serial16550::ControlLines() {
     uint8_t mcr = 0;
+    uint8_t lcr = 0;
     {
         std::lock_guard<std::mutex> lk(mu_);
         mcr = mcr_;
+        lcr = lcr_;
     }
-    const bool asserted = (mcr & MCR_LOOP) == 0u && (mcr & (MCR_DTR | MCR_RTS)) != 0u &&
-                          ControlOutputsDriven();
+    const bool looped   = (mcr & MCR_LOOP) != 0u;
+    const bool asserted = !looped && (mcr & (MCR_DTR | MCR_RTS)) != 0u && ControlOutputsDriven();
     SerialControlLines lines;
-    lines.dtr = asserted && (mcr & MCR_DTR) != 0u;
-    lines.rts = asserted && (mcr & MCR_RTS) != 0u;
+    lines.dtr      = asserted && (mcr & MCR_DTR) != 0u;
+    lines.rts      = asserted && (mcr & MCR_RTS) != 0u;
+    lines.in_break = !looped && (lcr & LCR_BREAK) != 0u && SerialOutputOnLine();
     return lines;
 }
 
@@ -261,7 +266,7 @@ void Serial16550::WriteReg8(uint32_t offset, uint8_t value) {
                 /* THR write: byte goes out, THR re-empties -> THRE re-arms. */
                 thre_armed_ = true;
                 tx_byte = value;
-                if (mcr_ & MCR_LOOP) loop_tx = true; else do_tx = true;
+                if (mcr_ & MCR_LOOP) loop_tx = true; else do_tx = (lcr_ & LCR_BREAK) == 0u;
                 break;
             case kIerDlm:
                 if (lcr_ & LCR_DLAB) { dlm_ = value; line_changed = true; break; }
@@ -275,7 +280,11 @@ void Serial16550::WriteReg8(uint32_t offset, uint8_t value) {
                 fcr_ = value;
                 if (value & FCR_RCVR_RESET) { rx_.clear(); rx_pos_ = 0; }
                 break;
-            case kLcr: lcr_ = value; line_changed = true; break;
+            case kLcr:
+                notify_lines = ((lcr_ ^ value) & LCR_BREAK) != 0u;
+                lcr_         = value;
+                line_changed = true;
+                break;
             case kMcr: {
                 const uint8_t old = mcr_;
                 mcr_ = value & 0x1Fu;

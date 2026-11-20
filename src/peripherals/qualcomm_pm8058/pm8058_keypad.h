@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cerfcore/core/service.h>
+#include "../key_matrix_cells.h"
 
 #include <cstdint>
 #include <mutex>
@@ -52,7 +53,7 @@ private:
     uint8_t  ctrl_ = 0;
     uint8_t  scan_ = 0;
 
-    uint8_t  state_[kMaxDrive]       = {};
+    KeyMatrixCells<kMaxDrive> pressed_;
     uint8_t  latched_new_[kMaxDrive] = {};
     uint8_t  latched_old_[kMaxDrive] = {};
 

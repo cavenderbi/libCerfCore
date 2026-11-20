@@ -49,7 +49,7 @@ void PcmciaAutoInsert::InsertLaunchCompactFlash(PcmciaSlot& slot) {
     for (const auto& card : cfg.bundled_compact_flash_cards) {
         if (!card.insert_on_launch) continue;
 
-        const std::string path = GetDeviceDir(cfg.device_name) + card.file;
+        const std::string path = ResolveDeviceFile(cfg.device_name, card.file);
 
         if (!host_platform::HostPathExists(path)) {
             LOG(Caution, "PcmciaAutoInsert: launch CF '%s' missing at '%s'\n",

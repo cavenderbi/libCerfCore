@@ -42,9 +42,7 @@ bool Sa11xxUartRxLine::Push(uint32_t port, const uint8_t* data, size_t n) {
 
 /* §11.11.1.1 (printed 11-110): "the receiver only tests for one stop bit per frame". */
 UartRxLine::Frame Sa11xxUartRxLine::FrameOf(const Control& ctl) {
-    const uint64_t f   = FrameBits(ctl.utcr0);
-    const uint64_t one = f - ((ctl.utcr0 & kUtcr0Sbs) != 0u ? 1u : 0u);
-    return UartRxLine::Frame{2u * one - 1u, 2u * f};
+    return UartRxLine::FirstStopCentre(BitsBeforeStop(ctl.utcr0), FrameBits(ctl.utcr0));
 }
 
 void Sa11xxUartRxLine::RateOverflow(const Line& l) {
@@ -77,11 +75,10 @@ void Sa11xxUartRxLine::Receive(uint32_t port, const Control& ctl, const uint8_t*
         return;
     }
     GuestCycleClock::Rate bit{};
-    if (!l.owner->BitClock(ctl, bit)) {
-        l.rx.LogNoClock(n);
-        return;
+    const bool            clocked = l.owner->BitClock(ctl, bit);
+    if (l.rx.Admit(data, n, clocked, clock_->ClockRate(), bit, FrameOf(ctl), now) == UartRxLine::Intake::kOverflow) {
+        RateOverflow(l);
     }
-    if (!l.rx.Receive(data, n, clock_->ClockRate(), bit, FrameOf(ctl), now)) RateOverflow(l);
 }
 
 /* §11.11.5.6 (printed 11-117): "When LBM=1, ... control of the TXD3 and RXD3 pins is given to the
@@ -125,10 +122,9 @@ bool Sa11xxUartRxLine::Retime(uint32_t port, const Control& old_ctl, const Contr
     }
     GuestCycleClock::Rate bit{};
     if (!l.owner->BitClock(ctl, bit)) return l.rx.DropNoClock() || dropped;
-    const bool reframed = l.rx.Reframe(FrameOf(old_ctl), FrameOf(ctl));
-    bool       rerated  = false;
-    if (!l.rx.SetBitRate(clock_->ClockRate(), bit, now, rerated)) RateOverflow(l);
-    return dropped || reframed || rerated;
+    bool moved = false;
+    if (!l.rx.Retime(FrameOf(old_ctl), FrameOf(ctl), clock_->ClockRate(), bit, now, moved)) RateOverflow(l);
+    return dropped || moved;
 }
 
 void Sa11xxUartRxLine::Stop(uint32_t port) {

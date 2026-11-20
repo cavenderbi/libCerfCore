@@ -1,91 +1,54 @@
-#include "hp_600_key_matrix.h"
+#include "../sh77xx_port_key_matrix.h"
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/state/hibernation.h>
-#include "../../socs/sh77xx/sh77xx_intc.h"
 #include "../../socs/sh77xx/sh77xx_pfc.h"
-#include "../../socs/sh77xx/sh77xx_port_data.h"
 #include "hp_600_family_id.h"
 #include "hp_600_keyboard_layout.h"
 
 namespace cerfcore {
 
-REGISTER_SERVICE(Hp600KeyMatrix);
-
 namespace {
 
-struct RowPin {
-    uint32_t port;
-    uint32_t pin;
-};
+class Hp600KeyMatrix : public Sh77xxPortKeyMatrix {
+public:
+    using Sh77xxPortKeyMatrix::Sh77xxPortKeyMatrix;
 
-constexpr RowPin kRowPins[Hp600KeyMatrix::kRows] = {
-    {kSh77xxPortD, 1u}, {kSh77xxPortD, 5u}, {kSh77xxPortD, 7u}, {kSh77xxPortE, 0u},
-    {kSh77xxPortE, 1u}, {kSh77xxPortE, 3u}, {kSh77xxPortE, 6u}, {kSh77xxPortE, 7u},
-};
-
-constexpr uint32_t kPortFColumns = 8u;
-
-constexpr Sh77xxIntcPin SensePin(uint32_t column) {
-    return column < kPortFColumns
-               ? static_cast<Sh77xxIntcPin>(static_cast<uint32_t>(Sh77xxIntcPin::kPint8) + column)
-               : static_cast<Sh77xxIntcPin>(static_cast<uint32_t>(Sh77xxIntcPin::kPint0) + column - kPortFColumns);
-}
-
-}
-
-bool Hp600KeyMatrix::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
-}
-
-void Hp600KeyMatrix::OnReady() {
-    intc_ = &emu_.Get<Sh77xxIntc>();
-    for (uint16_t scanned : emu_.Get<Hp600KeyboardLayout>().ScannedColumns()) {
-        sense_columns_ = static_cast<uint16_t>(sense_columns_ | scanned);
+    bool ShouldRegister() override {
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
     }
-    emu_.Get<Hibernation>().RegisterPostRestoreListener([this] {
-        std::lock_guard<std::mutex> lk(mtx_);
-        for (uint16_t& row : pressed_) row = 0u;
-        PublishLocked();
-    });
-}
 
-void Hp600KeyMatrix::SetKey(uint32_t cell, bool down) {
-    const uint32_t row = cell / kColumns;
-    const uint16_t bit = static_cast<uint16_t>(1u << (cell % kColumns));
-    std::lock_guard<std::mutex> lk(mtx_);
-    pressed_[row] = down ? static_cast<uint16_t>(pressed_[row] | bit) : static_cast<uint16_t>(pressed_[row] & ~bit);
-    PublishLocked();
-}
+protected:
+    std::span<const PortPin, kRows> RowPins() const override { return kRowPins; }
 
-void Hp600KeyMatrix::SetColumnPull(uint16_t columns_low) {
-    std::lock_guard<std::mutex> lk(mtx_);
-    pulled_low_ = columns_low;
-    PublishLocked();
-}
+    std::span<const PortPin> ColumnPins() const override { return kColumnPins; }
 
-void Hp600KeyMatrix::TrackRows(const Sh77xxPortData& ports) {
-    uint8_t rows_low = 0u;
-    for (uint32_t row = 0; row < kRows; ++row) {
-        if (ports.Drive(kRowPins[row].port, kRowPins[row].pin) == PinDrive::kLow) {
-            rows_low = static_cast<uint8_t>(rows_low | (1u << row));
+    uint16_t SenseColumns() const override {
+        uint16_t columns = 0u;
+        for (uint16_t scanned : emu_.Get<Hp600KeyboardLayout>().ScannedColumns()) {
+            columns = static_cast<uint16_t>(columns | scanned);
         }
+        return columns;
     }
-    std::lock_guard<std::mutex> lk(mtx_);
-    rows_low_ = rows_low;
-    PublishLocked();
+
+    std::span<const ColumnInput> ColumnInputs() const override { return {}; }
+
+private:
+    static constexpr PortPin kRowPins[kRows] = {
+        {kSh77xxPortD, 1u}, {kSh77xxPortD, 5u}, {kSh77xxPortD, 7u}, {kSh77xxPortE, 0u},
+        {kSh77xxPortE, 1u}, {kSh77xxPortE, 3u}, {kSh77xxPortE, 6u}, {kSh77xxPortE, 7u},
+    };
+
+    static constexpr PortPin kColumnPins[kColumns] = {
+        {kSh77xxPortF, 0u}, {kSh77xxPortF, 1u}, {kSh77xxPortF, 2u}, {kSh77xxPortF, 3u},
+        {kSh77xxPortF, 4u}, {kSh77xxPortF, 5u}, {kSh77xxPortF, 6u}, {kSh77xxPortF, 7u},
+        {kSh77xxPortC, 0u}, {kSh77xxPortC, 1u}, {kSh77xxPortC, 2u}, {kSh77xxPortC, 3u},
+        {kSh77xxPortC, 4u}, {kSh77xxPortC, 5u}, {kSh77xxPortC, 6u}, {kSh77xxPortC, 7u},
+    };
+};
+
 }
 
-void Hp600KeyMatrix::PublishLocked() {
-    uint16_t low = pulled_low_;
-    for (uint32_t row = 0; row < kRows; ++row) {
-        if (((rows_low_ >> row) & 1u) != 0u) low = static_cast<uint16_t>(low | pressed_[row]);
-    }
-    for (uint32_t column = 0; column < kColumns; ++column) {
-        if (((sense_columns_ >> column) & 1u) == 0u) continue;
-        intc_->SetPinLevel(SensePin(column), ((low >> column) & 1u) == 0u);
-    }
-}
+REGISTER_SERVICE_AS(Hp600KeyMatrix, Sh77xxPortKeyMatrix);
 
 }

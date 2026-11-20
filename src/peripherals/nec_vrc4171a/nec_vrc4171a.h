@@ -14,6 +14,9 @@ class NecVrc4171a : public IsaExcaSocketPair {
 public:
     explicit NecVrc4171a(CerfEmulator& emu);
 
+    static constexpr const char* kName                 = "VRC4171A";
+    static constexpr bool        kPortOverlayUndefined = false;
+
     static bool FittedOnFamily(std::string_view family);
     static bool IsTopLevelPort(uint32_t port);
 
@@ -27,7 +30,7 @@ public:
     bool     DisplayClocksEnabled();
 
 protected:
-    const char* ChipName() const override { return "VRC4171A"; }
+    const char* ChipName() const override { return kName; }
     uint8_t     UnbankedIndexReadLocked(uint32_t port) override;
     uint8_t     UnbankedDataReadLocked(uint32_t port) override;
     void        UnbankedDataWriteLocked(uint8_t value) override;

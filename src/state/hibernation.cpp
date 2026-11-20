@@ -25,6 +25,7 @@
 #include "../execution/engine_bridge.h"
 #include <cerfcore/peripherals/peripheral_base.h>
 #include "../peripherals/peripheral_dispatcher.h"
+#include <cerfcore/platform/host_error.h>
 #include <cerfcore/platform/host_file.h>
 
 #include <chrono>
@@ -104,12 +105,15 @@ void Hibernation::SaveAsync(const std::string& path, std::function<void(bool)> o
     });
 }
 
-void Hibernation::RestoreAsync(const std::string& path, bool ram_only) {
-    if (!ClaimWorker()) return;
-    worker_ = emu_.Get<InstanceThreads>().Start([this, path, ram_only] {
-        Restore(path, ram_only);
+bool Hibernation::RestoreAsync(const std::string& path, bool ram_only,
+                               std::function<void(const RestoreResult&)> on_done) {
+    if (!ClaimWorker()) return false;
+    worker_ = emu_.Get<InstanceThreads>().Start([this, path, ram_only, on_done = std::move(on_done)] {
+        const RestoreResult result = RestoreImage(path, ram_only);
         busy_.store(false, std::memory_order_release);
+        if (on_done) on_done(result);
     });
+    return true;
 }
 
 void Hibernation::OnShutdown() {
@@ -127,15 +131,11 @@ void Hibernation::Progress(const char* fmt, ...) {
 }
 
 std::string Hibernation::DeviceDirFile(const char* name) const {
-    return GetDeviceDir(emu_.Get<DeviceConfig>().device_name) + name;
+    return ResolveDeviceFile(emu_.Get<DeviceConfig>().device_name, name);
 }
 
 std::string Hibernation::DefaultStatePath() const {
     return DeviceDirFile(kDefaultStateFile);
-}
-
-bool Hibernation::DefaultStateExists() const {
-    return host_platform::HostPathExists(DefaultStatePath());
 }
 
 uint32_t Hibernation::PeripheralLayoutSig() const {
@@ -208,6 +208,7 @@ void Hibernation::SaveSection(StateWriter& w, StateSection section) {
         case StateSection::Reset:
             emu_.Get<GuestCpuReset>().SaveState(w);
             emu_.Get<GuestColdBoot>().SaveState(w);
+            emu_.Get<GuestDeepSleep>().SaveState(w);
             if (auto* c = emu_.TryGet<CerfVirtCustomizationsReset>())
                 c->SaveState(w);
             break;
@@ -219,7 +220,7 @@ bool Hibernation::Save(const std::string& path_in) {
     auto& pause = emu_.Get<EmulationPause>();
     auto& stack = emu_.Get<NotificationStack>();
 
-    stack.Show(NotificationId::SavingState, NotificationKind::Warning, kSavingText);
+    ShowSavingCard(NotificationId::SavingState);
     Progress("Saving state...");
     Progress("Saving RAM (%llu MB)...", static_cast<unsigned long long>(
         emu_.Get<EmulatedMemory>().VolatileByteCount() >> 20));
@@ -351,6 +352,7 @@ void Hibernation::RestoreSection(StateReader& r, StateSection section) {
         case StateSection::Reset:
             emu_.Get<GuestCpuReset>().RestoreState(r);
             emu_.Get<GuestColdBoot>().RestoreState(r);
+            emu_.Get<GuestDeepSleep>().RestoreState(r);
             if (auto* c = emu_.TryGet<CerfVirtCustomizationsReset>())
                 c->RestoreState(r);
             break;
@@ -369,34 +371,67 @@ void Hibernation::RollBack(const std::string& rollback_path) {
     }
 }
 
-bool Hibernation::Restore(const std::string& path_in, bool ram_only) {
+bool Hibernation::Restore(const std::string& path, bool ram_only) {
+    return RestoreImage(path, ram_only).outcome != RestoreOutcome::Refused;
+}
+
+Hibernation::RestoreResult Hibernation::RestoreImage(const std::string& path_in, bool ram_only) {
     const std::string path = path_in.empty() ? DefaultStatePath() : path_in;
     auto& stack = emu_.Get<NotificationStack>();
 
     stack.Show(NotificationId::LoadingState, NotificationKind::Warning, kLoadingText);
     Progress(ram_only ? "Warm boot: restoring RAM..." : "Restoring state...");
 
-    std::string reason;
-    const RestoreOutcome outcome = ApplyStateFile(path, ram_only, reason);
+    RestoreResult result;
+    result.outcome = ApplyStateFile(path, ram_only, result.reason);
 
     stack.Close(NotificationId::LoadingState);
-    if (outcome == RestoreOutcome::Refused)
-        stack.Post(NotificationKind::Error, WithDetail(kUnableToResumeFormat, reason), kRefusedCardTimeout);
-    if (outcome == RestoreOutcome::MemoryAfterRefusal)
+    if (result.outcome == RestoreOutcome::Refused)
+        stack.Post(NotificationKind::Error, WithDetail(kUnableToResumeFormat, result.reason), kRefusedCardTimeout);
+    if (result.outcome == RestoreOutcome::MemoryAfterRefusal)
         stack.Post(NotificationKind::Warning, kRamOnlyText, kRamOnlyCardTimeout);
-    return outcome != RestoreOutcome::Refused;
+    return result;
 }
 
 bool Hibernation::ApplyOrRollBack(const std::string& rollback_path,
                                   const std::function<void()>& apply, std::string& refusal) {
+    applying_image_.store(true, std::memory_order_release);
+    bool applied = true;
     try {
         apply();
-        return true;
     } catch (const StateImageRejected& e) {
         refusal = e.what();
         RollBack(rollback_path);
+        applied = false;
+    }
+    applying_image_.store(false, std::memory_order_release);
+    return applied;
+}
+
+void Hibernation::ShowSavingCard(NotificationId id) {
+    emu_.Get<NotificationStack>().Show(id, NotificationKind::Warning, kSavingText);
+}
+
+bool Hibernation::SaveAfterHalt(const std::string& path, std::string& error) {
+    if (!emu_.Get<JitRunner>().GuestRan()) {
+        error = "the guest ran no instruction in this instance";
         return false;
     }
+    auto snap = emu_.Get<EmulationFreeze>().SnapshotSection();
+    if (emu_.Get<GuestCpuReset>().WarmReportPending()) {
+        error = "the halt came before a warm boot from an image finished";
+        return false;
+    }
+    ShowSavingCard(NotificationId::SavingCrashState);
+    bool saved = true;
+    if (!applying_image_.load(std::memory_order_acquire)) {
+        saved = WriteImage(path, error);
+    } else if (!host_platform::ReplaceHostFile(DeviceDirFile(kRollbackStateFile), path, true)) {
+        error = host_platform::ErrorText(host_platform::LastErrorCode());
+        saved = false;
+    }
+    emu_.Get<NotificationStack>().Close(NotificationId::SavingCrashState);
+    return saved;
 }
 
 Hibernation::RestoreOutcome Hibernation::ApplyStateFile(const std::string& path, bool ram_only,

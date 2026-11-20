@@ -51,7 +51,10 @@ constexpr NamedKey kNamedKeys[] = {
     {"VK_OEM_PLUS", 0xBB},   {"VK_OEM_COMMA", 0xBC},  {"VK_OEM_MINUS", 0xBD},  {"VK_OEM_PERIOD", 0xBE},
     {"VK_OEM_2", 0xBF},      {"VK_OEM_3", 0xC0},      {"VK_OEM_4", 0xDB},      {"VK_OEM_5", 0xDC},
     {"VK_OEM_6", 0xDD},      {"VK_OEM_7", 0xDE},      {"VK_OEM_8", 0xDF},      {"VK_OFF", 0xDF},
-    {"VK_OEM_102", 0xE2},    {"VK_PROCESSKEY", 0xE5}, {"VK_ATTN", 0xF6},       {"VK_CRSEL", 0xF7},
+    {"VK_OEM_102", 0xE2},    {"VK_PROCESSKEY", 0xE5},
+    {"VK_DBE_ALPHANUMERIC", 0xF0}, {"VK_DBE_KATAKANA", 0xF1}, {"VK_DBE_HIRAGANA", 0xF2},
+    {"VK_DBE_SBCSCHAR", 0xF3},     {"VK_DBE_DBCSCHAR", 0xF4}, {"VK_DBE_ROMAN", 0xF5},
+    {"VK_ATTN", 0xF6},       {"VK_CRSEL", 0xF7},
     {"VK_EXSEL", 0xF8},      {"VK_EREOF", 0xF9},      {"VK_PLAY", 0xFA},       {"VK_ZOOM", 0xFB},
     {"VK_NONAME", 0xFC},     {"VK_PA1", 0xFD},        {"VK_OEM_CLEAR", 0xFE},
 };

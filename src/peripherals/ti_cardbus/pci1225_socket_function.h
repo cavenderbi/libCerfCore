@@ -4,6 +4,7 @@
 #include "../pcic82365/exca_socket_sequencer.h"
 #include "../pcic82365/pcic82365.h"
 #include "../pcmcia/pcmcia_slot.h"
+#include "pci1225_card_cycles.h"
 #include "pci1225_config_space.h"
 #include "pci1225_exca_chip_registers.h"
 #include "pci1225_interrupt_pin.h"
@@ -49,6 +50,7 @@ public:
     void OnCardDetectChanged(PcmciaSlot& slot) override;
     void OnReadyIreqLow(PcmciaSlot& slot) override;
     void OnReadyIreqHigh(PcmciaSlot& slot) override;
+    void OnStatusChange(PcmciaSlot& slot, bool low) override;
     uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
     void SaveState(StateWriter& w) override;
@@ -59,11 +61,6 @@ private:
     bool CardStsLevelLocked() const;
     Pci1225CardPins CardPins() const;
     bool SocketBarHit(uint32_t addr) const;
-    bool CardMemHit(uint32_t addr) const;
-    void MapClaimedMem(uint32_t addr, uint32_t* card, bool* attr, bool* wr, bool* sixteen);
-    void MapClaimedIo(uint32_t pci_io, uint32_t* card, PcmciaIoWidth* width);
-    uint32_t CardMemRead(uint32_t addr, unsigned size);
-    void     CardMemWrite(uint32_t addr, uint32_t value, unsigned size);
     bool     LegacyClaimLocked(uint32_t pci_io) const;
     uint32_t SocketRead(uint32_t off, unsigned size);
     void     SocketWrite(uint32_t off, uint32_t value, unsigned size);
@@ -74,9 +71,6 @@ private:
     void     ExCaWriteByte(uint32_t idx, uint8_t value);
     void     NoteExcaPowerRequestLocked(uint8_t before, uint8_t now);
     bool     CscRoutedToPciLocked() const;
-    void RequireIoCycleOrder(const char* access, uint32_t pci_io, uint32_t card, PcmciaIoWidth width,
-                             unsigned size);
-    [[noreturn]] void RefuseCycleOrder(const char* access, uint32_t addr, unsigned size, unsigned cycles);
     [[noreturn]] void RefuseExCa(const char* access, uint32_t idx);
 
     CerfEmulator&          emu_;
@@ -91,6 +85,7 @@ private:
     Pcic82365              exca_;
     Pci1225ConfigSpace     config_;
     Pci1225SocketRegisters socket_regs_;
+    Pci1225CardCycles      cycles_;
     Pci1225ExcaChipRegisters chip_regs_;
     Pci1225InterruptPin    pin_;
     bool                   functional_level_ = false;

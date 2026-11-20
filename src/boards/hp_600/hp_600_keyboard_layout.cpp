@@ -3,8 +3,8 @@
 namespace cerfcore {
 
 bool Hp600KeyboardLayout::Scanned(uint32_t cell) const {
-    const uint16_t scanned = ScannedColumns()[cell / Hp600KeyMatrix::kColumns];
-    return ((scanned >> (cell % Hp600KeyMatrix::kColumns)) & 1u) != 0u;
+    const uint16_t scanned = ScannedColumns()[cell / Sh77xxPortKeyMatrix::kColumns];
+    return ((scanned >> (cell % Sh77xxPortKeyMatrix::kColumns)) & 1u) != 0u;
 }
 
 std::optional<uint32_t> Hp600KeyboardLayout::ScannedCellOf(uint8_t vk) const {

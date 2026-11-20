@@ -39,6 +39,6 @@ protected:
 
 }
 
-REGISTER_SERVICE_AS(NecCronos3eTouchPanel, Vr41xxPiuPanel);
+REGISTER_SERVICE_AS_ALSO(NecCronos3eTouchPanel, Vr41xxPiuScreen, Vr41xxPiuPanel);
 
 }

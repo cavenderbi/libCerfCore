@@ -126,6 +126,12 @@ void PppTerminator::OnGuestData(const uint8_t* data, size_t n) {
     DrainTx();                 /* send outside mu_ - see QueueTx note */
 }
 
+void PppTerminator::OnGuestBreak() {
+    std::lock_guard<std::mutex> lk(mu_);
+    if (!active_) return;
+    hdlc_.LineError();
+}
+
 /* ---- guest -> us (under mu_ via OnGuestData) ---- */
 
 void PppTerminator::OnPppFrame(uint16_t proto, const uint8_t* p, size_t len) {

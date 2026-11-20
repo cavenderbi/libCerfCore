@@ -50,6 +50,9 @@ constexpr Vr41xxPmuModel kModel = {
        0 by casio_cassiopeia_em500_ppc2000 nk_main_kernel.exe sub_9F03BFAC @0x9F03BFBC. */
     0x0071u,
     0x0000u,
+    0xFFFFu,
+    0u,
+    true,
 };
 
 constexpr uint16_t kCntPllOffEn = 0x0008u;
@@ -92,11 +95,6 @@ public:
        carries no watchdog timer. */
     void LatchWatchdogReset() override {
         emu_.Get<Fatal>().Die("Vr4122Pmu::LatchWatchdogReset: no watchdog unit on the VR4122");
-    }
-
-    void SetPowerSwitch(bool high) override {
-        emu_.Get<Fatal>().Die("Vr4122Pmu::SetPowerSwitch(%d): the VR4122 POWER pin is not modeled",
-                              static_cast<int>(high));
     }
 
     void SaveState(StateWriter& w) override {

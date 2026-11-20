@@ -2,7 +2,9 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
+#include <cerfcore/host/guest_debug_lines.h>
 #include <cerfcore/host/hw_screen.h>
+#include "../peripherals/serial/serial_endpoint_port.h"
 
 #include <cstdio>
 
@@ -21,12 +23,13 @@ void KernelDebugSink::EmitLine(std::string_view line,
             (int)source.size(), source.data(),
             (int)line.size(), line.data());
     if (to_screen) emu_.Get<HwScreen>().AddLine(line);
+    emu_.Get<GuestDebugLines>().Publish(line, source);
 }
 
 void KernelDebugSink::EmitChar(char ch, std::string& buf,
                                std::string_view source,
                                bool to_screen, size_t cap) {
-    if (ch == '\n') { EmitLine(buf, source, to_screen); buf.clear(); return; }
+    if (ch == '\n') { FlushLine(buf, source, to_screen); return; }
     if (ch == '\r') return;  /* CE emits CRLF - drop CR, flush on LF. */
     const unsigned char uc = (unsigned char)ch;
     if (uc >= 0x20 && uc < 0x7F) {
@@ -36,7 +39,23 @@ void KernelDebugSink::EmitChar(char ch, std::string& buf,
         std::snprintf(esc, sizeof esc, "\\x%02X", uc);
         buf.append(esc);
     }
-    if (buf.size() >= cap) { EmitLine(buf, source, to_screen); buf.clear(); }
+    if (buf.size() >= cap) FlushLine(buf, source, to_screen);
+}
+
+void KernelDebugSink::FlushLine(std::string& buf, std::string_view source, bool to_screen) {
+    EmitLine(buf, source, to_screen);
+    buf.clear();
+}
+
+void KernelDebugSink::EmitBytes(const uint8_t* data, size_t n, std::string& buf, std::string_view source) {
+    for (size_t i = 0; i < n; ++i) EmitChar(static_cast<char>(data[i]), buf, source);
+}
+
+bool KernelDebugSink::DeliverOrEmit(SerialEndpointPort& port, const uint8_t* data, size_t n, bool wire_connected,
+                                    std::string& buf, std::string_view source) {
+    if (port.DeliverTx(data, n, wire_connected)) return false;
+    EmitBytes(data, n, buf, source);
+    return true;
 }
 
 void KernelDebugSink::EmitWideStringAt(const TraceContext& c, uint32_t va,

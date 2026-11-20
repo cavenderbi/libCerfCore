@@ -7,7 +7,7 @@
 
 #include "../../socs/reg_window_impl.h"
 #include "../pin_drive.h"
-#include "hd64461_pcc.h"
+#include "../hitachi_pcc/hitachi_pcc.h"
 #include <cerfcore/core/callback_list.h>
 
 namespace cerfcore {
@@ -70,12 +70,12 @@ public:
     void RestoreState(StateReader& r) override;
     void PostRestore() override;
 
-    uint32_t               PinMode(uint32_t port, uint32_t pin) const;
-    Hd64461Pcc::SocketPins Pcmcia1Presented(const Hd64461Pcc::SocketPins& live) const;
-    PinDrive               Drive(uint32_t port, uint32_t pin) const;
-    bool                   Pcmcia1PinsConnected() const;
-    void                   GateInputs(uint32_t gated_ports, const Hd64461Pcc::SocketPins& pcc1);
-    void                   AddPinListener(std::function<void()> listener);
+    uint32_t             PinMode(uint32_t port, uint32_t pin) const;
+    HitachiPccSocketPins Pcmcia1Presented(const HitachiPccSocketPins& live) const;
+    PinDrive             Drive(uint32_t port, uint32_t pin) const;
+    bool                 Pcmcia1PinsConnected() const;
+    void                 GateInputs(uint32_t gated_ports, const HitachiPccSocketPins& pcc1);
+    void                 AddPinListener(std::function<void()> listener);
 
 protected:
     uint16_t SampleRegister(uint32_t i, uint32_t addr) override;
@@ -86,8 +86,8 @@ protected:
 private:
     uint8_t ModePins(uint16_t control, uint32_t mode) const;
     uint8_t Pcmcia1Inputs(uint32_t port) const;
-    uint8_t Pcmcia1InputLevels(uint32_t port, const Hd64461Pcc::SocketPins& pcc1) const;
-    uint8_t InputLevels(uint32_t port, const Hd64461Pcc::SocketPins& pcc1) const;
+    uint8_t Pcmcia1InputLevels(uint32_t port, const HitachiPccSocketPins& pcc1) const;
+    uint8_t InputLevels(uint32_t port, const HitachiPccSocketPins& pcc1) const;
     uint8_t PresentedLevels(uint32_t port);
     void    PublishLocked();
     void    NotifyListeners();

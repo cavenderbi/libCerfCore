@@ -104,7 +104,10 @@ void MipsEngineBridge::FillSetup(cerfengine::Setup& setup) {
     setup.mips.fpu                = cfg.HasFpu();
     setup.mips.llsc               = cfg.HasLlsc();
     setup.mips.mips16             = cfg.HasMips16();
+    setup.mips.mips16_syscall     = cfg.HasMips16Syscall();
     setup.mips.tx39_multiply_add  = cfg.HasTx39MultiplyAdd();
+    setup.mips.macc_dmacc         = cfg.HasMaccDmacc();
+    setup.mips.madd16_dmadd16     = cfg.HasMadd16Dmadd16();
     setup.mips.vr41xx_power_modes = cfg.HasVr41xxPowerModes();
     setup.mips.cop1_cop2_unusable = cfg.Cop1Cop2Unusable();
     setup.mips.device_ip_mask     = cfg.DeviceIpMask();

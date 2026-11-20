@@ -21,19 +21,6 @@ namespace cerfcore {
 
 namespace {
 
-/* RTC1 block offsets from 0x0B0000C0 (UM Table 16-1 == Table 17-1). */
-enum : uint32_t {
-    kEtimeL = 0x00, kEtimeM = 0x02, kEtimeH = 0x04,
-    kEcmpL  = 0x08, kEcmpM  = 0x0A, kEcmpH  = 0x0C,
-    kRtcl1L = 0x10, kRtcl1H = 0x12, kRtcl1CntL = 0x14, kRtcl1CntH = 0x16,
-    kRtcl2L = 0x18, kRtcl2H = 0x1A, kRtcl2CntL = 0x1C, kRtcl2CntH = 0x1E,
-};
-/* RTC2 block offsets from 0x0B0001C0 (UM Table 16-1 == Table 17-1). */
-enum : uint32_t {
-    kTclkL = 0x00, kTclkH = 0x02, kTclkCntL = 0x04, kTclkCntH = 0x06,
-    kRtcIntReg = 0x1E,
-};
-
 constexpr uint16_t kRtcIntMask = 0x000Fu;   /* RTCINTREG D3:0 (UM 16.2.9 p353 == 17.2.9 p437) */
 
 constexpr uint64_t kNever = UINT64_MAX;
@@ -124,6 +111,7 @@ void Vr41xxRtc::ApplyRtcResetLocked() {
     etime_.Anchor(now, 0u);
     ecmp_         = 0;
     ecmp_armed_   = false;
+    ecmp_start_   = now;
     rtcl1_reload_ = 0; rtcl2_reload_ = 0;
     rtcl1_anchor_ = now; rtcl2_anchor_ = now;
     rtcl1_periods_ack_ = 0; rtcl2_periods_ack_ = 0;
@@ -175,9 +163,10 @@ uint64_t Vr41xxRtc::PeriodsReached(uint32_t reload, uint64_t elapsed) {
 /* "When a match occurs with the Elapsed Time compare registers, an alarm (Elapsed Time
    interrupt) occurs (and the count-up continues)" (VR4131 UM 13.2.1 p239, VR4121 UM 17.2.1). */
 void Vr41xxRtc::ArmEcmpLocked() {
-    const uint64_t now = RtcTicksLocked();
+    const uint64_t now   = RtcTicksLocked();
     const uint64_t etime = etime_.CountAt(now) & kMask48;
     ecmp_match_ = now + ((ecmp_ - etime) & kMask48);
+    if (ecmp_match_ < ecmp_start_) ecmp_match_ += kMask48 + 1u;
 }
 
 void Vr41xxRtc::EvaluateLocked() {
@@ -255,15 +244,26 @@ uint16_t Vr41xxRtc::RtclCntHalfLocked(int ch, bool high) {
 }
 
 void Vr41xxRtc::WriteEtimeHalfLocked(uint32_t half, uint16_t value) {
-    if (!etime_latch_.Write(half, value)) return;
-    etime_.Anchor(RtcTicksLocked(), etime_latch_.Value());
+    if (Model().time_pair_commit) {
+        if (!etime_latch_.Write(half, value)) return;
+        etime_.Anchor(RtcTicksLocked(), etime_latch_.Value());
+    } else {
+        const uint64_t shift = half * 16u;
+        const uint64_t count = ReadEtimeLocked();
+        etime_.Anchor(RtcTicksLocked(), ((count & ~(0xFFFFull << shift)) | (uint64_t{value} << shift)) & kMask48);
+    }
     if (ecmp_armed_) ArmEcmpLocked();
 }
 
 void Vr41xxRtc::WriteEcmpHalfLocked(uint32_t half, uint16_t value) {
-    if (!ecmp_latch_.Write(half, value)) return;
+    if (Model().time_pair_commit) {
+        if (!ecmp_latch_.Write(half, value)) return;
+    } else {
+        ecmp_latch_.WriteNow(half, value);
+    }
     ecmp_       = ecmp_latch_.Value();
     ecmp_armed_ = true;
+    ecmp_start_ = RtcTicksLocked() + Model().ecmp_start_ticks;
     ArmEcmpLocked();
 }
 
@@ -279,9 +279,13 @@ void Vr41xxRtc::WriteRtclHalfLocked(int ch, bool high, uint16_t value) {
     const bool      repeat = latch.Written(half);
     const uint64_t  now    = RtcTicksLocked();
     if (!latch.Open() || repeat) rephase_.OnPairStart(ch, repeat, now, RtclViewLocked(ch, now));
-    if (!latch.Write(half, value)) return;
+    if (Model().rtcl_pair_commit) {
+        if (!latch.Write(half, value)) return;
+    } else {
+        latch.WriteNow(half, value);
+    }
     const uint32_t reload = static_cast<uint32_t>(latch.Value());
-    if (reload >= 1u && reload <= 4u) {
+    if (reload != 0u && reload < Model().rtcl_min_cycle) {
         emu_.Get<Fatal>().Die("Vr41xxRtc: RTCL%d set to the prohibited cycle %u", ch + 1, reload);
     }
     (ch == 0 ? rtcl1_reload_ : rtcl2_reload_)      = reload;
@@ -398,6 +402,9 @@ void Vr41xxRtc::SaveState(StateWriter& w) {
     };
     w.Write("etime", ReadEtimeLocked());
     w.Write("ecmp", ecmp_); w.Write<uint8_t>("ecmp_programmed", ecmp_armed_ ? 1 : 0);
+    if (Model().ecmp_start_ticks != 0u) {
+        w.Write<uint64_t>("ecmp_start_left", ecmp_start_ > now ? ecmp_start_ - now : 0u);
+    }
     w.Write("rtcl1_reload", rtcl1_reload_); w.Write("rtcl2_reload", rtcl2_reload_); w.Write("tclk_reload", tclk_reload_);
     w.Write("rtcl1_pos", pos(rtcl1_reload_, now - rtcl1_anchor_));
     w.Write("rtcl2_pos", pos(rtcl2_reload_, now - rtcl2_anchor_));
@@ -416,9 +423,11 @@ void Vr41xxRtc::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(mtx_);
     uint64_t etime = 0;
     uint8_t  armed = 0;
+    uint64_t ecmp_start_left = 0;
     uint32_t rtcl1_pos = 0, rtcl2_pos = 0, tclk_pos = 0;
     r.Read("etime", etime);
     r.Read("ecmp", ecmp_); r.Read("ecmp_programmed", armed);
+    if (Model().ecmp_start_ticks != 0u) r.Read("ecmp_start_left", ecmp_start_left);
     r.Read("rtcl1_reload", rtcl1_reload_); r.Read("rtcl2_reload", rtcl2_reload_); r.Read("tclk_reload", tclk_reload_);
     r.Read("rtcl1_pos", rtcl1_pos); r.Read("rtcl2_pos", rtcl2_pos); r.Read("tclk_pos", tclk_pos);
     r.Read("rtcintreg", rtcintreg_);
@@ -433,6 +442,7 @@ void Vr41xxRtc::RestoreState(StateReader& r) {
     const uint64_t now = RtcTicksLocked();
 
     etime_.Anchor(now, etime);
+    ecmp_start_ = now + ecmp_start_left;
     if (ecmp_armed_) ArmEcmpLocked();
     rtcl1_anchor_      = now - rtcl1_pos;
     rtcl2_anchor_      = now - rtcl2_pos;

@@ -46,18 +46,12 @@ void CompaqIpaqH3000Battery::Reply(uint8_t* out) const {
     out[0] = on_ac ? 1u : 0u;
     out[1] = kChemistryLithiumPolymer;
     cerf::le::Put16(out + 2, on_ac ? open_circuit : static_cast<uint16_t>(open_circuit - LoadSag()));
-    out[4] = !on_ac ? 0u : (IsCharging(on_ac, fill) ? kStatusCharging : kStatusFull);
+    out[4] = !on_ac ? 0u : (Battery::ChargingAt(on_ac, fill) ? kStatusCharging : kStatusFull);
 }
 
-bool CompaqIpaqH3000Battery::OnAc() const { return !battery_.OnBattery(); }
+bool CompaqIpaqH3000Battery::OnAc() const { return battery_.OnExternalPower(); }
 
-bool CompaqIpaqH3000Battery::Charging() const {
-    return IsCharging(OnAc(), battery_.ChargePercent());
-}
-
-bool CompaqIpaqH3000Battery::IsCharging(bool on_ac, int fill_percent) {
-    return on_ac && fill_percent < 100;
-}
+bool CompaqIpaqH3000Battery::Charging() const { return battery_.Charging(); }
 
 bool CompaqIpaqH3000Battery::PcCardPowered() const {
     const auto& router = emu_.Get<PcmciaSpaceRouter>();

@@ -18,6 +18,7 @@ inline constexpr uint8_t kVkDown     = 0x28;
 inline constexpr uint8_t kVkDelete   = 0x2E;
 inline constexpr uint8_t kVkF        = 0x46;
 inline constexpr uint8_t kVkP        = 0x50;
+inline constexpr uint8_t kVkF9       = 0x78;
 inline constexpr uint8_t kVkF10      = 0x79;
 inline constexpr uint8_t kVkLShift   = 0xA0;
 inline constexpr uint8_t kVkRShift   = 0xA1;
@@ -25,5 +26,6 @@ inline constexpr uint8_t kVkLControl = 0xA2;
 inline constexpr uint8_t kVkRControl = 0xA3;
 inline constexpr uint8_t kVkLMenu    = 0xA4;
 inline constexpr uint8_t kVkRMenu    = 0xA5;
+inline constexpr uint8_t kVkOff      = 0xDF;
 
 }

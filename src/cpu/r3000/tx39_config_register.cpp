@@ -66,9 +66,10 @@ void CERFENGINE_FASTCALL Tx39ConfigRegister::WriteConfig(void* context, uint32_t
         reg->emu_.Get<Fatal>().Die("Tx39ConfigRegister: Config write 0x%08X sets Doze and Halt",
                                    value);
     }
-    if ((value & reg->config_->ConfigZeroOnly()) != 0u) {
-        reg->emu_.Get<Fatal>().Die("Tx39ConfigRegister: Config write 0x%08X sets bits 0x%08X that CERF supports at 0 only",
-                                   value, value & reg->config_->ConfigZeroOnly());
+    const MipsFixedFields fixed = reg->config_->ConfigFixed();
+    if (!fixed.Accepts(value)) {
+        reg->emu_.Get<Fatal>().Die("Tx39ConfigRegister: Config write 0x%08X sets fields 0x%08X to 0x%08X; CERF "
+                                   "supports 0x%08X only", value, fixed.mask, value & fixed.mask, fixed.value);
     }
     const uint32_t writable = reg->config_->ConfigWritable();
     const uint32_t old_rf   = reg->ReducedFrequency();

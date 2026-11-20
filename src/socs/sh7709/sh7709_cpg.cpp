@@ -13,7 +13,10 @@ constexpr Sh77xxFrqcrSetting kSh7709Modes34[] = {
     {0x01E8u, 1u, 1u}, {0x01E9u, 1u, 2u}, {0x01EAu, 1u, 4u},
 };
 
-constexpr Sh77xxCpgModel kSh7709Cpg{kSh7709Modes34, static_cast<uint32_t>(std::size(kSh7709Modes34))};
+constexpr Sh77xxCpgModel kSh7709Cpg{
+    {kSh7709Modes34, static_cast<uint32_t>(std::size(kSh7709Modes34)), 0xFFFFu},
+    {nullptr, 0u, 0u},
+};
 
 class Sh7709Cpg : public Sh77xxCpgBase<SocId::Sh7709, kSh7709Cpg> {
 public:

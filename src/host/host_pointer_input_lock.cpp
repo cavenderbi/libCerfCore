@@ -1,6 +1,7 @@
 #include <cerfcore/host/host_pointer_input_lock.h>
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/host/host_input_activity.h>
 #include <cerfcore/host/pointer_input.h>
 #include <cerfcore/host/relative_mouse_input.h>
 #include <cerfcore/host/touch_input.h>
@@ -53,5 +54,7 @@ void HostPointerInputLock::Release(uint64_t owner) {
     uint64_t expected = owner;
     owner_.compare_exchange_strong(expected, 0, std::memory_order_acq_rel);
 }
+
+void HostPointerInputLock::Admitted() { emu_.Get<HostInputActivity>().Delivered(); }
 
 }

@@ -24,7 +24,7 @@ public:
 
     uint32_t Attach(const Pr31x00SerialModem* modem, ControlFn on_control);
     void     SetInputs(uint32_t port, bool cts, bool dsr, bool ri, bool dcd);
-    void     Control(uint32_t port, bool& dtr, bool& rts) const;
+    void     Control(uint32_t port, bool& dtr, bool& rts, bool& powered) const;
 
     void SaveState(uint32_t port, StateWriter& w);
     void RestoreState(uint32_t port, StateReader& r);
@@ -41,9 +41,12 @@ private:
         uint32_t mfio_low = 0;
         uint32_t io_low   = 0;
 
-        bool dtr = false;
-        bool rts = false;
+        bool dtr     = false;
+        bool rts     = false;
+        bool powered = true;
     };
+
+    static bool PoweredLocked(const Channel& c);
 
     Channel&       Ch(uint32_t port);
     const Channel& Ch(uint32_t port) const;

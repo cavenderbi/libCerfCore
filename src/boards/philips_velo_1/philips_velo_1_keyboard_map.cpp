@@ -9,6 +9,24 @@ namespace cerfcore {
 
 namespace {
 
+constexpr char kWordLabel[]       = "Word";
+constexpr char kExcelLabel[]      = "Excel";
+constexpr char kCalendarLabel[]   = "Calendar";
+constexpr char kContactsLabel[]   = "Contacts";
+constexpr char kTasksLabel[]      = "Tasks";
+constexpr char kWwwLabel[]        = "WWW";
+constexpr char kInboxLabel[]      = "Inbox";
+constexpr char kDatabaseLabel[]   = "Database";
+constexpr char kCalculatorLabel[] = "Calculator";
+constexpr char kVoiceMemoLabel[]  = "Voice memo";
+constexpr char kHomeLabel[]       = "Home";
+constexpr char kPageUpLabel[]     = "PgUp";
+constexpr char kPageDownLabel[]   = "PgDn";
+constexpr char kEndLabel[]        = "End";
+constexpr char kDeleteLabel[]     = "Delete";
+constexpr char kBackTabLabel[]    = "Back Tab";
+constexpr char kCapsLockLabel[]   = "Caps Lock";
+
 /* device_code = scancode; inverse of keybddr sub_1F3C830's scancode->VK table
    (nk.bin @ 0x1D8F88). */
 class PhilipsVelo1KeyboardMap : public KeyboardMap {
@@ -53,16 +71,16 @@ public:
             {0xDBu, 0x48u, nullptr, 0u, 0u},  {0xDCu, 0x50u, nullptr, 0u, 0u},
             {0xDDu, 0x46u, nullptr, 0u, 0u},  {0xDEu, 0x2Eu, nullptr, 0u, 0u},
             {0xDFu, 0x53u, nullptr, 0u, 0u},
-            {0x31u, 0u, "Word", 1u, 0u},      {0x32u, 0u, "Excel", 1u, 0u},
-            {0x33u, 0u, "Calendar", 1u, 0u},  {0x34u, 0u, "Contacts", 1u, 0u},
-            {0x35u, 0u, "Tasks", 1u, 0u},     {0x36u, 0u, "WWW", 1u, 0u},
-            {0x37u, 0u, "Inbox", 1u, 0u},     {0x38u, 0u, "Database", 1u, 0u},
-            {0x39u, 0u, "Calculator", 1u, 0u}, {0x30u, 0u, "Voice memo", 1u, 0u},
-            {0xBFu, 0u, "Home", 1u, 0u},      {0x26u, 0u, "PgUp", 1u, 0u},
-            {0x25u, 0u, "Home", 1u, 0u},      {0x28u, 0u, "PgDn", 1u, 0u},
-            {0x27u, 0u, "End", 1u, 0u},
-            {0x08u, 0u, "Delete", 2u, 0u},    {0x09u, 0u, "Back Tab", 2u, 0u},
-            {0x10u, 0u, "Caps Lock", 2u, 0u},
+            {0x31u, 0u, kWordLabel, 1u, 0u},       {0x32u, 0u, kExcelLabel, 1u, 0u},
+            {0x33u, 0u, kCalendarLabel, 1u, 0u},   {0x34u, 0u, kContactsLabel, 1u, 0u},
+            {0x35u, 0u, kTasksLabel, 1u, 0u},      {0x36u, 0u, kWwwLabel, 1u, 0u},
+            {0x37u, 0u, kInboxLabel, 1u, 0u},      {0x38u, 0u, kDatabaseLabel, 1u, 0u},
+            {0x39u, 0u, kCalculatorLabel, 1u, 0u}, {0x30u, 0u, kVoiceMemoLabel, 1u, 0u},
+            {0xBFu, 0u, kHomeLabel, 1u, 0u},       {0x26u, 0u, kPageUpLabel, 1u, 0u},
+            {0x25u, 0u, kHomeLabel, 1u, 0u},       {0x28u, 0u, kPageDownLabel, 1u, 0u},
+            {0x27u, 0u, kEndLabel, 1u, 0u},
+            {0x08u, 0u, kDeleteLabel, 2u, 0u},     {0x09u, 0u, kBackTabLabel, 2u, 0u},
+            {0x10u, 0u, kCapsLockLabel, 2u, 0u},
         };
         return kBindings;
     }

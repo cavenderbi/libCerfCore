@@ -25,6 +25,17 @@ public:
         bool operator==(const Frame&) const = default;
     };
 
+    static Frame FirstStopCentre(uint64_t bits_before_stop, uint64_t frame_bits) {
+        return Frame{2u * bits_before_stop + 1u, 2u * frame_bits};
+    }
+
+    enum class Intake {
+        kNone,
+        kNoClock,
+        kQueued,
+        kOverflow,
+    };
+
     explicit UartRxLine(const char* name) : name_(name) {}
 
     const char* Name() const { return name_; }
@@ -32,6 +43,15 @@ public:
     bool                 Push(const uint8_t* data, size_t n);
     std::vector<uint8_t> TakeWire();
     bool                 WireEmpty() const;
+    bool                 Idle() const { return entries_.empty() && WireEmpty(); }
+
+    Intake TakeIn(bool clocked, GuestCycleClock::Rate cpu, GuestCycleClock::Rate bit, const Frame& frame,
+                  uint64_t now);
+    Intake Admit(const uint8_t* data, size_t n, bool clocked, GuestCycleClock::Rate cpu, GuestCycleClock::Rate bit,
+                 const Frame& frame, uint64_t now);
+    bool   Retime(const Frame& from, const Frame& to, GuestCycleClock::Rate cpu, GuestCycleClock::Rate bit,
+                  uint64_t now, bool& moved);
+    void   ArmEvent(GuestCycleClock& clock, GuestCycleClock::Event* event, uint64_t now, bool wanted) const;
 
     bool StartClock(GuestCycleClock::Rate cpu, GuestCycleClock::Rate bit, uint64_t now);
     bool Receive(const uint8_t* data, size_t n, GuestCycleClock::Rate cpu, GuestCycleClock::Rate bit,
@@ -64,6 +84,16 @@ public:
         return next_due_ == 0u || (timed_ && next_due_ <= half_.TicksAt(now));
     }
     uint16_t Front() const { return entries_.front(); }
+    template <typename Land>
+    bool LandDue(uint64_t now, Land&& land) {
+        bool landed = false;
+        while (FrontDue(now)) {
+            land(Front());
+            PopFront(now);
+            landed = true;
+        }
+        return landed;
+    }
     size_t   Pending() const { return entries_.size(); }
     uint64_t DueTick(size_t index) const { return due_[index]; }
     uint64_t CycleOfTick(uint64_t tick) const { return half_.CycleOfTick(tick); }

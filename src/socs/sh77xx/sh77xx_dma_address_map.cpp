@@ -1,10 +1,7 @@
 #include "sh77xx_dma_address_map.h"
 
-#include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
-#include "../sh7709/sh7709_id.h"
-#include "../sh7729/sh7729_id.h"
 #include "sh77xx_adc.h"
 #include "sh77xx_dac.h"
 #include "sh77xx_pfc.h"
@@ -49,13 +46,6 @@ bool DmaReachable(uint32_t pa, uint32_t bytes) {
 
 }
 
-REGISTER_SERVICE(Sh77xxDmaAddressMap);
-
-bool Sh77xxDmaAddressMap::ShouldRegister() {
-    const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
-    return soc == SocId::Sh7709 || soc == SocId::Sh7729;
-}
-
 uint32_t Sh77xxDmaAddressMap::BusAddress(uint32_t channel, uint32_t addr, uint32_t bytes, const char* side) const {
     if (addr % bytes != 0u) {
         emu_.Get<Fatal>().Die("Sh77xxDmac: channel %u %s address 0x%08X is not aligned to %u bytes", channel, side,
@@ -69,7 +59,7 @@ uint32_t Sh77xxDmaAddressMap::BusAddress(uint32_t channel, uint32_t addr, uint32
         emu_.Get<Fatal>().Die("Sh77xxDmac: channel %u %s address 0x%08X is in no area of the physical map", channel,
                               side, addr);
     }
-    if (pa >= kArea1First && pa < kArea1End && !DmaReachable(pa, bytes)) {
+    if (pa >= kArea1First && pa < kArea1End && !DmaReachable(pa, bytes) && !ReachesChipModule(pa, bytes)) {
         emu_.Get<Fatal>().Die("Sh77xxDmac: channel %u %s address 0x%08X is an on-chip register the DMAC may not access",
                               channel, side, addr);
     }

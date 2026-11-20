@@ -6,7 +6,7 @@
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
 #include "../../boards/hp_600/hp_600_family_id.h"
-#include "../../cpu/sh/sh_board_clock.h"
+#include "../../socs/sh77xx/sh77xx_cpg.h"
 #include "../peripheral_dispatcher.h"
 #include "hd64461_gpio.h"
 #include "hd64461_intc.h"
@@ -63,7 +63,7 @@ void Hd64461Timer::OnReady() {
     system_  = &emu_.Get<Hd64461SystemControl>();
     gpio_    = &emu_.Get<Hd64461Gpio>();
     output_  = emu_.TryGet<Hd64461TimerOutput>();
-    ckio_hz_ = emu_.Get<ShBoardClock>().CkioHz();
+    ckio_hz_ = emu_.Get<Sh77xxCpg>().AttachToCkioPin();
     ckio_.Attach(ckio_hz_, 1u);
     for (Channel& ch : ch_) {
         Channel* channel = &ch;

@@ -26,14 +26,6 @@ public:
         uint8_t  data_bits = 8;   /* 5..8 */
         enum class Parity { None, Odd, Even, Mark, Space } parity = Parity::None;
         enum class Stop   { One, OnePointFive, Two }        stop   = Stop::One;
-
-        /* Bit-times one character occupies on the wire: start + data + parity + stop. */
-        double BitsPerChar() const {
-            const double stop_bits = stop == Stop::Two          ? 2.0
-                                   : stop == Stop::OnePointFive ? 1.5
-                                                                : 1.0;
-            return 1.0 + data_bits + (parity != Parity::None ? 1.0 : 0.0) + stop_bits;
-        }
     };
     virtual LineConfig GetLineConfig() const = 0;
 

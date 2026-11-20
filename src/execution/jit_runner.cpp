@@ -33,14 +33,22 @@ JitRunner::~JitRunner() {
 void JitRunner::Start() {
     if (started_) return;
     pre_start_hooks_.Call();
+    start_cycles_ = emu_.Get<GuestCycleClock>().Cycles();
     started_     = true;
     Fatal& fatal = emu_.Get<Fatal>();
     thread_      = emu_.Get<InstanceThreads>().Start([this, &fatal] { RunGuest(fatal); },
-                                                     [this, &fatal] { FinishRun(fatal); });
+                                                     [this, &fatal] {
+                                                         FinishRun(fatal);
+                                                         run_end_listeners_.Call();
+                                                     });
 }
 
 void JitRunner::RegisterPreStartHook(std::function<void()> fn) {
     pre_start_hooks_.Add(std::move(fn));
+}
+
+void JitRunner::RegisterRunEndListener(std::function<void()> fn) {
+    run_end_listeners_.Add(std::move(fn));
 }
 
 void JitRunner::Join() {
@@ -103,7 +111,12 @@ void JitRunner::DeliverHeldReset() {
     hold_resets_ = true;
 }
 
+bool JitRunner::GuestRan() {
+    return emu_.Get<GuestCycleClock>().Cycles() != start_cycles_;
+}
+
 void JitRunner::FinishRun(Fatal& fatal) {
+    emu_.Get<EngineBridge>().Guest().SettleRestartPoint();
     fatal.SetLiveEngine(nullptr);
     LOG(Boot, "JitRunner: stop requested; thread exiting\n");
     stopped_.store(true, std::memory_order_release);

@@ -19,8 +19,18 @@ bool Battery::OnBattery() const {
     return on_battery_;
 }
 
+bool Battery::OnExternalPower() const {
+    std::lock_guard<std::mutex> lk(mtx_);
+    return !on_battery_;
+}
+
+bool Battery::Charging() const {
+    std::lock_guard<std::mutex> lk(mtx_);
+    return ChargingAt(!on_battery_, charge_percent_);
+}
+
 void Battery::SetChargePercent(int percent) {
-    UpdateFromHost([&] { charge_percent_ = std::clamp(percent, 0, 100); });
+    UpdateFromHost([&] { charge_percent_ = std::clamp(percent, 0, kFullPercent); });
 }
 
 void Battery::SetOnBattery(bool on_battery) {
@@ -49,7 +59,7 @@ void Battery::SaveObjectState(StateWriter& w) const {
 
 void Battery::RestoreObjectState(StateReader& r) {
     uint8_t on      = 0;
-    int32_t percent = 100;
+    int32_t percent = kFullPercent;
     r.Read("on_battery", on);
     r.Read("fill_percent", percent);
     {

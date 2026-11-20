@@ -2,7 +2,7 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/state/hibernation.h>
-#include "hp_600_key_matrix.h"
+#include "../sh77xx_port_key_matrix.h"
 
 #include <utility>
 
@@ -30,7 +30,7 @@ constexpr uint32_t kButtonNetBits = ButtonNetBits();
 
 void Hp600InputNets::OnReady() {
     intc_   = &emu_.Get<Sh77xxIntc>();
-    matrix_ = &emu_.Get<Hp600KeyMatrix>();
+    matrix_ = &emu_.Get<Sh77xxPortKeyMatrix>();
     emu_.Get<Hibernation>().RegisterPostRestoreListener([this] { ReleaseButtons(); });
 }
 

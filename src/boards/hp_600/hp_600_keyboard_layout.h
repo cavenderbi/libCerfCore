@@ -2,7 +2,7 @@
 
 #include <cerfcore/core/service.h>
 #include "../jornada/jornada_keyboard_layers.h"
-#include "hp_600_key_matrix.h"
+#include "../sh77xx_port_key_matrix.h"
 
 #include <array>
 #include <cstdint>
@@ -11,7 +11,7 @@
 
 namespace cerfcore {
 
-inline constexpr uint32_t kHp600KeyCells = Hp600KeyMatrix::kRows * Hp600KeyMatrix::kColumns;
+inline constexpr uint32_t kHp600KeyCells = Sh77xxPortKeyMatrix::kCells;
 
 struct Hp600HostAlias {
     uint8_t     host_vk;
@@ -24,7 +24,7 @@ public:
     using Service::Service;
 
     virtual const std::array<uint8_t, kHp600KeyCells>& CellVk() const = 0;
-    virtual const std::array<uint16_t, Hp600KeyMatrix::kRows>& ScannedColumns() const = 0;
+    virtual const std::array<uint16_t, Sh77xxPortKeyMatrix::kRows>& ScannedColumns() const = 0;
     virtual std::span<const Hp600HostAlias> HostAliases() const = 0;
     virtual std::span<const jornada_kbd::LayerKey> AltGrLayer() const = 0;
 

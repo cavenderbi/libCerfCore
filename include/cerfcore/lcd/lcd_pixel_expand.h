@@ -6,6 +6,7 @@ namespace cerfcore {
 
 namespace lcd_pixel {
 
+inline uint32_t Expand2(uint32_t v) { return (v << 6) | (v << 4) | (v << 2) | v; }
 inline uint32_t Expand4(uint32_t v) { return (v << 4) | v; }
 inline uint32_t Expand5(uint32_t v) { return (v << 3) | (v >> 2); }
 inline uint32_t Expand6(uint32_t v) { return (v << 2) | (v >> 4); }
@@ -38,6 +39,11 @@ inline uint32_t MsbFirstShift(uint32_t bit, uint32_t bpp) { return 8u - bpp - (b
 inline uint32_t PackedIndexMsbFirst(const uint8_t* row, uint32_t x, uint32_t bpp) {
     const uint32_t bit = x * bpp;
     return (row[bit >> 3] >> MsbFirstShift(bit, bpp)) & ((1u << bpp) - 1u);
+}
+
+inline uint32_t PackedIndexLsbFirst(const uint8_t* row, uint32_t x, uint32_t bpp) {
+    const uint32_t bit = x * bpp;
+    return (row[bit >> 3] >> (bit & 7u)) & ((1u << bpp) - 1u);
 }
 
 inline uint32_t SubPixelPanelWidth(uint32_t dots) { return (dots + 2u) / 3u; }

@@ -15,7 +15,13 @@ public:
     bool ShouldRegister() override { return emu_.Get<BoardContext>().GetSocId() == SocId::Sh7709; }
 
 protected:
-    bool ChannelsHeldInStandby() const override { return false; }
+    StandbyEffect Standby() const override { return StandbyEffect::kInitializes; }
+    uint32_t      ExternalRequestControls() const override { return kChcrRlAmAlDs; }
+    uint8_t       Stbcr2ModuleStop() const override { return kStbcr2Mstp7; }
+
+private:
+    static constexpr uint32_t kChcrRlAmAlDs = 0x00070040u;
+    static constexpr uint8_t  kStbcr2Mstp7  = 0x10u;
 };
 
 }

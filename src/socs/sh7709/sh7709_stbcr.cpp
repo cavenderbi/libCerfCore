@@ -7,7 +7,7 @@ namespace cerfcore {
 namespace {
 
 constexpr cerf_reg_window_detail::RegWindowModel kSh7709Stbcr = sh77xx_power_down::Stbcr(
-    cerf_reg_window_detail::OtherReset::kReset);
+    0x78u, cerf_reg_window_detail::OtherReset::kReset);
 
 class Sh7709Stbcr : public sh77xx_power_down::StandbyControlRegister<SocId::Sh7709, kSh7709Stbcr> {
 public:

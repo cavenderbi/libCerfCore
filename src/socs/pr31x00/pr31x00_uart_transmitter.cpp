@@ -60,6 +60,21 @@ void Pr31x00UartTransmitter::WriteHold(uint32_t port, uint8_t byte) {
     c.raise_ints(ints);
 }
 
+void Pr31x00UartTransmitter::WriteBreakControl(uint32_t port, uint32_t value, bool ends_break) {
+    Channel& c = Ch(port);
+    {
+        std::lock_guard<std::mutex> lk(c.mu);
+        if (!c.clock_running || c.hold_full || c.dma_pending) {
+            emu_.Get<Fatal>().Die("Pr31x00UartTransmitter: TXHOLD 0x%03X break control written with "
+                                  "the UART clock stopped or a byte held", value);
+        }
+    }
+    TxInts ints;
+    if (ends_break) ints.sent = true;
+    else            ints.hold_free = true;
+    c.raise_ints(ints);
+}
+
 void Pr31x00UartTransmitter::StartDma(uint32_t port) {
     Channel& c = Ch(port);
     {

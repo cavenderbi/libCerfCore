@@ -99,10 +99,7 @@ void HpJornada700Touch::OnSample() {
             return;
         }
     } else {
-        int x = 0;
-        int y = 0;
-        LatestPosition(&x, &y);
-        MapToPanel(x, y, kPanel, &adc_x_, &adc_y_);
+        LatestOnPanel(kPanel, &adc_x_, &adc_y_);
     }
     PulsePenLine();
 }

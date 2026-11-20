@@ -165,6 +165,8 @@ struct DeviceConfig : public Service {
         StateBootMode::Resume;
 #endif
 
+    std::string state_path;
+
     bool start_fullscreen = kDefaultStartFullscreen;
 
     bool double_tap_helper = kDefaultDoubleTapHelper;

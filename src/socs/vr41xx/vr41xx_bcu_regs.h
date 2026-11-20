@@ -25,6 +25,10 @@ constexpr const char* SpeedRfuEncoding(uint16_t speed) {
     return nullptr;
 }
 
+constexpr const char* SpeedWriteRfuEncoding(uint32_t off, uint16_t value) {
+    return off == kOffSpeed ? SpeedRfuEncoding(value) : nullptr;
+}
+
 }
 
 }

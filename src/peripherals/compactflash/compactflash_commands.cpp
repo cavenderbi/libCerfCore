@@ -35,7 +35,7 @@ REGISTER_SERVICE(CompactFlashCommands);
 std::string CompactFlashCommands::CfImgPath() const { return GetCerfDir() + kDefaultCfImageName; }
 
 std::string CompactFlashCommands::BundledPath(const std::string& file) const {
-    return GetDeviceDir(emu_.Get<DeviceConfig>().device_name) + file;
+    return ResolveDeviceFile(emu_.Get<DeviceConfig>().device_name, file);
 }
 
 uint64_t CompactFlashCommands::PayloadMb(const std::vector<std::string>& files) const {
@@ -103,16 +103,30 @@ void CompactFlashCommands::Generate(MachineObject& socket, Fat fat, PcmciaCardCa
         size.maximum     = std::numeric_limits<uint32_t>::max();
         size.recommended = minimum;
         emu_.Get<MachineRequests>().Ask(
-            std::move(size), [this, fat, documents = files.documents, inserter](const MachineReply& r) {
+            std::move(size), [this, &socket, fat, documents = files.documents, inserter](const MachineReply& r) {
                 if (r.cancelled) return;
-                Build(fat, documents, r.size, inserter);
+                AskOutput(socket, fat, documents, r.size, inserter);
             });
     });
 }
 
+void CompactFlashCommands::AskOutput(MachineObject& socket, Fat fat, const std::vector<std::string>& files,
+                                     uint64_t size_mb, const PcmciaCardCatalog::CardInserter& inserter) {
+    MachineRequest output;
+    output.kind             = MachineRequestKind::kOutputPath;
+    output.id               = "compact_flash_output_image";
+    output.object           = &socket;
+    output.extensions       = {"img"};
+    output.recommended_path = CfImgPath();
+    emu_.Get<MachineRequests>().Ask(std::move(output),
+                                    [this, fat, files, size_mb, inserter](const MachineReply& r) {
+                                        if (r.cancelled) return;
+                                        Build(fat, files, size_mb, r.path, inserter);
+                                    });
+}
+
 void CompactFlashCommands::Build(Fat fat, const std::vector<std::string>& files, uint64_t size_mb,
-                                 const PcmciaCardCatalog::CardInserter& inserter) {
-    const std::string cf    = CfImgPath();
+                                 const std::string& cf, const PcmciaCardCatalog::CardInserter& inserter) {
     const uint32_t    mb    = static_cast<uint32_t>(size_mb);
     const bool        built = fat == Fat::k16 ? emu_.Get<CompactFlashFat16Builder>().Build(cf, files, mb)
                                               : emu_.Get<CompactFlashFat32Builder>().Build(cf, files, mb);

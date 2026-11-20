@@ -8,6 +8,8 @@
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/emulation_freeze.h>
 
+#include <cerfengine/unwind_rollback.h>
+
 #include <utility>
 
 namespace cerfcore {
@@ -58,6 +60,7 @@ void GuestColdBoot::ExecuteIfPending() {
     std::function<void()> fill;
     if (fill_pending_.exchange(false, std::memory_order_acq_rel)) fill = std::exchange(fill_, nullptr);
     if (!wipe && !fill) return;
+    cerfengine::UnwindRollback still_pending([this, wipe] { pending_.store(wipe, std::memory_order_release); });
 
     if (wipe) {
         LOG(Boot, "GuestColdBoot: hard reset - wiping volatile RAM, replaying "
@@ -69,6 +72,7 @@ void GuestColdBoot::ExecuteIfPending() {
         fill();
     }
     ReplayBootWrites();
+    still_pending.Commit();
     if (wipe) emu_.Get<GuestPowerNotifier>().NotifyHardReset();
 }
 

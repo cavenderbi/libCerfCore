@@ -44,6 +44,7 @@ public:
     void OnCardDetectChanged(PcmciaSlot& slot) override;
     void OnReadyIreqLow     (PcmciaSlot& slot) override;
     void OnReadyIreqHigh    (PcmciaSlot& slot) override;
+    void OnStatusChange     (PcmciaSlot& slot, bool low) override;
     uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
 private:

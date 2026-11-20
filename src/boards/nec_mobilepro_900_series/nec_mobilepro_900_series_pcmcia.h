@@ -22,10 +22,12 @@ public:
        1 = PC Card. */
     void ResetSocket(int socket);
     bool SocketHasCard(int socket) const;
+    bool SocketStatusChangeLow(int socket) const;
 
     void OnCardDetectChanged(PcmciaSlot& slot) override;
     void OnReadyIreqLow     (PcmciaSlot& slot) override;
     void OnReadyIreqHigh    (PcmciaSlot& slot) override;
+    void OnStatusChange     (PcmciaSlot&, bool) override {}
     uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
 private:

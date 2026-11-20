@@ -7,9 +7,12 @@ namespace cerfcore {
 
 namespace {
 
-class RicohRf5c396MemWindow : public IsaExcaMemWindow<RicohRf5c396, RicohRf5c396Board, 0x01000000u> {
+class RicohRf5c396MemWindow : public IsaExcaMemWindow<RicohRf5c396, 0x01000000u> {
 public:
     using IsaExcaMemWindow::IsaExcaMemWindow;
+
+protected:
+    uint32_t AreaBase() override { return emu_.Get<RicohRf5c396Board>().IsaMemBase(); }
 };
 
 }

@@ -61,6 +61,8 @@ constexpr uint8_t kIntS0Ready   = 49u;
 constexpr uint8_t kIntS1Ready   = 50u;
 constexpr uint8_t kIntS0CdValid = 51u;
 constexpr uint8_t kIntS1CdValid = 52u;
+constexpr uint8_t kIntS0Bvd1Stschg = 53u;
+constexpr uint8_t kIntS1Bvd1Stschg = 54u;
 
 class Sa1111Pcmcia : public Sa1111Unit, public PcmciaSlotHost {
 public:
@@ -87,29 +89,32 @@ public:
         w.Write("pccr", pccr_);
         w.Write("pcssr", pcssr_);
         w.WriteBytes("ready_ireq_low",ready_ireq_low_, sizeof(ready_ireq_low_));
+        w.WriteBytes("stschg_low", stschg_low_, sizeof(stschg_low_));
     }
     void RestoreState(StateReader& r) override {
         std::lock_guard<std::mutex> lk(state_mutex_);
         r.Read("pccr", pccr_);
         r.Read("pcssr", pcssr_);
         r.ReadBytes("ready_ireq_low",ready_ireq_low_, sizeof(ready_ireq_low_));
+        r.ReadBytes("stschg_low", stschg_low_, sizeof(stschg_low_));
     }
     void PostRestore() override {
         UpdateResetSignals();
         for (int n = 0; n < 2; ++n) {
             DriveCardDetect(*slots_[n]);
-            DriveReady(n);
+            DrivePins(n);
         }
     }
 
     void OnCardDetectChanged(PcmciaSlot& slot) override {
         DriveCardDetect(slot);
-        DriveReady(SocketOf(slot));
+        DrivePins(SocketOf(slot));
     }
-    void OnCardPowerChanged(PcmciaSlot& slot) override { DriveReady(SocketOf(slot)); }
+    void OnCardPowerChanged(PcmciaSlot& slot) override { DrivePins(SocketOf(slot)); }
 
     void OnReadyIreqLow(PcmciaSlot& slot) override { SetReadyIreqLow(SocketOf(slot), true); }
     void OnReadyIreqHigh(PcmciaSlot& slot) override { SetReadyIreqLow(SocketOf(slot), false); }
+    void OnStatusChange(PcmciaSlot& slot, bool low) override { SetStatusChangeLow(SocketOf(slot), low); }
     uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
 protected:
@@ -165,8 +170,8 @@ protected:
             }
             DriveCardDetect(*slots_[0]);
             DriveCardDetect(*slots_[1]);
-            DriveReady(0);
-            DriveReady(1);
+            DrivePins(0);
+            DrivePins(1);
         }
         UpdateResetSignals();
     }
@@ -189,30 +194,43 @@ private:
 
     bool CardDrivesPins(int n) const { return slots_[n]->HasCard() && slots_[n]->IsPowered(); }
 
-    void PublishReadyLocked(int n) {
-        emu_.Get<Sa1111Intc>().SetSourceLevel(n == 0 ? kIntS0Ready : kIntS1Ready,
-                                              ReadyPinLocked(n));
+    bool Bvd1PinLocked(int n) const { return !(slots_[n]->IsPowered() && stschg_low_[n]); }
+
+    void PublishPinsLocked(int n) {
+        Sa1111Intc& intc = emu_.Get<Sa1111Intc>();
+        intc.SetSourceLevel(n == 0 ? kIntS0Ready : kIntS1Ready, ReadyPinLocked(n));
+        intc.SetSourceLevel(n == 0 ? kIntS0Bvd1Stschg : kIntS1Bvd1Stschg, Bvd1PinLocked(n));
     }
 
-    void DriveReady(int n) {
+    void SetStatusChangeLow(int n, bool low) {
         std::lock_guard<std::mutex> lk(state_mutex_);
-        PublishReadyLocked(n);
+        stschg_low_[n] = low;
+        PublishPinsLocked(n);
+    }
+
+    void DrivePins(int n) {
+        std::lock_guard<std::mutex> lk(state_mutex_);
+        PublishPinsLocked(n);
     }
 
     void SetReadyIreqLow(int n, bool low) {
         std::lock_guard<std::mutex> lk(state_mutex_);
         ready_ireq_low_[n] = low;
-        PublishReadyLocked(n);
+        PublishPinsLocked(n);
     }
 
     uint32_t ComputePcsr() {
-        bool ready0, ready1;
+        bool ready0, ready1, bvd1_0, bvd1_1;
         {
             std::lock_guard<std::mutex> lk(state_mutex_);
             ready0 = ReadyPinLocked(0);
             ready1 = ReadyPinLocked(1);
+            bvd1_0 = Bvd1PinLocked(0);
+            bvd1_1 = Bvd1PinLocked(1);
         }
-        uint32_t v = kPcsrS0Bvd1 | kPcsrS0Bvd2 | kPcsrS1Bvd1 | kPcsrS1Bvd2;
+        uint32_t v = kPcsrS0Bvd2 | kPcsrS1Bvd2;
+        if (bvd1_0) v |= kPcsrS0Bvd1;
+        if (bvd1_1) v |= kPcsrS1Bvd1;
         if (!slots_[0]->Vs1Grounded()) v |= kPcsrS0Vs1;
         if (!slots_[0]->Vs2Grounded()) v |= kPcsrS0Vs2;
         if (!slots_[1]->Vs1Grounded()) v |= kPcsrS1Vs1;
@@ -277,6 +295,7 @@ private:
     uint32_t   pccr_  = 0u;
     uint32_t   pcssr_ = 0u;
     bool       ready_ireq_low_[2] = {};
+    bool       stschg_low_[2]     = {};
 };
 
 }  /* namespace */

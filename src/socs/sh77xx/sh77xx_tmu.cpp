@@ -5,6 +5,7 @@
 #include <cerfcore/host/guest_deep_sleep.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
+#include "../../cpu/sh/sh_board_clock.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "sh77xx_frqcr.h"
 
@@ -15,6 +16,7 @@ namespace cerfcore {
 
 namespace {
 
+constexpr uint32_t kOffTocr         = 0x00u;
 constexpr uint32_t kOffTstr         = 0x02u;
 constexpr uint32_t kOffChannels     = 0x04u;
 constexpr uint32_t kChannelStride   = 0x0Cu;
@@ -23,6 +25,8 @@ constexpr uint32_t kChannelConstant = 0x00u;
 constexpr uint32_t kChannelCount    = 0x04u;
 constexpr uint32_t kChannelControl  = 0x08u;
 
+constexpr uint8_t kTocrTcoe     = 0x01u;
+constexpr uint8_t kTocrReserved = 0xFEu;
 constexpr uint8_t kTstrReserved = 0xF8u;
 
 constexpr uint16_t kTcrTpsc     = 0x0007u;
@@ -34,9 +38,6 @@ constexpr uint16_t kTcrReserved = 0xFEC0u;
 constexpr uint16_t kTcr2Stored  = 0x00FFu;
 constexpr uint16_t kTcr2Reserved = 0xFC00u;
 
-constexpr uint16_t kTpscRtcclk    = 4u;
-constexpr uint16_t kTpscPclkLast  = 3u;
-constexpr uint32_t kPclkTapShift  = 2u;
 constexpr uint32_t kChannelInput2 = 2u;
 
 constexpr uint8_t kStbcrMstp2 = 0x04u;
@@ -48,7 +49,7 @@ constexpr Sh77xxIntcSource kUnderflowSource[3] = {Sh77xxIntcSource::kTuni0, Sh77
 
 constexpr const char* kChannelPrefix[3] = {"tmu0_", "tmu1_", "tmu2_"};
 
-uint32_t PclkShift(uint16_t control) { return kPclkTapShift + 2u * (control & kTcrTpsc); }
+uint16_t Tpsc(uint16_t control) { return static_cast<uint16_t>(control & kTcrTpsc); }
 
 }
 
@@ -56,27 +57,28 @@ void Sh77xxTmu::OnReady() {
     clock_ = &emu_.Get<GuestCycleClock>();
     intc_  = &emu_.Get<Sh77xxIntc>();
     stbcr_ = &emu_.Get<Sh77xxStbcr>();
-    rtc_   = &emu_.Get<Sh77xxRtc>();
     for (Channel& ch : ch_) {
         Channel* channel = &ch;
         ch.event         = clock_->Add([this, channel] {
             Sync(*channel);
         });
     }
-    pclk_.Attach([this] {
-        for (Channel& ch : ch_) {
-            if (!Rtcclk(ch)) Arm(ch);
-        }
-    });
-    emu_.Get<Sh77xxStandbyEntry>().RegisterListener([this] { StopPeripheralClockChannels(); });
+    timer_clock_.Attach(
+        [this] {
+            for (Channel& ch : ch_) {
+                if (!Rtcclk(ch)) Arm(ch);
+            }
+        },
+        [this] {
+            for (Channel& ch : ch_) {
+                if (Rtcclk(ch)) Arm(ch);
+            }
+        });
+    emu_.Get<Sh77xxStandbyEntry>().RegisterListener([this] { EnterStandby(); });
     stbcr_->RegisterChangeListener([this](uint8_t from, uint8_t to) { OnStandbyControlChange(from, to); });
-    emu_.Get<Sh77xxFrqcr>().RegisterChangeListener([this](uint16_t from, uint16_t to) {
-        if (((from ^ to) & kSh77xxFrqcrStc) != 0u) StopPeripheralClockChannels();
-    });
-    rtc_->RegisterRtcclkListener([this] {
-        for (Channel& ch : ch_) {
-            if (Rtcclk(ch)) Arm(ch);
-        }
+    const ShBoardClock& board_clock = emu_.Get<ShBoardClock>();
+    emu_.Get<Sh77xxFrqcr>().RegisterChangeListener([this, &board_clock](uint16_t from, uint16_t to) {
+        if (((from ^ to) & kSh77xxFrqcrStc) != 0u && !board_clock.Pll1Switchable()) StopPeripheralClockChannels();
     });
     GuestDeepSleep& sleep = emu_.Get<GuestDeepSleep>();
     sleep.RegisterParkClock([this] { SyncRtcclkChannels(); });
@@ -88,27 +90,25 @@ void Sh77xxTmu::OnReady() {
 
 uint32_t Sh77xxTmu::Index(const Channel& ch) const { return static_cast<uint32_t>(&ch - ch_); }
 
-bool Sh77xxTmu::Rtcclk(const Channel& ch) const { return (ch.control & kTcrTpsc) == kTpscRtcclk; }
+bool Sh77xxTmu::Rtcclk(const Channel& ch) const { return Sh77xxTimerClock::Rtcclk(Tpsc(ch.control)); }
 
-uint64_t Sh77xxTmu::Ticks(const Channel& ch) {
-    if (Rtcclk(ch)) return rtc_->RtcclkTicks();
-    return pclk_.DividedTicks(PclkShift(ch.control));
-}
+uint64_t Sh77xxTmu::Ticks(const Channel& ch) { return timer_clock_.Ticks(Tpsc(ch.control)); }
 
 void Sh77xxTmu::Arm(Channel& ch) {
     if (!ch.counter.Running() || (ch.control & kTcrUnie) == 0u || ch.counter.Flagged()) {
         clock_->Disarm(ch.event);
         return;
     }
-    if (Rtcclk(ch)) {
-        rtc_->ArmAtRtcclk(ch.event, ch.counter.NextFlag());
-        return;
-    }
-    clock_->Arm(ch.event, pclk_.CycleOfDividedTick(ch.counter.NextFlag(), PclkShift(ch.control)));
+    timer_clock_.ArmAt(ch.event, ch.counter.NextFlag(), Tpsc(ch.control));
 }
 
 void Sh77xxTmu::Drive(Channel& ch) {
     intc_->SetSourceRequest(kUnderflowSource[Index(ch)], ch.counter.Flagged() && (ch.control & kTcrUnie) != 0u);
+}
+
+void Sh77xxTmu::PublishStandbyWake(const Channel& ch) {
+    intc_->SetStandbyWake(kUnderflowSource[Index(ch)], Rtcclk(ch));
+    if (Index(ch) == kChannelInput2) intc_->SetStandbyWake(Sh77xxIntcSource::kTicpi2, Rtcclk(ch));
 }
 
 void Sh77xxTmu::Sync(Channel& ch) {
@@ -176,7 +176,7 @@ void Sh77xxTmu::WriteControl(Channel& ch, uint16_t value) {
         emu_.Get<Fatal>().Die("Sh77xxTmu: TCR%u write 0x%04X enables input capture", Index(ch), value);
     }
     const uint16_t tpsc = value & kTcrTpsc;
-    if (tpsc > kTpscPclkLast && tpsc != kTpscRtcclk) {
+    if (!Sh77xxTimerClock::HasSource(tpsc)) {
         emu_.Get<Fatal>().Die("Sh77xxTmu: TCR%u write 0x%04X selects TPSC %u", Index(ch), value, tpsc);
     }
     Sync(ch);
@@ -184,20 +184,35 @@ void Sh77xxTmu::WriteControl(Channel& ch, uint16_t value) {
     ch.control          = static_cast<uint16_t>(value & (input2 ? kTcr2Stored : kTcrStored));
     ch.counter.Move(from, Ticks(ch));
     if ((value & kTcrUnf) == 0u) ch.counter.ClearFlag();
+    PublishStandbyWake(ch);
     Drive(ch);
     Arm(ch);
 }
 
 uint8_t Sh77xxTmu::ReadByte(uint32_t addr) {
     RequireClock("ReadByte", addr, 0u);
+    if (addr - MmioBase() == kOffTocr) return 0u;
     if (addr - MmioBase() != kOffTstr) HaltUnsupportedAccess("ReadByte", addr, 0u);
     return ReadTstr();
 }
 
 void Sh77xxTmu::WriteByte(uint32_t addr, uint8_t value) {
     RequireClock("WriteByte", addr, value);
+    if (addr - MmioBase() == kOffTocr) {
+        WriteTocr(value);
+        return;
+    }
     if (addr - MmioBase() != kOffTstr) HaltUnsupportedAccess("WriteByte", addr, value);
     WriteTstr(value);
+}
+
+void Sh77xxTmu::WriteTocr(uint8_t value) const {
+    if ((value & kTocrReserved) != 0u) {
+        emu_.Get<Fatal>().Die("Sh77xxTmu: TOCR write 0x%02X sets reserved bits", value);
+    }
+    if ((value & kTocrTcoe) != 0u) {
+        emu_.Get<Fatal>().Die("Sh77xxTmu: TOCR write 0x%02X makes the TCLK pin the RTC clock output", value);
+    }
 }
 
 uint16_t Sh77xxTmu::ReadHalf(uint32_t addr) {
@@ -246,7 +261,19 @@ void Sh77xxTmu::PowerOnReset() {
         ch.counter.PowerOnReset(kPowerOnCount);
         ch.control = 0u;
         clock_->Disarm(ch.event);
+        PublishStandbyWake(ch);
         Drive(ch);
+    }
+}
+
+void Sh77xxTmu::EnterStandby() {
+    StopPeripheralClockChannels();
+    if (!StandbyInitializesFlags()) return;
+    for (Channel& ch : ch_) {
+        ch.counter.Advance(Ticks(ch));
+        ch.counter.ClearFlag();
+        Drive(ch);
+        Arm(ch);
     }
 }
 
@@ -271,7 +298,7 @@ int64_t Sh77xxTmu::ParkWakeDueNs() {
     for (Channel& ch : ch_) {
         if (!Rtcclk(ch) || !ch.counter.Running() || (ch.control & kTcrUnie) == 0u || ch.counter.Flagged()) continue;
         if (!intc_->WakesStandby(kUnderflowSource[Index(ch)])) continue;
-        const int64_t at = rtc_->RtcclkSleptNsAtTick(ch.counter.NextFlag());
+        const int64_t at = timer_clock_.RtcclkSleptNsAtTick(ch.counter.NextFlag());
         if (at < due) due = at;
     }
     return due;
@@ -287,7 +314,7 @@ void Sh77xxTmu::SaveState(StateWriter& w) {
         ch.counter.Save(w, kChannelPrefix[Index(ch)], Ticks(ch));
         w.Write((std::string(kChannelPrefix[Index(ch)]) + "control").c_str(), ch.control);
     }
-    pclk_.Save(w);
+    timer_clock_.Save(w);
 }
 
 void Sh77xxTmu::RestoreState(StateReader& r) {
@@ -295,13 +322,14 @@ void Sh77xxTmu::RestoreState(StateReader& r) {
         ch.counter.Restore(r, kChannelPrefix[Index(ch)]);
         r.Read((std::string(kChannelPrefix[Index(ch)]) + "control").c_str(), ch.control);
     }
-    pclk_.Restore(r);
+    timer_clock_.Restore(r);
 }
 
 void Sh77xxTmu::PostRestore() {
-    pclk_.PostRestore();
+    timer_clock_.PostRestore();
     for (Channel& ch : ch_) {
         ch.counter.Rebase(Ticks(ch));
+        PublishStandbyWake(ch);
         Drive(ch);
         Arm(ch);
     }

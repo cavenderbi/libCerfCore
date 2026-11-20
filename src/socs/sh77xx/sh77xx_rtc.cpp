@@ -3,15 +3,12 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
-#include <cerfcore/host/guest_deep_sleep.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 
 #include <algorithm>
 #include <cstdint>
-#include <limits>
-#include <utility>
 
 namespace cerfcore {
 
@@ -19,10 +16,8 @@ namespace {
 
 using Cal = Sh77xxRtcCalendar;
 
-constexpr uint64_t kCrystalHz      = 32768u;
-constexpr uint64_t kRtcclkDivider  = 2u;
 constexpr uint64_t kTicksPerCount  = 256u;
-constexpr uint64_t kTicksPerSecond = kCrystalHz;
+constexpr uint64_t kTicksPerSecond = Sh77xxRtcOscillator::kCrystalHz;
 constexpr uint64_t kDividerPeriod  = 2u * kTicksPerSecond;
 
 constexpr uint64_t kPeriodTicks[8] = {0u, 128u, 512u, 2048u, 8192u, 16384u, 32768u, 65536u};
@@ -56,30 +51,25 @@ uint8_t Flag(bool set, uint8_t bit) { return set ? bit : static_cast<uint8_t>(0u
 void Sh77xxRtc::OnReady() {
     intc_  = &emu_.Get<Sh77xxIntc>();
     stbcr_ = &emu_.Get<Sh77xxStbcr>();
-    clock_ = &emu_.Get<GuestCycleClock>();
-    osc_.Attach(kCrystalHz, 1u);
-    seen_ = osc_.Now();
+    AttachOscillator();
+    AttachDivider(kDividerPeriod);
     cal_.SeedFromHost();
-    event_ = clock_->Add([this] {
-        Advance();
-        Settle();
-    });
-    clock_->RegisterRateListener([this] {
-        Advance();
-        osc_.Rescale();
-        Schedule();
-        NotifyRtcclk();
-    });
     emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) { OnReset(kind); });
-    GuestDeepSleep& sleep = emu_.Get<GuestDeepSleep>();
-    sleep.RegisterParkClock([this] {
-        Advance();
-        Settle();
-    });
-    sleep.RegisterParkWakeDue([this] { return ParkWakeDueNs(); });
     PowerOnReset();
     emu_.Get<PeripheralDispatcher>().Register(this);
 }
+
+void Sh77xxRtc::OnOscillatorRateChange() {
+    Advance();
+    Schedule();
+}
+
+void Sh77xxRtc::OnDividerEvent() {
+    Advance();
+    Settle();
+}
+
+uint64_t Sh77xxRtc::NextWakingTick() { return NextEventTick(true); }
 
 void Sh77xxRtc::RequireClock(const char* access, uint32_t addr, uint8_t value) const {
     if (!stbcr_->ModuleStopped(kStbcrMstp1)) return;
@@ -100,15 +90,11 @@ void Sh77xxRtc::RequireCountable(const char* trigger) const {
 uint64_t Sh77xxRtc::PeriodTicks() const { return kPeriodTicks[pes_]; }
 
 void Sh77xxRtc::Advance() {
-    const uint64_t now = osc_.Now();
-    const uint64_t from = phase_;
-    const uint64_t to   = from + (now - seen_);
-    seen_               = now;
-    if (to == from) return;
-    if (to / kTicksPerCount != from / kTicksPerCount) cf_ = true;
-    if (pes_ != 0u && to / PeriodTicks() != from / PeriodTicks()) pef_ = true;
-    const uint64_t secs = to / kTicksPerSecond - from / kTicksPerSecond;
-    phase_              = static_cast<uint32_t>(to % kDividerPeriod);
+    const DividerStep step = StepDivider();
+    if (step.to == step.from) return;
+    if (step.to / kTicksPerCount != step.from / kTicksPerCount) cf_ = true;
+    if (pes_ != 0u && step.to / PeriodTicks() != step.from / PeriodTicks()) pef_ = true;
+    const uint64_t secs = step.Seconds();
     if (secs != 0u && start_) CountSeconds(secs);
 }
 
@@ -138,8 +124,8 @@ void Sh77xxRtc::Settle() {
 }
 
 uint64_t Sh77xxRtc::NextEventTick(bool waking_only) {
-    uint64_t   next     = std::numeric_limits<uint64_t>::max();
-    const auto consider = [&](uint64_t period) { next = std::min(next, seen_ + period - phase_ % period); };
+    uint64_t   next     = kNoTick;
+    const auto consider = [&](uint64_t period) { next = std::min(next, NextBoundaryTick(period)); };
     const auto counts   = [&](Sh77xxIntcSource source) { return !waking_only || intc_->WakesStandby(source); };
     if (cie_ && !cf_ && counts(Sh77xxIntcSource::kCui)) consider(kTicksPerCount);
     if (pes_ != 0u && !pef_ && counts(Sh77xxIntcSource::kPri)) consider(PeriodTicks());
@@ -150,30 +136,13 @@ uint64_t Sh77xxRtc::NextEventTick(bool waking_only) {
     return next;
 }
 
-void Sh77xxRtc::Schedule() {
-    const uint64_t next = NextEventTick(false);
-    if (next == std::numeric_limits<uint64_t>::max()) {
-        clock_->Disarm(event_);
-        return;
-    }
-    osc_.ArmAt(event_, next);
-}
-
-int64_t Sh77xxRtc::ParkWakeDueNs() {
-    Advance();
-    Settle();
-    const uint64_t next = NextEventTick(true);
-    if (!rtcen_ || next == std::numeric_limits<uint64_t>::max()) return GuestDeepSleep::kNoParkWake;
-    return osc_.SleptNsAtTick(next);
-}
+void Sh77xxRtc::Schedule() { ScheduleTick(NextEventTick(false)); }
 
 void Sh77xxRtc::RecomputeAlarmDue() {
     alarm_stale_        = false;
     const uint64_t secs = cal_.SecondsToOnset(alarm_, match_);
     alarm_reachable_    = secs != 0u;
-    if (alarm_reachable_) {
-        alarm_due_ = seen_ + (kTicksPerSecond - phase_ % kTicksPerSecond) + (secs - 1u) * kTicksPerSecond;
-    }
+    if (alarm_reachable_) alarm_due_ = SecondBoundaryTick(secs);
 }
 
 void Sh77xxRtc::DriveLines() {
@@ -182,34 +151,9 @@ void Sh77xxRtc::DriveLines() {
     intc_->SetSourceRequest(Sh77xxIntcSource::kCui, cf_ && cie_);
 }
 
-void Sh77xxRtc::SetCounting(bool counting) {
-    rtcen_ = counting;
-    osc_.SetCounting(counting);
-    NotifyRtcclk();
-}
-
-uint64_t Sh77xxRtc::RtcclkTicks() { return osc_.Now() / kRtcclkDivider; }
-
-void Sh77xxRtc::ArmAtRtcclk(GuestCycleClock::Event* event, uint64_t tick) {
-    osc_.ArmAt(event, tick * kRtcclkDivider);
-}
-
-int64_t Sh77xxRtc::RtcclkSleptNsAtTick(uint64_t tick) {
-    if (!rtcen_) return GuestDeepSleep::kNoParkWake;
-    return osc_.SleptNsAtTick(tick * kRtcclkDivider);
-}
-
-void Sh77xxRtc::RegisterRtcclkListener(std::function<void()> listener) {
-    rtcclk_listeners_.Add(std::move(listener));
-}
-
-void Sh77xxRtc::NotifyRtcclk() {
-    rtcclk_listeners_.Call();
-}
-
 void Sh77xxRtc::OnReset(ResetLineKind kind) {
     Advance();
-    if (kind == ResetLineKind::Rtc) {
+    if (emu_.Get<GuestCpuReset>().PowerOnReset(kind)) {
         PowerOnReset();
     } else {
         ManualReset();
@@ -225,7 +169,7 @@ void Sh77xxRtc::PowerOnReset() {
     af_          = false;
     pef_         = false;
     pes_         = 0u;
-    if (!rtcen_) SetCounting(true);
+    if (!OscillatorRunning()) SetOscillatorRunning(true);
     if (!start_) RequireCountable("power-on reset");
     start_ = true;
     for (uint8_t& field : alarm_) field &= static_cast<uint8_t>(~Cal::kAlarmEnable);
@@ -246,7 +190,7 @@ uint8_t Sh77xxRtc::ReadRcr1() const {
 }
 
 uint8_t Sh77xxRtc::ReadRcr2() const {
-    return static_cast<uint8_t>(Flag(pef_, kRcr2Pef) | (pes_ << kRcr2PesShift) | Flag(rtcen_, kRcr2Rtcen) |
+    return static_cast<uint8_t>(Flag(pef_, kRcr2Pef) | (pes_ << kRcr2PesShift) | Flag(OscillatorRunning(), kRcr2Rtcen) |
                                 Flag(start_, kRcr2Start));
 }
 
@@ -264,16 +208,16 @@ void Sh77xxRtc::WriteRcr2(uint8_t value) {
     pef_ = (value & kRcr2Pef) != 0u;
     pes_ = static_cast<uint8_t>((value >> kRcr2PesShift) & kRcr2PesMask);
     const bool rtcen = (value & kRcr2Rtcen) != 0u;
-    if (rtcen != rtcen_) SetCounting(rtcen);
+    if (rtcen != OscillatorRunning()) SetOscillatorRunning(rtcen);
     if ((value & kRcr2Adj) != 0u) {
         if (cal_.CrossesDay(cal_.RoundUpSeconds())) RequireCountable("RCR2 ADJ");
         cal_.RoundToMinute();
-        phase_       = 0u;
+        RestartDivider();
         alarm_stale_ = true;
         Compare();
     }
     if ((value & kRcr2Reset) != 0u) {
-        phase_       = 0u;
+        RestartDivider();
         alarm_stale_ = true;
     }
     const bool start = (value & kRcr2Start) != 0u;
@@ -313,7 +257,7 @@ uint8_t Sh77xxRtc::ReadByte(uint32_t addr) {
     const uint32_t off   = addr - MmioBase();
     uint8_t        value = 0u;
     if (off == kOffR64cnt) {
-        value = static_cast<uint8_t>((phase_ % kTicksPerSecond) / kTicksPerCount);
+        value = static_cast<uint8_t>((DividerPhase() % kTicksPerSecond) / kTicksPerCount);
     } else if (off >= kOffCounter && off < kOffAlarm && (off & 1u) == 0u) {
         value = cal_.Register(static_cast<Cal::Counter>((off - kOffCounter) / 2u));
     } else if (off >= kOffAlarm && off < kOffRcr1 && (off & 1u) == 0u) {
@@ -349,36 +293,37 @@ void Sh77xxRtc::WriteByte(uint32_t addr, uint8_t value) {
 
 void Sh77xxRtc::SaveState(StateWriter& w) {
     Advance();
-    osc_.Save(w);
+    SaveOscillator(w);
     cal_.Save(w);
     w.WriteBytes("alarm", alarm_.data(), sizeof(alarm_));
-    w.Write("phase", phase_);
+    SaveDivider(w);
     w.Write("pes", pes_);
     w.Write("cf", cf_);
     w.Write("cie", cie_);
     w.Write("aie", aie_);
     w.Write("af", af_);
     w.Write("pef", pef_);
-    w.Write("rtcen", rtcen_);
+    w.Write("rtcen", OscillatorRunning());
     w.Write("start", start_);
     w.Write("match", match_);
 }
 
 void Sh77xxRtc::RestoreState(StateReader& r) {
-    osc_.Restore(r);
+    RestoreOscillator(r);
     cal_.Restore(r);
     r.ReadBytes("alarm", alarm_.data(), sizeof(alarm_));
-    r.Read("phase", phase_);
+    RestoreDivider(r);
     r.Read("pes", pes_);
     r.Read("cf", cf_);
     r.Read("cie", cie_);
     r.Read("aie", aie_);
     r.Read("af", af_);
     r.Read("pef", pef_);
-    r.Read("rtcen", rtcen_);
+    bool rtcen = true;
+    r.Read("rtcen", rtcen);
+    RestoreOscillatorRunning(rtcen);
     r.Read("start", start_);
     r.Read("match", match_);
-    seen_        = osc_.Now();
     alarm_stale_ = true;
 }
 

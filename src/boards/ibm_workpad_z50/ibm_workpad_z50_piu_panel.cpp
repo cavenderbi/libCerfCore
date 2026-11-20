@@ -3,7 +3,6 @@
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/core/fatal.h>
 #include "ibm_workpad_z50_battery.h"
 #include "ibm_workpad_z50_family_id.h"
 
@@ -18,6 +17,7 @@ using cerf_vr41xx_piu_detail::kAdcmdAdin0;
 using cerf_vr41xx_piu_detail::kAdcmdAdin1;
 using cerf_vr41xx_piu_detail::kAdcmdAdin2;
 using cerf_vr41xx_piu_detail::kAdcmdAudioIn;
+using cerf_vr41xx_piu_detail::kUndrivenPortSample;
 
 constexpr uint32_t kMainFullChargeCount = 944u;
 constexpr uint16_t kBackupHealthy      = 0x316u;
@@ -35,15 +35,11 @@ public:
 
     bool HasTouchscreen() const override { return false; }
 
-    std::optional<uint16_t> ConvertCommandPort(uint16_t adcmd, uint16_t, uint16_t) override {
-        emu_.Get<Fatal>().Die("IbmWorkpadZ50PiuPanel: PIU command scan of A/D port 0x%X", adcmd);
-    }
+    std::optional<uint16_t> PressureSample(bool) override { return kUndrivenPortSample; }
 
-    std::optional<uint16_t> PressureSample() override {
-        emu_.Get<Fatal>().Die("IbmWorkpadZ50PiuPanel: PIU pressure sample");
-    }
+    uint16_t ReleasedPlateSample() override { return kUndrivenPortSample; }
 
-    std::optional<uint16_t> AdPortScanSample(uint16_t port) override {
+    std::optional<uint16_t> PortSample(uint16_t port) override {
         const auto& battery = emu_.Get<IbmWorkpadZ50Battery>();
         switch (port) {
             case kAdcmdAdin0:
@@ -52,14 +48,13 @@ public:
             case kAdcmdAdin1: return kBackupHealthy;
             case kAdcmdAdin2: return battery.ChargeComplete() ? kChargeCompleteLow : kChargeIncomplete;
             case kAdcmdAudioIn: return kAudioInSample;
-            default:
-                emu_.Get<Fatal>().Die("IbmWorkpadZ50PiuPanel: ADPortScan of A/D port 0x%X", port);
+            default:            return kUndrivenPortSample;
         }
     }
 };
 
 }
 
-REGISTER_SERVICE_AS(IbmWorkpadZ50PiuPanel, Vr41xxPiuPanel);
+REGISTER_SERVICE_AS_ALSO(IbmWorkpadZ50PiuPanel, Vr41xxPiuScreen, Vr41xxPiuPanel);
 
 }

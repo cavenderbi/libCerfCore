@@ -6,25 +6,7 @@ namespace cerfcore {
 
 void GuestClockTouchInput::OnReady() {
     samples_.Attach([this] { OnSample(); });
-    pens_.Attach(emu_, [this](const HostPen& pen) { ApplyHostPen(pen); });
-    OnTouchReady();
-}
-
-void GuestClockTouchInput::PenDown(int x, int y) {
-    pens_.Track(x, y);
-    QueueHostPen(HostPen{kPenDown, x, y});
-}
-
-void GuestClockTouchInput::PenMove(int x, int y) {
-    pens_.Track(x, y);
-}
-
-void GuestClockTouchInput::PenUp(int, int) {
-    QueueHostPen(HostPen{kPenUp, 0, 0});
-}
-
-void GuestClockTouchInput::CaptureLost() {
-    QueueHostPen(HostPen{kPenUp, 0, 0});
+    HostPenTouchInput::OnReady();
 }
 
 void GuestClockTouchInput::StartSamples(GuestCycleClock::Rate rate) {
@@ -41,7 +23,7 @@ void GuestClockTouchInput::StopSamples() {
 
 void GuestClockTouchInput::ClearOnRestore() {
     StopSamples();
-    pens_.Clear();
+    ClearPens();
 }
 
 }

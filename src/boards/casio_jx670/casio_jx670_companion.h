@@ -5,7 +5,9 @@
 #include "casio_jx670_audio.h"
 #include "casio_jx670_display.h"
 #include "casio_jx670_eeprom.h"
+#include "casio_jx670_keys.h"
 #include "casio_jx670_modem.h"
+#include "casio_jx670_socket.h"
 #include "casio_jx670_touch.h"
 
 #include <atomic>
@@ -41,6 +43,7 @@ public:
 
     void SetTouchPen(bool down, int x, int y) { touch_.SetPen(down, x, y); }
     void TouchCaptureLost() { touch_.OnCaptureLost(); }
+    void SetButtons(uint16_t bits, bool down) { keys_.SetHeld(bits, down); }
 
     bool IsDisplayEnabled() const { return display_.IsDisplayEnabled(); }
     uint32_t GuestW()      const { return display_.GuestW(); }
@@ -56,12 +59,15 @@ private:
 
     void WriteReg(uint32_t off, uint32_t value);
     void WriteCodecCommand(uint32_t value);
-    void WriteSysCtrl(uint32_t off, uint32_t value, uint32_t keep_mask);
+    bool WriteSysCtrl(uint32_t off, uint32_t value, uint32_t keep_mask);
     void UpdateIrqLine();
+    uint16_t IntStatus() const;
 
     CasioJx670Audio audio_{emu_};
     CasioJx670Display display_;
     CasioJx670Eeprom eeprom_;
+    CasioJx670Keys keys_;
+    CasioJx670Socket socket_;
     CasioJx670Modem* modem_ = nullptr;
     CasioJx670Touch touch_;
 
@@ -74,17 +80,10 @@ private:
     uint32_t ctrl_a0d4_ = 0;
     /* nk_main_kernel.exe @0x9F03C188-0x9F03C194; sub_9F08EE0C SYSINTR-19/28/30/31. */
     uint32_t clk8004_ = 0;
-    /* nk_main_kernel.exe sub_9F038A58 @0x9F038A60 */
-    uint16_t data_a040_ = 0;
     /* nk_main_kernel.exe @0x9F032CDC, sub_9F03473C @0x9F034834/@0x9F034844. */
     uint32_t reg_1110_ = 0;
-    /* nk_main_kernel.exe writes @0x9F08EF7C/@0x9F03C330/@0x9F03C338; store-only,
-       read side sub_9F03C304 @0x9F03C308 born-FATAL until hit. */
     uint32_t reg_1054_ = 0;
-    /* pcmcia.dll @0xF81878/@0xF81880 (RMW |0x30). */
-    uint32_t socket_ctrl_ac8_ = 0;
-    /* pcmcia.dll @0xF81D76/@0xF81D80 (RMW &~0xC). */
-    uint32_t socket_a038_ = 0;
+    uint32_t reg_a0dc_ = 0;
     /* nk_main_kernel.exe sub_9F08EE0C @0x9F08EE28/@0x9F08EE34. */
     uint16_t intcfg8404_ = 0;
     /* wavedev.dll 0x03C0 register file; 0x03F4 data port latched by the 0x5000
@@ -96,9 +95,6 @@ private:
     uint32_t latch1118_ = 0;
     /* nk_main_kernel.exe @0x9F035930 (sw 0x10), idle @0x9F0388F4 (lw; andi 1). */
     uint32_t latch130C_ = 0;
-    /* socket.dll @0xF41978-0xF41984 (0x4000 -> table[4]=+0 @0xF421D2, desc
-       0xAA008000 @0xF421F8) via sub_F42258 store. */
-    uint32_t strap8000_ = 0;
     /* remocon.dll mapper @0xED181C-0xED1820 (base+0x89C); init RMW @0xED158C
        (&~0x38); IST @0xED15D6-0xED15E4 (&~0x30|8), @0xED1682-0xED168C (&~0x38);
        gate sub_ED19A0 (&0x40). */
@@ -109,9 +105,6 @@ private:
     uint32_t sib_regs_[5] = {};
     /* nk_main_kernel.exe sub_9F038AF0 @0x9F038AF8 */
     std::atomic<uint32_t> sys_ctrl_[16] = {};
-    /* nk_main_kernel.exe @0x9F0330DC-0x9F0330F0; keybddr.dll sub_FB1F80
-       base+(0x30+i)*2, i=0..15. */
-    uint16_t edge_cfg_[16] = {};
 
 };
 

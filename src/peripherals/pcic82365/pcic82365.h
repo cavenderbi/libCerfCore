@@ -57,6 +57,7 @@ struct ExcaPartRules {
     ExcaBatteryDeadPin battery_dead_pin;
     ExcaBatteryWarning battery_warning;
     bool outputs_require_card;
+    bool outputs_require_vcc;
     bool card_inputs_high_without_vcc;
     bool ring_indicate_masks_status_change;
     uint16_t irq_select_reserved;
@@ -87,11 +88,13 @@ public:
     void CardDetectChanged(bool present, ExcaWriteEffect* effect);
     void RequestVccFromSocketControl(bool vcc_on, ExcaWriteEffect* effect);
     void SetReadyIreqLow(bool low);
+    void SetStatusChangeLow(bool low);
     void SetInterfaceIsolated(bool on, ExcaWriteEffect* effect);
     void SoftwareCardDetect();
     void LatchGpiChange();
     void ClearGpiChange();
     void SetConfigurationResetOnRemoval(bool on) { configuration_reset_on_removal_ = on; }
+    void SetCardInputsHighWithoutVcc(bool on) { rules_.card_inputs_high_without_vcc = on; }
     uint8_t InterfaceStatus() const;
     bool IreqPinLow() const { return ready_ireq_low_; }
     bool ReadyPin() const;
@@ -161,6 +164,8 @@ private:
     bool    ready_ireq_low_             = false;
     bool    pin_present_                = false;
     bool    pin_ireq_low_               = false;
+    bool    stschg_low_                 = false;
+    bool    pin_stschg_low_             = false;
     bool    isolated_                   = false;
     uint8_t frozen_inputs_              = 0u;
     bool    ready_pin_                  = false;

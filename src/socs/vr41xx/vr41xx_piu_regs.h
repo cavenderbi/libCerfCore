@@ -40,7 +40,7 @@ enum : uint16_t {
 enum : uint16_t {
     kPadRst = 0x0001, kPiuPwr = 0x0002, kSeqEn = 0x0004,
     kScanStart = 0x0040, kScanStop = 0x0080, kAtStart = 0x0100, kAtStop = 0x0200,
-    kCntStored  = 0x033Eu,
+    kCntStored  = 0x03FEu,
 };
 
 constexpr uint16_t CntReadValue(bool penstp, bool penstc, uint16_t state, uint16_t cnt_cfg) {
@@ -50,7 +50,10 @@ constexpr uint16_t CntReadValue(bool penstp, bool penstc, uint16_t state, uint16
 
 enum : uint16_t {
     kAdcmdTpx0 = 0x0u, kAdcmdAdin0 = 0x4u, kAdcmdAdin1 = 0x5u, kAdcmdAdin2 = 0x6u, kAdcmdAudioIn = 0x7u,
+    kAdcmdStandby = 0xFu,
 };
+
+constexpr uint16_t kUndrivenPortSample = 0u;
 
 /* PIUASCNREG D1 TPPSCAN "0: ADIN(2:0)/AUDIOIN as A/D port", D0 ADPSSTART "1: Start ADPortScan"
    (VR4121 UM 20.3.6, VR4102 UM 19.3.6). */

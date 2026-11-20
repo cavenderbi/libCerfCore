@@ -4,6 +4,7 @@
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfengine/mips/mips_cpu_state.h>
+#include "../../socs/vr4101/vr4101_id.h"
 #include "../../socs/vr4102/vr4102_id.h"
 #include "../../socs/vr4111/vr4111_id.h"
 #include "../../socs/vr4121/vr4121_id.h"
@@ -38,8 +39,8 @@ public:
 
     bool ShouldRegister() override {
         const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
-        return soc == SocId::Vr4102 || soc == SocId::Vr4111 || soc == SocId::Vr4121 ||
-               soc == SocId::Vr4122 || soc == SocId::Vr5500;
+        return soc == SocId::Vr4101 || soc == SocId::Vr4102 || soc == SocId::Vr4111 ||
+               soc == SocId::Vr4121 || soc == SocId::Vr4122 || soc == SocId::Vr5500;
     }
 
     cerfengine::MipsTlbHooks Hooks() override {

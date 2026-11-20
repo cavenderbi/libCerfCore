@@ -39,6 +39,6 @@ public:
 
 }  /* namespace */
 
-REGISTER_SERVICE_AS(Vr4102Giu, Vr41xxGiu);
+REGISTER_SERVICE_AS_ALSO(Vr4102Giu, Vr41xxGiu, Vr41xxPortGiu);
 
 }

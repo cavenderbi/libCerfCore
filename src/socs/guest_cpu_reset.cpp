@@ -8,6 +8,8 @@
 #include <cerfcore/state/emulation_freeze.h>
 #include "../execution/engine_bridge.h"
 
+#include <cerfengine/unwind_rollback.h>
+
 namespace cerfcore {
 
 REGISTER_SERVICE(GuestCpuReset);
@@ -58,6 +60,10 @@ void GuestCpuReset::ResetWithLatchedCause(ResetLineKind kind) {
     Request(kind);
 }
 
+bool GuestCpuReset::PowerOnReset(ResetLineKind kind) const {
+    return kind == ResetLineKind::Rtc || (latch_ != nullptr && latch_->CpuTookPowerOnReset());
+}
+
 void GuestCpuReset::RegisterResetListener(std::function<void(ResetLineKind)> fn) {
     reset_listeners_.Add(std::move(fn));
 }
@@ -95,6 +101,11 @@ void GuestCpuReset::OnResetDelivered() {
     delivering_kind_.store(kind, std::memory_order_release);
     delivering_.store(true, std::memory_order_release);
     delivered_reported_warm_ = report_warm_pending_.exchange(false, std::memory_order_acq_rel);
+    cerfengine::UnwindRollback still_pending([this, kind] {
+        pending_kind_.store(kind, std::memory_order_release);
+        pending_is_resume_.store(delivered_is_resume_, std::memory_order_release);
+        report_warm_pending_.store(delivered_reported_warm_, std::memory_order_release);
+    });
     line_held_ = true;
     reset_listeners_.Call(kind);
     if (delivered_reported_warm_ && latch_) latch_->ReportOnlyWarmReset();
@@ -102,6 +113,7 @@ void GuestCpuReset::OnResetDelivered() {
     line_held_ = false;
     release_listeners_.Call();
     emu_.Get<GuestPowerNotifier>().NotifyResetReleased();
+    still_pending.Commit();
     delivering_.store(false, std::memory_order_release);
 }
 

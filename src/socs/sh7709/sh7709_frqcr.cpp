@@ -5,7 +5,7 @@ namespace cerfcore {
 
 namespace {
 
-constexpr cerf_reg_window_detail::RegWindowModel kSh7709Frqcr = sh77xx_frqcr::Window(0xE3FFu, 0x1C00u, false);
+constexpr cerf_reg_window_detail::RegWindowModel kSh7709Frqcr = sh77xx_frqcr::Window(0xE3FFu, 0x1E00u, false);
 
 class Sh7709Frqcr : public sh77xx_frqcr::Sh77xxFrqcrBase<SocId::Sh7709, kSh7709Frqcr> {
 public:

@@ -1,30 +1,21 @@
-#include <cerfcore/core/service.h>
+#include "../nec_vr41xx_battery_lock.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include "../../socs/vr41xx/vr41xx_giu.h"
-#include <cerfcore/boards/board_context.h>
 #include "nec_cronos3e_family_id.h"
 
 namespace cerfcore {
 
 namespace {
 
-/* nec_mobilepro_790_hpc2000 nk.exe start @0x9E0999E8 boots on GIUPIODL D12 = 1; with it 0,
-   sub_9E09B554 shows "Slide the battery release lock to the locked position!" and polls D12
-   (VR4121 UM U13569EJ2V0UM00 19.2.3). */
 constexpr int kBatteryLockPin = 12;
 
-class NecCronos3eBatteryLock : public Service {
+class NecCronos3eBatteryLock : public NecVr41xxBatteryLock {
 public:
-    using Service::Service;
+    using NecVr41xxBatteryLock::NecVr41xxBatteryLock;
 
-    bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecCronos3e;
-    }
-
-    void OnReady() override {
-        emu_.Get<Vr41xxGiu>().SetPinLevel(kBatteryLockPin, true);
-    }
+protected:
+    std::string_view BatteryLockFamilyId() const override { return BoardFamilyId::NecCronos3e; }
+    int              BatteryLockPin() const override { return kBatteryLockPin; }
 };
 
 }

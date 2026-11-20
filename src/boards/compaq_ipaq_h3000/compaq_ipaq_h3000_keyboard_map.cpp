@@ -23,18 +23,25 @@ constexpr uint32_t kMicroDown     = 9;
 constexpr uint32_t kGpioAction    = kIpaqH3000GpioButtonFlag | kIpaqH3000ActionButtonPin;
 constexpr uint32_t kGpioPower     = kIpaqH3000GpioButtonFlag | kIpaqH3000PowerButtonPin;
 
+constexpr char kApp1Label[]   = "App1";
+constexpr char kApp2Label[]   = "App2";
+constexpr char kApp3Label[]   = "App3";
+constexpr char kApp4Label[]   = "App4";
+constexpr char kRecordLabel[] = "Record";
+constexpr char kPowerLabel[]  = "Power";
+
 const std::vector<KeyBinding> kBindings = {
     { 0x0D, kGpioAction,    nullptr,  0, 0 },
     { 0x26, kMicroUp,       nullptr,  0, 0 },
     { 0x27, kMicroRight,    nullptr,  0, 0 },
     { 0x25, kMicroLeft,     nullptr,  0, 0 },
     { 0x28, kMicroDown,     nullptr,  0, 0 },
-    { 0x70, kMicroCalendar, "App1",   0, 0 },
-    { 0x71, kMicroContacts, "App2",   0, 0 },
-    { 0x72, kMicroQ,        "App3",   0, 0 },
-    { 0x73, kMicroStart,    "App4",   0, 0 },
-    { 0x74, kMicroRecord,   "Record", 0, 0 },
-    { 0xDF, kGpioPower,     "Power",  0, 0 },
+    { 0x70, kMicroCalendar, kApp1Label,   0, 0 },
+    { 0x71, kMicroContacts, kApp2Label,   0, 0 },
+    { 0x72, kMicroQ,        kApp3Label,   0, 0 },
+    { 0x73, kMicroStart,    kApp4Label,   0, 0 },
+    { 0x74, kMicroRecord,   kRecordLabel, 0, 0 },
+    { 0xDF, kGpioPower,     kPowerLabel,  0, 0 },
 };
 
 class CompaqIpaqH3000KeyboardMap : public KeyboardMap {

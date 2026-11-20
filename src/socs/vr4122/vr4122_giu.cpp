@@ -7,7 +7,7 @@ namespace cerfcore {
 
 namespace {
 
-using cerf_vr41xx_giu_detail::Vr41xxGiuBase;
+using cerf_vr41xx_giu_detail::Vr41xxGiuCore;
 using cerf_vr41xx_giu_detail::Vr41xxGiuModel;
 
 /* VR4122 GIU (VR4131 UM U15350EJ2V0UM Table 14-2, p.256; NetBSD vripreg.h
@@ -34,16 +34,18 @@ constexpr Vr41xxGiuModel kModel = {
    (offset 0x1E); the shared VR4102/4121 template decodes 0x1C as its own GIUPODATL, and its
    ReadWord/WriteWord call the private ReadHalfLocked, so a word access touching the tail
    must not reach the base. */
-class Vr4122Giu : public Vr41xxGiuBase<SocId::Vr4122, kModel> {
+class Vr4122Giu : public Vr41xxGiuCore<SocId::Vr4122, kModel, Vr41xxGiu> {
+    using Core = Vr41xxGiuCore<SocId::Vr4122, kModel, Vr41xxGiu>;
+
 public:
-    using Vr41xxGiuBase::Vr41xxGiuBase;
+    using Core::Core;
 
     /* GIUPODATEN 0x1C D3:0 PIOEN(35:32), GIUPODATL 0x1E D3:0 PIOD(35:32) - a latch
        independent of PIOEN ("The set value can be read by reading the PIOD bit");
        RTCRST column 0, other resets retained (VR4131 UM 14.2.15 p.272 / 14.2.16
        p.273). Guest: sh 0 -> 0x15C @0x9F033A1C, sh 0 -> 0x15E @0x9F033A24. */
     void OnReady() override {
-        Vr41xxGiuBase::OnReady();
+        Core::OnReady();
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
             if (kind == ResetLineKind::Rtc) {
                 podaten_ = 0;
@@ -56,7 +58,7 @@ public:
         switch (addr - MmioBase()) {
             case kTailPodatEn: return podaten_;
             case kTailPodatL:  return podatl_;
-            default: return Vr41xxGiuBase::ReadHalf(addr);
+            default: return Core::ReadHalf(addr);
         }
     }
     void WriteHalf(uint32_t addr, uint16_t value) override {
@@ -67,33 +69,29 @@ public:
             case kTailPodatL:
                 podatl_ = static_cast<uint16_t>(value & kPioenMask);
                 return;
-            default: Vr41xxGiuBase::WriteHalf(addr, value); return;
+            default: Core::WriteHalf(addr, value); return;
         }
     }
-    uint16_t OutputDataLow() override {
-        emu_.Get<Fatal>().Die("Vr4122Giu::OutputDataLow: the VR4122 GIU has no GIUPODATL at 0x1C");
-    }
-
     PinDrive OutputDrive(int gpio) override {
         emu_.Get<Fatal>().Die("Vr4122Giu::OutputDrive: GPIO%d is not modeled", gpio);
     }
 
     uint32_t ReadWord(uint32_t addr) override {
         if (TouchesTail(addr - MmioBase())) HaltUnsupportedAccess("VR4122 GIU output-data tail", addr, 0);
-        return Vr41xxGiuBase::ReadWord(addr);
+        return Core::ReadWord(addr);
     }
     void WriteWord(uint32_t addr, uint32_t value) override {
         if (TouchesTail(addr - MmioBase())) HaltUnsupportedAccess("VR4122 GIU output-data tail", addr, value);
-        Vr41xxGiuBase::WriteWord(addr, value);
+        Core::WriteWord(addr, value);
     }
 
     void SaveState(StateWriter& w) override {
-        Vr41xxGiuBase::SaveState(w);
+        Core::SaveState(w);
         w.Write("podaten", podaten_);
         w.Write("podatl", podatl_);
     }
     void RestoreState(StateReader& r) override {
-        Vr41xxGiuBase::RestoreState(r);
+        Core::RestoreState(r);
         r.Read("podaten", podaten_);
         r.Read("podatl", podatl_);
     }

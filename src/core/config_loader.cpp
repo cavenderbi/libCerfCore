@@ -285,7 +285,7 @@ void ConfigLoader::LoadInto(DeviceConfig& config) {
     config.device_name = device_name;
 
     LiveDeviceSettings live;
-    const std::string dev_path = GetDeviceDir(device_name) + kDeviceConfigFileName;
+    const std::string dev_path = ResolveDeviceFile(device_name, kDeviceConfigFileName);
     json dev = Reader().ReadLoggedJsonFile(dev_path);
     if (dev.is_null()) {
         LOG(Cfg, "No device config: %s (using DeviceConfig defaults)\n", dev_path.c_str());
@@ -376,6 +376,9 @@ void ConfigLoader::LoadInto(DeviceConfig& config) {
             else if (strcmp(v, kBootCold)   == 0) config.boot_mode = StateBootMode::Cold;
             else Reader().Fail("(command line)", std::string(CliOptionName(kArgBoot)) + " must be " + kBootResume +
                                                      ", " + kBootWarm + ", or " + kBootCold);
+        } else if (ReadCliOption(a, kArgStatePath, v)) {
+            if (!v[0]) Reader().Fail("(command line)", std::string(CliOptionName(kArgStatePath)) + " needs a path");
+            config.state_path = v;
         } else if (ReadCliOption(a, kArgTab, v)) {
             if      (strcmp(v, kTabBoot)        == 0) config.start_tab = CanvasTab::Boot;
             else if (strcmp(v, kTabHw)          == 0) config.start_tab = CanvasTab::Hw;

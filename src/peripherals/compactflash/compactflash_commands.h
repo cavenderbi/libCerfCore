@@ -25,7 +25,9 @@ private:
     std::string BundledPath(const std::string& file) const;
     uint64_t    PayloadMb(const std::vector<std::string>& files) const;
     void        Generate(MachineObject& socket, Fat fat, PcmciaCardCatalog::CardInserter inserter);
-    void        Build(Fat fat, const std::vector<std::string>& files, uint64_t size_mb,
+    void        AskOutput(MachineObject& socket, Fat fat, const std::vector<std::string>& files, uint64_t size_mb,
+                          const PcmciaCardCatalog::CardInserter& inserter);
+    void        Build(Fat fat, const std::vector<std::string>& files, uint64_t size_mb, const std::string& cf,
                       const PcmciaCardCatalog::CardInserter& inserter);
 };
 

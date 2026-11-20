@@ -223,7 +223,8 @@ void CompactFlashAtaCommandSet::WalkSectors() {
 }
 
 void CompactFlashAtaCommandSet::Identify() {
-    BuildCompactFlashIdentify(core_.xfer.Buffer(), core_.tf, core_.media.TotalSectors(), core_.multiple);
+    BuildCompactFlashIdentify(core_.xfer.Buffer(), core_.tf, core_.media.TotalSectors(), core_.multiple,
+                              core_.media.Serial());
     core_.BeginRead(CompactFlashTransfer::kReadOnce);
 }
 

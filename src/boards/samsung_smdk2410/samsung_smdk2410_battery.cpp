@@ -55,7 +55,7 @@ uint8_t SamsungSmdk2410Battery::ReadByte(uint32_t addr) {
             name  = "IsOnBattery";
             break;
         case kRegChargePercent:
-            value = static_cast<uint8_t>(100 - battery_.ChargePercent());
+            value = static_cast<uint8_t>(Battery::kFullPercent - battery_.ChargePercent());
             name  = "ChargePercent";
             break;
         default:

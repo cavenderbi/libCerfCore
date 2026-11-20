@@ -1,6 +1,7 @@
 #include "host_pen_input.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/host/guest_deep_sleep.h>
 #include <cerfcore/host/host_presentation.h>
 #include "../../execution/engine_bridge.h"
 #include <cerfengine/host_request_channel.h>
@@ -27,6 +28,8 @@ void HostPenInput::Attach(CerfEmulator& emu, std::function<void(const Pen&)> app
     requests_->RegisterListener([this] { Apply(); });
 }
 
+void HostPenInput::ApplyInPark() { emu_->Get<GuestDeepSleep>().RegisterParkClock([this] { Apply(); }); }
+
 void HostPenInput::Queue(const Pen& pen) {
     {
         std::lock_guard<std::mutex> lk(mtx_);
@@ -34,6 +37,15 @@ void HostPenInput::Queue(const Pen& pen) {
     }
     requests_->Request();
 }
+
+void HostPenInput::QueueEdge(bool down, int x, int y) { Queue(Pen{down ? kPenDown : kPenUp, x, y}); }
+
+void HostPenInput::Down(int x, int y) {
+    Track(x, y);
+    QueueEdge(true, x, y);
+}
+
+void HostPenInput::Up() { QueueEdge(false, 0, 0); }
 
 void HostPenInput::Track(int x, int y) {
     const uint64_t packed = static_cast<uint64_t>(static_cast<uint32_t>(x)) |

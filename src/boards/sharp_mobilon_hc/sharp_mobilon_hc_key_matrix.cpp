@@ -22,33 +22,16 @@ void SharpMobilonHcKeyMatrix::OnReady() {
 
 uint16_t SharpMobilonHcKeyMatrix::ReadHalf(uint32_t addr) {
     const uint32_t off = addr - kBase;
-    uint16_t result = 0;
-    for (uint8_t col = 0; col < 8; ++col)
-        if (off & (2u << col))
-            result |= rows_[col].load(std::memory_order_acquire);
-    return result;
+    return cells_.Pressed((off >> 1) & kAllColumns);
 }
 
 void SharpMobilonHcKeyMatrix::SetKey(uint8_t col, uint8_t row, bool down) {
-    if (col >= 8 || row >= 16) return;
-    const uint16_t bit = static_cast<uint16_t>(1u << row);
-
-    const uint16_t prev = rows_[col].load(std::memory_order_acquire);
-    const uint16_t next = down ? static_cast<uint16_t>(prev | bit)
-                               : static_cast<uint16_t>(prev & ~bit);
-    if (next == prev) return;
-    rows_[col].store(next, std::memory_order_release);
-
-    bool any = false;
-    for (auto& r : rows_)
-        if (r.load(std::memory_order_acquire)) { any = true; break; }
-
-    emu_.Get<Pr31x00Io>().DriveMfioInput(kSpinMfioPin, any);
+    if (col >= kColumnCount || row >= Cells::kColumns) return;
+    if (!cells_.Set(col * Cells::kColumns + row, down)) return;
+    emu_.Get<Pr31x00Io>().DriveMfioInput(kSpinMfioPin, cells_.Pressed(kAllColumns) != 0u);
 }
 
-void SharpMobilonHcKeyMatrix::RestoreState(StateReader&) {
-    for (auto& r : rows_) r.store(0, std::memory_order_release);
-}
+void SharpMobilonHcKeyMatrix::RestoreState(StateReader&) { cells_.ReleaseAll(); }
 
 REGISTER_SERVICE(SharpMobilonHcKeyMatrix);
 

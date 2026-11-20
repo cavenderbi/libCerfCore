@@ -98,11 +98,8 @@ void Imx31Kpp::Retime() {
 }
 
 uint16_t Imx31Kpp::RowSenseLocked() const {
-    uint16_t rows = kMatrixRows;
-    for (uint8_t c = 0; c < 4; ++c)
-        if (((kpdr_col_ >> (8u + c)) & 1u) == 0u)
-            rows &= static_cast<uint16_t>(~pressed_[c]);
-    return rows;
+    const uint32_t driven = ~(static_cast<uint32_t>(kpdr_col_) >> 8u) & ((1u << kKeyColumns) - 1u);
+    return static_cast<uint16_t>(kMatrixRows & ~pressed_.Pressed(driven));
 }
 
 bool Imx31Kpp::AnyEnabledRowLowLocked() const {
@@ -212,10 +209,7 @@ void Imx31Kpp::SetMatrixKey(uint8_t col, uint8_t row, bool pressed) {
     }
     {
         std::lock_guard<std::mutex> lk(mtx_);
-        const uint8_t bit = static_cast<uint8_t>(1u << row);
-        if (((host_pressed_[col] & bit) != 0) == pressed) return;
-        if (pressed) host_pressed_[col] |= bit;
-        else         host_pressed_[col] &= static_cast<uint8_t>(~bit);
+        if (!host_pressed_.Set(col * KeyMatrixCells<kKeyColumns>::kColumns + row, pressed)) return;
     }
     host_requests_->Request();
 }
@@ -225,11 +219,8 @@ void Imx31Kpp::OnHostKeys() {
     std::lock_guard<std::mutex> lk(mtx_);
     CaptureDueLocked(clock_->Cycles());
     const bool low_before = AnyEnabledRowLowLocked();
-    bool changed = false;
-    for (uint8_t c = 0; c < 4; ++c) {
-        changed |= pressed_[c] != host_pressed_[c];
-        pressed_[c] = host_pressed_[c];
-    }
+    const bool changed = !(pressed_ == host_pressed_);
+    pressed_           = host_pressed_;
     if (!changed) return;
     if (AnyEnabledRowLowLocked() != low_before) ArmSyncLocked(clock_->Cycles());
 }
@@ -284,7 +275,9 @@ void Imx31Kpp::SaveState(StateWriter& w) {
     w.Write("kpsr", kpsr_);
     w.Write("kddr", kddr_);
     w.Write("kpdr_col", kpdr_col_);
-    w.WriteBytes("pressed", pressed_, sizeof(pressed_));
+    uint8_t pressed[kKeyColumns];
+    for (uint32_t c = 0; c < kKeyColumns; ++c) pressed[c] = static_cast<uint8_t>(pressed_.Line(c));
+    w.WriteBytes("pressed", pressed, sizeof(pressed));
     w.Write<uint8_t>("depress_out", depress_out_ ? 1u : 0u);
     w.Write<uint8_t>("release_out", release_out_ ? 1u : 0u);
     w.Write<uint8_t>("sync_pending", sync_pending_ ? 1u : 0u);
@@ -301,7 +294,9 @@ void Imx31Kpp::RestoreState(StateReader& r) {
     r.Read("kpsr", kpsr_);
     r.Read("kddr", kddr_);
     r.Read("kpdr_col", kpdr_col_);
-    r.ReadBytes("pressed", pressed_, sizeof(pressed_));
+    uint8_t pressed[kKeyColumns] = {};
+    r.ReadBytes("pressed", pressed, sizeof(pressed));
+    for (uint32_t c = 0; c < kKeyColumns; ++c) pressed_.SetLine(c, pressed[c]);
     r.Read("depress_out", depress);
     r.Read("release_out", release);
     r.Read("sync_pending", pending);
@@ -314,10 +309,8 @@ void Imx31Kpp::RestoreState(StateReader& r) {
     sync_pending_ = pending != 0u;
     pending_kpsr_ = 0u;
     const bool low_saved = AnyEnabledRowLowLocked();
-    for (uint8_t c = 0; c < 4; ++c) {
-        pressed_[c]      = 0u;
-        host_pressed_[c] = 0u;
-    }
+    pressed_.ReleaseAll();
+    host_pressed_.ReleaseAll();
     if (AnyEnabledRowLowLocked() != low_saved) {
         sync_tick_    = restored_count_ + kSyncCkilCycles;
         sync_pending_ = true;

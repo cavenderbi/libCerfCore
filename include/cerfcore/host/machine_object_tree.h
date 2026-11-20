@@ -36,6 +36,8 @@ public:
     std::vector<MachineObject*> Roots();
     std::vector<MachineObject*> Children(const MachineObject* parent);
     MachineObject*              Parent(const MachineObject* object);
+    std::vector<std::string>    PathOf(const MachineObject* object);
+    MachineObject*              Find(const std::vector<std::string>& path);
 
     void Subscribe(Listener listener);
 

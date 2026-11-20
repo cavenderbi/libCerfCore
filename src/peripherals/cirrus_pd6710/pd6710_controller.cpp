@@ -402,6 +402,12 @@ void Pd6710Controller::SetReadyIreqLow(bool low) {
     DriveCardLineLocked(false);
 }
 
+void Pd6710Controller::OnStatusChange(PcmciaSlot&, bool low) {
+    std::lock_guard<std::mutex> lk(state_mutex_);
+    exca_.SetStatusChangeLow(low);
+    UpdateManagementLineLocked();
+}
+
 void Pd6710Controller::SaveState(StateWriter& w) {
     {
         std::lock_guard<std::mutex> lk(state_mutex_);

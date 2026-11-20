@@ -27,8 +27,7 @@ constexpr Vr41xxPmuModel kModel = {
     /*int_power_on=*/0x0010u,   /* RTCRST: D4 RTCRST */
     /* PMUCNTREG (UM p331): D15-8 GPIO3-0 MSK/TRG + D7 STANDBY + D2 HALTIMERRST R/W;
        D6-3/D0 reserved "write 0 ... 0 is returned after a read", D1 reserved "write 1
-       ... 1 is returned". HALTIMERRST is stored with NO HAL-timer modeled behind it;
-       past its ~4 s expiry "an automatic shutdown is performed". */
+       ... 1 is returned". */
     /*cnt_writable=*/0xFF84u,
     /*cnt_fixed_read=*/0x0002u,
     /*cnt_power_on=*/0x8802u,   /* RTCRST: GPIO3MSK(D15) + GPIO3TRG(D11) + D1 */

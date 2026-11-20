@@ -3,8 +3,8 @@
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../peripherals/hitachi_hd64461/hd64461_gpio.h"
+#include "../../peripherals/pin_net_hold.h"
 #include "hp_600_family_id.h"
-#include "hp_600_net_hold.h"
 
 namespace cerfcore {
 
@@ -27,7 +27,7 @@ public:
     void RestoreState(StateReader& r) override { nets_.RestoreState(r); }
 
 private:
-    Hp600NetHold<cerf_hd64461_gpio_detail::kPorts, cerf_hd64461_gpio_detail::kPins> nets_;
+    PinNetHold<cerf_hd64461_gpio_detail::kPorts, cerf_hd64461_gpio_detail::kPins> nets_;
 };
 
 }

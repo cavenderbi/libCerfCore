@@ -27,8 +27,6 @@ constexpr uint32_t kSp1IntcMask = 1u << 15;
 /* jornada820 gwes sub_8FB14: [2] BatteryLifePercent; [3,4] capacity LE, minutes =
    capacity - 5 for BatteryLifeTime; [12] bit 2 = charging. */
 std::array<uint8_t, 14> BuildPacket(int percent, bool on_battery) {
-    if (percent < 0)   percent = 0;
-    if (percent > 100) percent = 100;
     const uint16_t cap = static_cast<uint16_t>(percent + 5);
     std::array<uint8_t, 14> p{};
     p[0]  = kFrameStart;

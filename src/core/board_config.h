@@ -18,6 +18,7 @@ public:
 
     void OnReady() override;
 
+    bool               Has(std::string_view param_id) const;
     const std::string& EnumId(std::string_view param_id) const;
 
     template <typename T, size_t N>

@@ -92,8 +92,9 @@ public:
             d.write_context = config_reg_;
         }
         if (rd == Tx39Cp0::kStatus) {
-            d.write_mask = config_->StatusWritable();
-            d.zero_only  = config_->StatusZeroOnly();
+            d.write_mask  = config_->StatusWritable();
+            d.fixed_mask  = config_->StatusFixed().mask;
+            d.fixed_value = config_->StatusFixed().value;
         }
         if (rd == Tx39Cp0::kCause) {
             d.write_mask = kMipsCauseSoftwareIp;

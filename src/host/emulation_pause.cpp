@@ -11,7 +11,7 @@ REGISTER_SERVICE(EmulationPause);
 
 namespace {
 
-constexpr char kPausedText[] = "The emulator is paused\nResume it in Actions menu";
+constexpr char kPausedText[] = "The emulator is paused";
 
 }
 
@@ -20,41 +20,62 @@ bool EmulationPause::UserCanToggle() const {
            emu_.Get<JitRunner>().Started();
 }
 
-void EmulationPause::Toggle() {
-    std::lock_guard<std::mutex> lk(mtx_);
-    if (!UserCanToggle()) return;
-    const bool user = !user_.load(std::memory_order_acquire);
-    Apply(user, false);
-    ShowUserCard(user);
+void EmulationPause::Toggle() { SetUserPaused(!IsUserPaused()); }
+
+bool EmulationPause::SetUserPaused(bool paused) {
+    bool changed = false;
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        if (!UserCanToggle()) return false;
+        if (paused != user_.load(std::memory_order_acquire)) {
+            changed = Apply(paused, false);
+            ShowUserCard(paused);
+        }
+    }
+    if (changed) change_listeners_.Call();
+    return true;
 }
 
 void EmulationPause::BeginStateOperation() {
-    std::lock_guard<std::mutex> lk(mtx_);
-    auto& runner = emu_.Get<JitRunner>();
-    runner.HoldResets(true);
-    Apply(user_.load(std::memory_order_acquire), true);
-    runner.Pause();
+    bool changed = false;
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        auto& runner = emu_.Get<JitRunner>();
+        runner.HoldResets(true);
+        changed = Apply(user_.load(std::memory_order_acquire), true);
+        runner.Pause();
+    }
+    if (changed) change_listeners_.Call();
 }
 
 void EmulationPause::EndStateOperation(bool release_user_pause) {
-    std::lock_guard<std::mutex> lk(mtx_);
-    const bool was_user = user_.load(std::memory_order_acquire);
-    const bool user     = was_user && !release_user_pause;
-    Apply(user, false);
-    emu_.Get<JitRunner>().HoldResets(false);
-    if (was_user && !user) ShowUserCard(false);
+    bool changed = false;
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        const bool was_user = user_.load(std::memory_order_acquire);
+        const bool user     = was_user && !release_user_pause;
+        changed             = Apply(user, false);
+        emu_.Get<JitRunner>().HoldResets(false);
+        if (was_user && !user) ShowUserCard(false);
+    }
+    if (changed) change_listeners_.Call();
 }
 
-void EmulationPause::Apply(bool user, bool state_operation) {
-    const bool was = IsPaused();
-    const bool now = user || state_operation;
+void EmulationPause::RegisterChangeListener(std::function<void()> fn) { change_listeners_.Add(std::move(fn)); }
+
+bool EmulationPause::Apply(bool user, bool state_operation) {
+    const bool was      = IsPaused();
+    const bool was_user = user_.load(std::memory_order_acquire);
+    const bool now      = user || state_operation;
     if (now && !was) pause_tick_ms_.store(HostSteadyMicros() / 1000, std::memory_order_release);
     user_.store(user, std::memory_order_release);
     state_operation_.store(state_operation, std::memory_order_release);
-    if (now == was) return;
-    auto& runner = emu_.Get<JitRunner>();
-    if (now) runner.Pause();
-    else     runner.Resume();
+    if (now != was) {
+        auto& runner = emu_.Get<JitRunner>();
+        if (now) runner.Pause();
+        else     runner.Resume();
+    }
+    return now != was || user != was_user;
 }
 
 void EmulationPause::ShowUserCard(bool shown) {

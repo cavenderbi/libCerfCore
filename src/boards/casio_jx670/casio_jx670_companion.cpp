@@ -2,11 +2,14 @@
 
 #include <cerfcore/boards/board_context.h>
 #include "casio_jx670_family_id.h"
+#include "casio_jx670_guest_writes.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../socs/vr41xx/vr41xx_giu.h"
+#include "../../socs/vr41xx/vr41xx_pmu.h"
+#include <cerfcore/host/guest_deep_sleep.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
 
@@ -18,9 +21,6 @@ namespace {
 
 /* nk_main_kernel.exe sub_9F0389EC @0x9F0389EC */
 constexpr uint32_t kOffCtrl8904 = 0x8904u;
-
-/* nk_main_kernel.exe sub_9F038A58 @0x9F038A60 */
-constexpr uint32_t kOffDataA040 = 0xA040u;
 
 /* nk_main_kernel.exe sub_9F038AF0 @0x9F038AF8 */
 constexpr uint32_t kOffSysCtrlLo = 0x0010u;
@@ -34,6 +34,10 @@ constexpr uint16_t kIntStatusAudio   = 0x100u;
 /* casio_cassiopeia_em500_ppc2000 nk_main_kernel.exe @0x9F036180 andi 0x200 -> loc_9F03623C
    -> loc_9F036554, the 0x0304 cause demux @0x9F036608. */
 constexpr uint16_t kIntStatusTouch   = 0x200u;
+constexpr uint16_t kIntStatusKeys    = 0x2u;
+
+constexpr uint32_t kOffKeyChannel0014 = 0x0014u;
+constexpr uint32_t kKeyChannelEnable  = 0x8u;
 
 /* nk_main_kernel.exe sub_9F08EE0C case 20 writes 12 to 0xAA000030; loc_9F03703C
    @0x9F0370B8 lw 0xAA000030 / and 0xFFFFFFF7 / @0x9F0370C4 sw clears bit3 while
@@ -64,15 +68,6 @@ constexpr uint32_t kOffMboxResp2 = 0x890Cu;
 constexpr uint32_t kOffVariantStrap = 0xA0E0u;
 constexpr uint32_t kVariantStrap    = 0x3u;
 
-/* nk_main_kernel.exe @0x9F033048/@0x9F0330B0 + @0x9F0335D4 (nibble-0 -> PMUINTREG
-   0xAF0000C0 D9/D0 fallback); keybddr.dll sub_FB2D0C @0xFB2DB4 ("AppWakeUP"),
-   @0xFB2E70. */
-constexpr uint32_t kOffWakeStatus1 = 0xA042u;
-constexpr uint32_t kOffWakeStatus2 = 0xA044u;
-
-/* nk_main_kernel.exe @0x9F03308C, ISR loc_9F036C70. */
-constexpr uint32_t kOffSocketStatus = 0xA03Cu;
-
 /* nk_main_kernel.exe @0x9F0331FC-0x9F033208 (|1), @0x9F033238-0x9F033244 (&~1),
    @0x9F033248-0x9F033254 (|2), @0x9F033278-0x9F033284 (&~2). */
 constexpr uint32_t kOffCtrlA0D4 = 0xA0D4u;
@@ -85,25 +80,29 @@ constexpr uint32_t kOffClk8004 = 0x8004u;
    @0x9F038994 (sw 0). */
 constexpr uint32_t kOffLatch1110 = 0x1110u;
 
-/* nk_main_kernel.exe sub_9F08EE0C @0x9F08EF7C (sw 3), @0x9F03C330 (sw 0x30)/
-   @0x9F03C338 (sw 2), + @0x9F0354C4/@0x9F08F21C/@0x9F08F48C. Write accepted
-   (guarded downgrade); the read side sub_9F03C304 @0x9F03C308 (& 0x40 bit6) is
-   born-FATAL until hit, so bit6 is grounded at its own halt. */
-constexpr uint32_t kOffReg1054 = 0x1054u;
+constexpr uint32_t kOffReg1054     = 0x1054u;
+constexpr uint32_t kReg1054Status  = 0x0070u;
+constexpr uint32_t kReg1054Written = 0x0033u;
 
-/* pcmcia.dll (MIPS16) per-socket table unk_F88288: RMW @0xF81878 (lw) + @0xF81880
-   (sw |0x30); getters @0xF81840-46 (&4), @0xF8185A-62 (&0x30). */
-constexpr uint32_t kOffSocketCtrlAC8 = 0x0AC8u;
+constexpr uint32_t kOffRegA0DC    = 0xA0DCu;
+constexpr uint32_t kRegA0DCBoot   = 0x0085u;
+constexpr uint32_t kRegA0DCEnable = 0x0001u;
+constexpr uint32_t kOffStatus1010 = 0x1010u;
 
-/* pcmcia.dll (MIPS16) per-socket table unk_F8828C entry+0x38: RMW @0xF81D76 (lw) +
-   @0xF81D80 (sw &~0xC); getter @0xF81D54-66 (not; srl 6; &1). */
-constexpr uint32_t kOffSocketA038 = 0xA038u;
+constexpr uint32_t kCtrl8904Written  = 0x001Bu;
+constexpr uint32_t kCtrlA0D4Written  = 0x0003u;
+constexpr uint32_t kClk8004Written   = 0x1711u;
+constexpr uint32_t kLatch1110Written = 0x0001u;
+constexpr uint32_t kLatch1118Written = 0x0001u;
+constexpr uint32_t kLatch130CWritten = 0x0010u;
+constexpr uint32_t kAdcCtrl89CWritten = 0x003Cu;
+constexpr uint32_t kCause8800Ack     = 0x0002u;
+constexpr uint32_t kSibWritten[]     = {0x7FFu, 0x7Fu, ~0u, ~0u, ~0u};
 
-/* pcmcia.dll (MIPS16) card-detect getter @0xF818AA-0xF818B8 (lw 8; andi 2);
-   bit1=1 = empty per consumers @0xF86B42 (nonzero -> power-down + re-poll) and
-   @0xF86DEA (nonzero -> abort power-up). */
-constexpr uint32_t kOffCardDetectA008 = 0xA008u;
-constexpr uint32_t kCardDetectEmpty   = 0x2u;
+constexpr uint32_t kSysCtrlWritten[] = {
+    0x3Cu, 0x3Cu, 0x3Cu, 0x3Fu, 0x3Cu, 0x30u, 0x30u, 0x3Cu,
+    0x3Cu, 0x3Cu, 0x30u, 0x3Cu, 0x30u, 0x30u, 0x30u, 0x30u,
+};
 
 /* wavedev.dll sub_F616F4 @0xF616FE (sw 1 -> 0x1118); 0x3C4 polls are lw+beqz. */
 constexpr uint32_t kOffCodecCmd   = 0x03C0u;
@@ -134,18 +133,6 @@ constexpr uint32_t kOffLatch130C  = 0x130Cu;
 /* remocon.dll mapper @0xED181C-0xED1820; init RMW @0xED158C. */
 constexpr uint32_t kOffAdcCtrl89C = 0x089Cu;
 
-/* socket.dll init @0xF41966-0xF419A0 (sub_F42258 halfword stores; register
-   table @0xF421BC-0xF421D6, descriptor 0xAA008000 @0xF421F8). */
-constexpr uint32_t kOffStrap8000  = 0x8000u;
-constexpr uint32_t kOffCfg8018    = 0x8018u;
-
-/* Modem-socket accessory-ID pins, read-only (zero ROM writers). socket.dll
-   @0xF422C0 (lhu; mask 0x1F @0xF416A0), index-0 code cmpi 1 @0xF41594;
-   nk_main_kernel.exe sub_9F03C278/2A4/2D4 (&0xF ==15/==8/==12), suspend gate
-   @0x9F038180. 0x1F = connector empty. */
-constexpr uint32_t kOffSocketId8010 = 0x8010u;
-constexpr uint32_t kSocketIdEmpty   = 0x1Fu;
-
 /* nk_main_kernel.exe sub_9F08EE0C @0x9F08EE28 (lhu) + @0x9F08EE34 (sh &0xFDFF). */
 constexpr uint32_t kOffIntCfg8404 = 0x8404u;
 
@@ -160,14 +147,10 @@ constexpr uint32_t kOffSibRegsLo = 0x0900u;
    sw 1/0x11/0x71/0x77), power-down @0x9F038B5C (lw; andi 0x79; sw). */
 constexpr uint32_t kOffPanelState904 = 0x0904u;
 
-constexpr uint32_t kOffEdgeCfgLo = 0xA060u;
-constexpr uint32_t kOffEdgeCfgHi = 0xA07Eu;
-
 }  /* namespace */
 
 bool CasioJx670Companion::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::CasioJx670;
+    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CasioJx670;
 }
 
 void CasioJx670Companion::OnReady() {
@@ -175,11 +158,16 @@ void CasioJx670Companion::OnReady() {
     display_.Init(emu_);
     modem_ = &emu_.Get<CasioJx670Modem>();
     touch_.Init(emu_, [this] { UpdateIrqLine(); });
+    keys_.Init([this] { UpdateIrqLine(); },
+               [this](bool high) { emu_.Get<Vr41xxPmu>().SetPowerSwitch(high); });
+    emu_.Get<GuestDeepSleep>().RegisterUserWakeInput(
+        [this] { keys_.LatchWake(CasioJx670Keys::kPowerButton); });
     emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
         PowerOnRegisters();
         display_.PowerOnRegisters();
         touch_.PowerOnRegisters();
         eeprom_.PowerOnRegisters();
+        if (!emu_.Get<GuestCpuReset>().DeliveredResetWasResume()) keys_.PowerOnRegisters();
     });
     emu_.Get<GuestCpuReset>().RegisterResetReleaseListener([this] { UpdateIrqLine(); });
     emu_.Get<PeripheralDispatcher>().Register(this);
@@ -187,17 +175,22 @@ void CasioJx670Companion::OnReady() {
 
 void CasioJx670Companion::PowerOnRegisters() {
     mbox_cmd_ = ctrl8904_ = ctrl_a0d4_ = clk8004_ = 0;
-    data_a040_ = 0;
-    reg_1110_ = reg_1054_ = socket_ctrl_ac8_ = socket_a038_ = 0;
+    reg_1110_ = reg_1054_ = reg_a0dc_ = 0;
     intcfg8404_ = 0;
+    socket_.PowerOnRegisters();
     for (uint16_t& v : codec_regs_) v = 0;
     codec_written_    = 0;
     codec_data_       = 0;
     codec_data_valid_ = false;
-    latch1118_ = latch130C_ = strap8000_ = adc_ctrl_89C_ = 0;
+    latch1118_ = latch130C_ = adc_ctrl_89C_ = 0;
     for (uint32_t& v : sib_regs_) v = 0;
     for (std::atomic<uint32_t>& v : sys_ctrl_) v.store(0u, std::memory_order_release);
-    for (uint16_t& v : edge_cfg_) v = 0;
+}
+
+uint16_t CasioJx670Companion::IntStatus() const {
+    return static_cast<uint16_t>((audio_.IrqPending() ? kIntStatusAudio : 0u) |
+                                 (touch_.IrqPending() ? kIntStatusTouch : 0u) |
+                                 (keys_.IrqPending() ? kIntStatusKeys : 0u));
 }
 
 uint8_t CasioJx670Companion::ReadByte(uint32_t addr) {
@@ -210,11 +203,8 @@ uint8_t CasioJx670Companion::ReadByte(uint32_t addr) {
 uint16_t CasioJx670Companion::ReadHalf(uint32_t addr) {
     const uint32_t off = addr - kBase;
     if (uint16_t v; display_.TryReadHalf(off, v)) return v;
-    if (off == kOffDataA040) return data_a040_;
-    if (off == kOffIntStatus0004)
-        return static_cast<uint16_t>((audio_.IrqPending() ? kIntStatusAudio : 0u) |
-                                     (touch_.IrqPending() ? kIntStatusTouch : 0u));
-    if (off == kOffWakeStatus1 || off == kOffWakeStatus2) return 0u;
+    if (uint16_t kv; keys_.TryReadHalf(off, kv)) return kv;
+    if (off == kOffIntStatus0004) return IntStatus();
     /* mailbox cmd 0x8900 bit9 (0x200) = busy; cdm.dll sub_EE15EC @0xEE1624
        busy-waits `while (*0x8900 & 0x200)`. Not-busy: command completes instantly
        (no sub-CPU), matching ReadWord 0x8900 = 0. */
@@ -227,18 +217,14 @@ uint16_t CasioJx670Companion::ReadHalf(uint32_t addr) {
     /* socket.dll sub_F42258 @0xF42284 (lhu) / @0xF42292 (sh), mask 0x1010
        call @0xF41986-0xF41990, table[5]=+4 @0xF421D6. */
     if (off == kOffClk8004) return static_cast<uint16_t>(clk8004_);
-    /* socket.dll table[4]=+0 (0x8000): sub_F42258 RMW read-back only; the sole
-       consuming read sub_F422A8 @0xF416A0 targets table[2]=0x8010, never 0x8000. */
-    if (off == kOffStrap8000) return static_cast<uint16_t>(strap8000_);
+    if (uint16_t sv; socket_.TryReadHalf(off, sv)) return sv;
     if (uint16_t mv; modem_->TryReadHalf(off, mv)) return mv;
-    if (off == kOffSocketId8010) return kSocketIdEmpty;
+    if (off == 0x0020u)
+        return static_cast<uint16_t>(sys_ctrl_[(0x0020u - kOffSysCtrlLo) / 4u].load(std::memory_order_acquire));
     /* nk_main_kernel.exe @0x9F038904/@0x9F03890C/@0x9F038914 (lh x3, $t1
        overwritten untested, before cop0 0x22); xref-complete, no writer. */
     if (off == 0x0404u) return 0u;
     if (uint16_t av; audio_.TryReadHalf(off, av)) return av;
-    /* keybddr.dll sub_FB2AB8 @0xFB2ACC RMW read-back (companion 0xA060-0xA07E). */
-    if (off >= kOffEdgeCfgLo && off <= kOffEdgeCfgHi && (off & 1u) == 0u)
-        return edge_cfg_[(off - kOffEdgeCfgLo) / 2u];
     HaltUnsupportedAccess("EM-500 companion ReadHalf", addr, 0);
 }
 
@@ -252,11 +238,11 @@ uint32_t CasioJx670Companion::ReadWord(uint32_t addr) {
     if (off == kOffMboxResp) return 0u;
     if (off == kOffMboxResp2) return 0u;
     if (off == kOffVariantStrap) return kVariantStrap;
-    if (off == kOffSocketStatus) return 0u;
+    if (uint32_t sv; socket_.TryReadWord(off, sv)) return sv;
     if (off == kOffLatch1110) return reg_1110_;
-    if (off == kOffSocketCtrlAC8) return socket_ctrl_ac8_;
-    if (off == kOffSocketA038) return socket_a038_;
-    if (off == kOffCardDetectA008) return kCardDetectEmpty;
+    if (off == kOffRegA0DC) return reg_a0dc_;
+    if (off == kOffStatus1010) return 0u;
+    if (off == kOffReg1054) return reg_1054_;
     if (off == kOffLatch1118) return latch1118_;
     if (off == kOffLatch130C) return latch130C_;
     if (off == kOffAdcCtrl89C) return adc_ctrl_89C_;
@@ -285,8 +271,9 @@ uint32_t CasioJx670Companion::ReadWord(uint32_t addr) {
     /* nk_main_kernel.exe sub_9F08EE0C case 30 @0x9F08F0C0/@0x9F08F0CC (lw 0x20; |=; sw). */
     if (off == 0x0020u)
         return sys_ctrl_[(0x0020u - kOffSysCtrlLo) / 4u].load(std::memory_order_acquire);
-    if (off == kOffIntMask0030)
-        return sys_ctrl_[(kOffIntMask0030 - kOffSysCtrlLo) / 4u].load(std::memory_order_acquire);
+    if (off == kOffIntMask0030 || off == kOffKeyChannel0014)
+        return sys_ctrl_[(off - kOffSysCtrlLo) / 4u].load(std::memory_order_acquire);
+    if (off == kOffIntStatus0004) return IntStatus();
     HaltUnsupportedAccess("EM-500 companion ReadWord", addr, 0);
 }
 
@@ -300,27 +287,18 @@ void CasioJx670Companion::WriteByte(uint32_t addr, uint8_t value) {
 void CasioJx670Companion::WriteHalf(uint32_t addr, uint16_t value) {
     const uint32_t off = addr - kBase;
     if (display_.TryWriteHalf(off, value)) return;
-    if (off == kOffDataA040) { data_a040_ = value; return; }
-    /* nk_main_kernel.exe sub_9F032B60 @0x9F032C44 */
-    if (off == kOffCtrl8904) { ctrl8904_ = value; return; }
+    if (keys_.TryWriteHalf(off, value)) return;
+    if (off == kOffCtrl8904 && SetsOnly(value, kCtrl8904Written)) { ctrl8904_ = value; return; }
     /* mailbox cmd 0x8900 write (cdm.dll sub_EE15EC @0xEE1648, bit9 busy set);
        stored, not processed (no sub-CPU, S13), as WriteReg 0x8900. */
     if (off == kOffMboxCmd) { mbox_cmd_ = value; return; }
-    /* nk_main_kernel.exe @0x9F03C194 (sh of the |1 write-back). */
-    if (off == kOffClk8004) { clk8004_ = value; return; }
-    if (off == kOffIntCfg8404) { intcfg8404_ = value; return; }
-    if (off == kOffStrap8000) { strap8000_ = value; return; }
-    if (off == kOffCfg8018) return;
+    if (off == kOffClk8004 && SetsOnly(value, kClk8004Written)) { clk8004_ = value; return; }
+    if (off == kOffIntCfg8404 && SetsOnly(value, intcfg8404_)) { intcfg8404_ = value; return; }
+    if (socket_.TryWriteHalf(off, value)) return;
     if (modem_->TryWriteHalf(off, value)) return;
     if (audio_.TryWriteHalf(off, value)) return;
-    if (off >= kOffEdgeCfgLo && off <= kOffEdgeCfgHi && (off & 1u) == 0u) {
-        edge_cfg_[(off - kOffEdgeCfgLo) / 2u] = value;
-        return;
-    }
-    /* nk_main_kernel.exe sub_9F08F334 @0x9F08F4E8 (offset 0x0010) / @0x9F08F4EC
-       (offset 0x003C), sh of 0x30/4/0xC @0x9F08F4FC-@0x9F08F50C. */
-    if (off >= kOffSysCtrlLo && off <= kOffSysCtrlHi && (off & 3u) == 0u) {
-        WriteSysCtrl(off, value, 0xFFFF0000u);
+    if (off >= kOffSysCtrlLo && off <= kOffSysCtrlHi && (off & 3u) == 0u &&
+        WriteSysCtrl(off, value, 0xFFFF0000u)) {
         return;
     }
     HaltUnsupportedAccess("EM-500 companion WriteHalf", addr, value);
@@ -333,31 +311,58 @@ void CasioJx670Companion::WriteWord(uint32_t addr, uint32_t value) {
     if (touch_.TryWriteWord(off, value)) return;
     if (eeprom_.TryWriteWord(off, value)) return;
     if (audio_.TryWriteWord(off, value)) return;
+    if (socket_.TryWriteWord(off, value)) return;
     WriteReg(off, value);
 }
 
 void CasioJx670Companion::WriteReg(uint32_t off, uint32_t value) {
     switch (off) {
-        case kOffCtrl8904: ctrl8904_ = value; return;
-        case kOffLatch1110: reg_1110_ = value; return;
-        case kOffReg1054: reg_1054_ = value; return;
-        case kOffSocketCtrlAC8: socket_ctrl_ac8_ = value; return;
-        case kOffSocketA038: socket_a038_ = value; return;
-        case kOffLatch1118: latch1118_ = value; return;
-        case kOffLatch130C: latch130C_ = value; return;
-        case kOffAdcCtrl89C: adc_ctrl_89C_ = value; return;
-        /* nk_main_kernel.exe sub_9F08EE0C cases 19/28/30/31 @0x9F08F0AC (lw 0x8004; |=; sw). */
-        case kOffClk8004: clk8004_ = value; return;
-        case kOffStrap8000: strap8000_ = value; return;
-        case kOffCfg8018: return;
+        case kOffCtrl8904:
+            if (!SetsOnly(value, kCtrl8904Written)) break;
+            ctrl8904_ = value;
+            return;
+        case kOffLatch1110:
+            if (!SetsOnly(value, kLatch1110Written)) break;
+            reg_1110_ = value;
+            return;
+        case kOffReg1054:
+            if (!SetsOnly(value, kReg1054Written)) break;
+            reg_1054_ = value & ~kReg1054Status;
+            return;
+        case kOffRegA0DC:
+            if (value != kRegA0DCBoot && value != (reg_a0dc_ & ~kRegA0DCEnable)) break;
+            reg_a0dc_ = value;
+            return;
+        case kOffLatch1118:
+            if (!SetsOnly(value, kLatch1118Written)) break;
+            latch1118_ = value;
+            return;
+        case kOffLatch130C:
+            if (!SetsOnly(value, kLatch130CWritten)) break;
+            latch130C_ = value;
+            return;
+        case kOffAdcCtrl89C:
+            if (!SetsOnly(value, kAdcCtrl89CWritten)) break;
+            adc_ctrl_89C_ = value;
+            return;
+        case kOffClk8004:
+            if (!SetsOnly(value, kClk8004Written)) break;
+            clk8004_ = value;
+            return;
         case kOffCodecCmd: WriteCodecCommand(value); return;
         /* nk_main_kernel.exe @0x9F033174/@0x9F0331B8 (sw of the folded 0x2C2/0x2C1),
            sub_9F03C104 @0x9F03C120, sub_9F03C140 @0x9F03C160 (0x301/0x300). */
         case kOffMboxCmd: mbox_cmd_ = value; return;
-        case kOffCtrlA0D4: ctrl_a0d4_ = value; return;
-        case kOffCause8800: return;
+        case kOffCtrlA0D4:
+            if (!SetsOnly(value, kCtrlA0D4Written)) break;
+            ctrl_a0d4_ = value;
+            return;
+        case kOffCause8800:
+            if (value != kCause8800Ack) break;
+            return;
         /* touch.dll loc_F91958 @0xF91B48/@0xF91BFE (0x304 |= 0x18 ack). */
         case 0x0900u: case 0x0904u: case 0x0908u: case 0x090Cu: case 0x0910u:
+            if (!SetsOnly(value, kSibWritten[(off - kOffSibRegsLo) / 4u])) break;
             sib_regs_[(off - kOffSibRegsLo) / 4u] = value;
             return;
         default: break;
@@ -367,24 +372,26 @@ void CasioJx670Companion::WriteReg(uint32_t off, uint32_t value) {
        @0x9F033828/@0x9F033854/@0x9F038970, 0x1338 @0x9F03383C/@0x9F03384C. */
     if (off == 0xA00Cu) return;
     if (off == 0x0008u ||
-        off == 0xA0C4u || off == 0xA0CCu || off == 0xA0DCu ||
+        off == 0xA0C4u || off == 0xA0CCu ||
         off == 0x1300u || off == 0x1338u ||
         (off >= 0x1100u && off <= 0x1130u && (off & 3u) == 0u)) {
         return;
     }
-    if (off >= kOffSysCtrlLo && off <= kOffSysCtrlHi && (off & 3u) == 0u) {
-        WriteSysCtrl(off, value, 0u);
+    if (off >= kOffSysCtrlLo && off <= kOffSysCtrlHi && (off & 3u) == 0u &&
+        WriteSysCtrl(off, value, 0u)) {
         return;
     }
     HaltUnsupportedAccess("EM-500 companion WriteWord", kBase + off, value);
 }
 
-void CasioJx670Companion::WriteSysCtrl(uint32_t off, uint32_t value,
-                                                   uint32_t keep_mask) {
-    std::atomic<uint32_t>& w = sys_ctrl_[(off - kOffSysCtrlLo) / 4u];
+bool CasioJx670Companion::WriteSysCtrl(uint32_t off, uint32_t value, uint32_t keep_mask) {
+    const uint32_t index = (off - kOffSysCtrlLo) / 4u;
+    if (!SetsOnly(value, kSysCtrlWritten[index])) return false;
+    std::atomic<uint32_t>& w = sys_ctrl_[index];
     const uint32_t prev = w.load(std::memory_order_acquire);
     w.store((prev & keep_mask) | (value & ~keep_mask), std::memory_order_release);
-    if (off == kOffIntMask0030) UpdateIrqLine();
+    if (off == kOffIntMask0030 || off == kOffKeyChannel0014) UpdateIrqLine();
+    return true;
 }
 
 void CasioJx670Companion::UpdateIrqLine() {
@@ -392,7 +399,10 @@ void CasioJx670Companion::UpdateIrqLine() {
     const uint32_t mask =
         sys_ctrl_[(kOffIntMask0030 - kOffSysCtrlLo) / 4u].load(std::memory_order_acquire);
     const bool audio = audio_.IrqPending() && (mask & kIntMaskAudio) != 0u;
-    emu_.Get<Vr41xxGiu>().SetPinLevel(kCompanionGiuPin, audio || touch_.IrqPending());
+    const uint32_t key_channel =
+        sys_ctrl_[(kOffKeyChannel0014 - kOffSysCtrlLo) / 4u].load(std::memory_order_acquire);
+    const bool keys = keys_.IrqPending() && (key_channel & kKeyChannelEnable) != 0u;
+    emu_.Get<Vr41xxGiu>().SetPinLevel(kCompanionGiuPin, audio || keys || touch_.IrqPending());
 }
 
 void CasioJx670Companion::WriteCodecCommand(uint32_t value) {
@@ -422,15 +432,14 @@ void CasioJx670Companion::SaveState(StateWriter& w) {
     w.Write("ctrl8904", ctrl8904_);
     w.Write("ctrl_a0d4", ctrl_a0d4_);
     w.Write("clk8004", clk8004_);
-    w.Write("data_a040", data_a040_);
+    keys_.SaveState(w);
     for (uint32_t v : sib_regs_) w.Write("sib_regs", v);
     for (const std::atomic<uint32_t>& v : sys_ctrl_)
         w.Write("sys_ctrl", v.load(std::memory_order_acquire));
-    for (uint16_t v : edge_cfg_) w.Write("edge_cfg", v);
     w.Write("reg_1110", reg_1110_);
     w.Write("reg_1054", reg_1054_);
-    w.Write("socket_ctrl_ac8", socket_ctrl_ac8_);
-    w.Write("socket_a038", socket_a038_);
+    w.Write("reg_a0dc", reg_a0dc_);
+    socket_.SaveState(w);
     w.Write("intcfg8404", intcfg8404_);
     for (uint16_t v : codec_regs_) w.Write("codec_regs", v);
     w.Write("codec_written", codec_written_);
@@ -438,7 +447,6 @@ void CasioJx670Companion::SaveState(StateWriter& w) {
     w.Write<uint8_t>("codec_data_valid", codec_data_valid_ ? 1u : 0u);
     w.Write("latch1118", latch1118_);
     w.Write("latch130C", latch130C_);
-    w.Write("strap8000", strap8000_);
     w.Write("adc_ctrl_89C", adc_ctrl_89C_);
     eeprom_.SaveState(w);
     audio_.SaveState(w);
@@ -452,18 +460,17 @@ void CasioJx670Companion::RestoreState(StateReader& r) {
     r.Read("ctrl8904", ctrl8904_);
     r.Read("ctrl_a0d4", ctrl_a0d4_);
     r.Read("clk8004", clk8004_);
-    r.Read("data_a040", data_a040_);
+    keys_.RestoreState(r);
     for (uint32_t& v : sib_regs_) r.Read("sib_regs", v);
     for (std::atomic<uint32_t>& v : sys_ctrl_) {
         uint32_t t = 0;
         r.Read("sys_ctrl", t);
         v.store(t, std::memory_order_release);
     }
-    for (uint16_t& v : edge_cfg_) r.Read("edge_cfg", v);
     r.Read("reg_1110", reg_1110_);
     r.Read("reg_1054", reg_1054_);
-    r.Read("socket_ctrl_ac8", socket_ctrl_ac8_);
-    r.Read("socket_a038", socket_a038_);
+    r.Read("reg_a0dc", reg_a0dc_);
+    socket_.RestoreState(r);
     r.Read("intcfg8404", intcfg8404_);
     for (uint16_t& v : codec_regs_) r.Read("codec_regs", v);
     r.Read("codec_written", codec_written_);
@@ -473,7 +480,6 @@ void CasioJx670Companion::RestoreState(StateReader& r) {
     codec_data_valid_ = data_valid != 0;
     r.Read("latch1118", latch1118_);
     r.Read("latch130C", latch130C_);
-    r.Read("strap8000", strap8000_);
     r.Read("adc_ctrl_89C", adc_ctrl_89C_);
     eeprom_.RestoreState(r);
     audio_.RestoreState(r);

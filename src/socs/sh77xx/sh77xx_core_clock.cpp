@@ -2,6 +2,8 @@
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
+#include "../hd6417096/hd6417096_id.h"
+#include "../sh7707/sh7707_id.h"
 #include "../sh7709/sh7709_id.h"
 #include "../sh7729/sh7729_id.h"
 #include "sh77xx_cpg.h"
@@ -16,7 +18,7 @@ public:
 
     bool ShouldRegister() override {
         const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
-        return soc == SocId::Sh7709 || soc == SocId::Sh7729;
+        return soc == SocId::Hd6417096 || soc == SocId::Sh7707 || soc == SocId::Sh7709 || soc == SocId::Sh7729;
     }
 
     GuestCycleClock::Rate ResetRate() const override { return emu_.Get<Sh77xxCpg>().ResetCpuRate(); }

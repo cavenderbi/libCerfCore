@@ -10,8 +10,6 @@ namespace cerfcore {
 
 namespace {
 
-constexpr uint32_t kPostLatchOffset = 0x400u;
-
 class HpDebugBoardPostLatch : public Peripheral {
 public:
     using Peripheral::Peripheral;
@@ -21,12 +19,18 @@ public:
     }
 
     void OnReady() override {
-        base_pa_ = emu_.Get<HpDebugBoardPlacement>().BasePa() + kPostLatchOffset;
+        const HpDebugBoardPlacement& placement = emu_.Get<HpDebugBoardPlacement>();
+        base_pa_ = placement.BasePa() + placement.PostLatchOffset();
         emu_.Get<PeripheralDispatcher>().Register(this);
     }
 
     uint32_t MmioBase() const override { return base_pa_; }
     uint32_t MmioSize() const override { return 4u; }
+
+    void WriteByte(uint32_t addr, uint8_t value) override {
+        if (addr != base_pa_) HaltUnsupportedAccess("WriteByte", addr, value);
+        value_ = value;
+    }
 
     void WriteHalf(uint32_t addr, uint16_t value) override {
         if (addr != base_pa_) HaltUnsupportedAccess("WriteHalf", addr, value);

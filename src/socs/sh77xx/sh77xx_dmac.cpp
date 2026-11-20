@@ -30,7 +30,6 @@ constexpr uint32_t kChcrRo        = 0x00080000u;
 constexpr uint32_t kChcrDi        = 0x00100000u;
 constexpr uint32_t kChcrReserved  = 0xFFE00000u;
 constexpr uint32_t kChcrCommon    = 0x0000FF3Fu;
-constexpr uint32_t kChcrExtra[4]  = {0x00070040u, 0x00070040u, kChcrRo, kChcrDi};
 constexpr uint32_t kChcrTsShift   = 3u;
 constexpr uint32_t kChcrRsShift   = 8u;
 constexpr uint32_t kChcrSmShift   = 12u;
@@ -57,8 +56,6 @@ constexpr uint8_t kStaleSar = 0x1u;
 constexpr uint8_t kStaleDar = 0x2u;
 constexpr uint8_t kStaleTcr = 0x4u;
 constexpr uint8_t kStaleAll = kStaleSar | kStaleDar | kStaleTcr;
-
-constexpr uint8_t kStbcr2Mstp7 = 0x10u;
 
 constexpr const char* kChannelPrefix[4] = {"ch0_", "ch1_", "ch2_", "ch3_"};
 
@@ -87,7 +84,8 @@ void Sh77xxDmac::OnReady() {
     addresses_ = &emu_.Get<Sh77xxDmaAddressMap>();
     coherence_ = &emu_.Get<EngineBridge>().Engine().Get<cerfengine::ShBusMasterCoherence>();
     stbcr2_->RegisterChangeListener([this](uint8_t from, uint8_t to) {
-        if ((from & kStbcr2Mstp7) != 0u && (to & kStbcr2Mstp7) == 0u) Service();
+        const uint8_t stop = Stbcr2ModuleStop();
+        if ((from & stop) != 0u && (to & stop) == 0u) Service();
     });
     emu_.Get<Sh77xxStandbyEntry>().RegisterListener([this] { EnterStandby(); });
     emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
@@ -180,7 +178,7 @@ void Sh77xxDmac::WriteChcr(Channel& ch, uint32_t value) {
     }
     const bool armed = Armed(ch);
     const bool te    = (ch.chcr & kChcrTe) != 0u && ((value & kChcrTe) != 0u || !ch.te_read);
-    ch.chcr          = (value & (kChcrCommon | kChcrExtra[i]) & ~kChcrTe) | (te ? kChcrTe : 0u);
+    ch.chcr          = (value & ChcrStored(i) & ~kChcrTe) | (te ? kChcrTe : 0u);
     if (!te) ch.te_read = false;
     if (enabled && (ch.chcr & kChcrDe) == 0u) AbortReload(ch);
     if (Armed(ch)) {
@@ -189,6 +187,11 @@ void Sh77xxDmac::WriteChcr(Channel& ch, uint32_t value) {
     }
     Drive(ch);
     Service();
+}
+
+uint32_t Sh77xxDmac::ChcrStored(uint32_t channel) const {
+    if (channel < 2u) return kChcrCommon | ExternalRequestControls();
+    return kChcrCommon | (channel == 2u ? kChcrRo : kChcrDi);
 }
 
 void Sh77xxDmac::WriteDmaor(uint16_t value) {
@@ -212,7 +215,7 @@ void Sh77xxDmac::AbortReload(Channel& ch) {
     ch.stale        = kStaleAll;
 }
 
-bool Sh77xxDmac::ClockStopped() const { return stbcr2_->ModuleStopped(kStbcr2Mstp7); }
+bool Sh77xxDmac::ClockStopped() const { return stbcr2_->ModuleStopped(Stbcr2ModuleStop()); }
 
 bool Sh77xxDmac::Armed(const Channel& ch) const {
     return (ch.chcr & (kChcrDe | kChcrTe)) == kChcrDe && (dmaor_ & kDmaorDme) != 0u;
@@ -372,11 +375,11 @@ void Sh77xxDmac::Drive(const Channel& ch) {
 }
 
 void Sh77xxDmac::EnterStandby() {
-    if (!ChannelsHeldInStandby()) {
-        Initialize();
-        return;
+    switch (Standby()) {
+        case StandbyEffect::kInitializes: Initialize(); return;
+        case StandbyEffect::kClearsDmaor: WriteDmaor(0u); return;
+        case StandbyEffect::kHolds:       return;
     }
-    WriteDmaor(0u);
 }
 
 void Sh77xxDmac::Initialize() {

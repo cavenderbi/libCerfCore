@@ -8,7 +8,7 @@
 
 namespace cerfcore {
 
-void DeviceButtons::WiredButton::Press() { emu_.Get<HostPointerInputLock>().RunUnlessHeld(spec_.press); }
+bool DeviceButtons::WiredButton::Pressed() { return emu_.Get<HostPointerInputLock>().AdmitUnlessHeld(spec_.press); }
 
 void DeviceButtons::OnReady() {
     auto& tree = emu_.Get<MachineObjectTree>();

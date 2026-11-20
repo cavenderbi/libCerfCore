@@ -21,19 +21,23 @@ inline constexpr uint32_t kBpbSecPerTrk   = 24;
 inline constexpr uint32_t kBpbNumHeads    = 26;
 inline constexpr uint32_t kBpbHiddSec     = 28;
 inline constexpr uint32_t kBpbTotSec32    = 32;
-inline constexpr uint32_t kBs16DrvNum     = 36;
+inline constexpr uint32_t kBs16VolumeInfo = 36;
 inline constexpr uint32_t kBpb32FatSz32   = 36;
 inline constexpr uint32_t kBpb32ExtFlags  = 40;
 inline constexpr uint32_t kBpb32FsVer     = 42;
 inline constexpr uint32_t kBpb32RootClus  = 44;
 inline constexpr uint32_t kBpb32FsInfo    = 48;
 inline constexpr uint32_t kBpb32BkBootSec = 50;
-inline constexpr uint32_t kBs32DrvNum     = 64;
-inline constexpr uint32_t kBs32BootSig    = 66;
-inline constexpr uint32_t kBs32VolId      = 67;
-inline constexpr uint32_t kBs32VolLab     = 71;
-inline constexpr uint32_t kBs32FilSysType = 82;
+inline constexpr uint32_t kBs32VolumeInfo = 64;
 inline constexpr uint32_t kBootSignature  = 510;
+
+inline constexpr uint32_t kVolDrvNum        = 0;
+inline constexpr uint32_t kVolBootSig        = 2;
+inline constexpr uint32_t kVolId             = 3;
+inline constexpr uint32_t kVolLab            = 7;
+inline constexpr uint32_t kVolFilSysType     = 18;
+inline constexpr uint8_t  kExtBootSignature  = 0x29u;
+inline constexpr char     kNoVolumeLabel[]   = "NO NAME    ";
 
 inline constexpr uint32_t kMbrPartTable      = 446;
 inline constexpr uint32_t kMbrPartEntryBytes = 16;
@@ -78,24 +82,29 @@ struct Bpb {
     uint32_t    total_sectors32 = 0;
 };
 
+struct VolumeInfo {
+    uint8_t     drive_number = 0;
+    uint32_t    volume_id = 0;
+    const char* volume_label = nullptr;
+    const char* fs_type = nullptr;
+};
+
 struct Fat32Extension {
     uint32_t    fat_size32 = 0;
     uint32_t    root_cluster = 0;
     uint16_t    fsinfo_sector = 0;
     uint16_t    backup_boot_sector = 0;
-    uint8_t     drive_number = 0;
-    uint8_t     boot_signature = 0;
-    uint32_t    volume_id = 0;
-    const char* volume_label = nullptr;
-    const char* fs_type = nullptr;
+    VolumeInfo  volume;
 };
 
 uint8_t* MbrPartitionEntry(uint8_t* mbr, unsigned index);
 void WriteMbrPartition(uint8_t* mbr, unsigned index, const MbrPartition& p);
 void WriteBootSignature(uint8_t* sector);
 void WriteBpb(uint8_t* bs, const Bpb& b);
+void WriteFat16VolumeInfo(uint8_t* bs, const VolumeInfo& v);
 void WriteFat32Extension(uint8_t* bs, const Fat32Extension& e);
 void WriteFsInfo(uint8_t* fsi, uint32_t free_count, uint32_t next_free);
+uint32_t NewVolumeId();
 
 }
 

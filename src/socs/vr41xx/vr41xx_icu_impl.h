@@ -96,6 +96,8 @@ struct Vr41xxIcuModel {
     uint16_t msysint2_writable;
     uint16_t mgiuh_writable;
     uint16_t mfir_writable;
+    uint16_t s1_serial     = 0u;
+    uint16_t soft_writable = kSoftWritable;
 };
 
 template <const std::string_view& Soc, const Vr41xxIcuModel& M>
@@ -166,7 +168,7 @@ public:
                 RecomputeLocked();
                 return;
             case kOffSoftint:
-                softint_ = static_cast<uint16_t>(value & kSoftWritable);
+                softint_ = static_cast<uint16_t>(value & M.soft_writable);
                 RecomputeLocked();
                 return;
             default: Peripheral::WriteHalf(addr, value); return;
@@ -311,14 +313,15 @@ private:
         if (aiuint_ & maiu_)  s |= kS1Aiu;
         if (kiuint_ & mkiu_)  s |= kS1Kiu;
         if ((giuintl_ & mgiul_) | (giuinth_ & mgiuh_)) s |= kS1Giu;
-        if (softint_ & kSoftWritable) s |= kS1Soft;
+        if (softint_ & M.soft_writable) s |= kS1Soft;
+        if (dsiuint_ & mdsiu_) s |= M.s1_serial;
         return s;
     }
 
     uint16_t ComputeSysint2Locked() const {
         uint16_t s = static_cast<uint16_t>(sysint2_direct_ & M.s2_direct);
         if (firint_  & mfir_)  s |= kS2Fir;
-        if (dsiuint_ & mdsiu_) s |= kS2Dsiu;
+        if (M.s1_serial == 0u && (dsiuint_ & mdsiu_)) s |= kS2Dsiu;
         return s;
     }
 

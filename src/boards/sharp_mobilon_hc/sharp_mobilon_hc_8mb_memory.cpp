@@ -3,7 +3,7 @@
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../core/board_config.h"
-#include "../ram_param_id.h"
+#include "../ram_param.h"
 #include "sharp_mobilon_hc_family_id.h"
 
 #include <cstdint>

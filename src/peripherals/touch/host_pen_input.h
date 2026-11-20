@@ -34,7 +34,11 @@ public:
     static constexpr uint8_t kFirstOwnerKind = 2u;
 
     void Attach(CerfEmulator& emu, std::function<void(const Pen&)> apply);
+    void ApplyInPark();
     void Queue(const Pen& pen);
+    void QueueEdge(bool down, int x, int y);
+    void Down(int x, int y);
+    void Up();
     void Track(int x, int y);
     Point Latest() const;
     void MapToPanel(int x, int y, const PanelRange& range, uint16_t* adc_x, uint16_t* adc_y) const;

@@ -4,6 +4,7 @@
 #include <cerfengine/host_request_channel.h>
 #include <cerfcore/peripherals/peripheral_base.h>
 #include <cerfcore/state/state_stream.h>
+#include "../../peripherals/key_matrix_cells.h"
 #include "../cycle_anchored_counter.h"
 
 #include <cstdint>
@@ -59,8 +60,10 @@ private:
     uint16_t kpsr_     = 0;
     uint16_t kddr_     = 0;
     uint16_t kpdr_col_ = 0xFF00u;
-    uint8_t  pressed_[4] = {};
-    uint8_t  host_pressed_[4] = {};
+    static constexpr uint32_t kKeyColumns = 4u;
+
+    KeyMatrixCells<kKeyColumns> pressed_;
+    KeyMatrixCells<kKeyColumns> host_pressed_;
     bool     irq_on_   = false;
 
     GuestCycleClock*           clock_       = nullptr;

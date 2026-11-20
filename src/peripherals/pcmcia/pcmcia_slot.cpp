@@ -58,7 +58,10 @@ void PcmciaSlot::SetPowered(bool on) {
             if (on) card_->PowerOn();
             else    card_->PowerOff();
         }
-        if (!on) DriveLine(kLineBusy, false);
+        if (!on) {
+            DriveLine(kLineBusy, false);
+            DriveStatusChange(false);
+        }
     }
     host_.OnCardPowerChanged(*this);
 }
@@ -187,6 +190,11 @@ bool PcmciaSlot::InputAcknowledge(uint32_t offset) {
 void PcmciaSlot::RaiseIrq() { DriveLine(kLineIreq, true); }
 void PcmciaSlot::ClearIrq() { DriveLine(kLineIreq, false); }
 
+void PcmciaSlot::DriveStatusChange(bool low) {
+    if (status_change_.exchange(low, std::memory_order_acq_rel) == low) return;
+    host_.OnStatusChange(*this, low);
+}
+
 ExternalDeviceClock::Timer& PcmciaSlot::CardTimer() {
     if (!card_timer_) card_timer_ = &emu_.Get<ExternalDeviceClock>().AddTimer([this] { OnCardTimer(); });
     return *card_timer_;
@@ -224,6 +232,7 @@ void PcmciaSlot::EjectLocked() {
     PublishPinsLocked();
     PublishInsertedLocked();
     DriveLine(kLineIreq | kLineBusy, false);
+    DriveStatusChange(false);
 }
 
 void PcmciaSlot::InsertCard(std::unique_ptr<PcmciaCard> card) {
@@ -267,6 +276,7 @@ void PcmciaSlot::SaveSlotState(StateWriter& w) {
     w.Write<uint8_t>("powered", powered_ ? 1u : 0u);
     w.Write<uint8_t>("reset_line", reset_asserted_ ? 1u : 0u);
     w.Write<uint8_t>("card_busy", (line_.load(std::memory_order_acquire) & kLineBusy) != 0u ? 1u : 0u);
+    w.Write<uint8_t>("status_change", status_change_.load(std::memory_order_acquire) ? 1u : 0u);
     emu_.Get<ExternalDeviceClock>().SaveTimer(CardTimer(), w, "card_timer_");
     gap_.Save(w);
     const bool has = (card_ != nullptr);
@@ -297,10 +307,11 @@ void PcmciaSlot::RestoreSlotState(StateReader& r) {
 
 void PcmciaSlot::RestoreSlotBodyLocked(StateReader& r, bool& ejected, bool& inserted) {
     ++generation_;
-    uint8_t powered = 0, reset_line = 0, card_busy = 0, has = 0;
+    uint8_t powered = 0, reset_line = 0, card_busy = 0, status_change = 0, has = 0;
     r.Read("powered", powered);
     r.Read("reset_line", reset_line);
     r.Read("card_busy", card_busy);
+    r.Read("status_change", status_change);
     emu_.Get<ExternalDeviceClock>().RestoreTimer(CardTimer(), r, "card_timer_");
     ejected = gap_.HeldItem().has_value();
     gap_.Restore(r);
@@ -316,6 +327,7 @@ void PcmciaSlot::RestoreSlotBodyLocked(StateReader& r, bool& ejected, bool& inse
         PublishPinsLocked();
         PublishInsertedLocked();
         line_.store(card_busy != 0u ? kLineBusy : 0u, std::memory_order_release);
+        status_change_.store(status_change != 0u, std::memory_order_release);
         return;
     }
     const PcmciaCardIdentity identity = PcmciaCardIdentity::Restore(r, "");
@@ -341,6 +353,7 @@ void PcmciaSlot::RestoreSlotBodyLocked(StateReader& r, bool& ejected, bool& inse
     card_->RestoreState(r);
     r.LeaveFrame();
     line_.store(card_busy != 0u ? kLineBusy : 0u, std::memory_order_release);
+    status_change_.store(status_change != 0u, std::memory_order_release);
     PublishInsertedLocked();
 }
 

@@ -35,6 +35,7 @@ public:
     void OnResetRequested(bool is_resume) override;
     void OnRebootRequested() override;
     void OnResetDelivered() override;
+    void OnCpuReset() override;
     void OnPowerDownRequest() override;
     void OnBlockCompiled(const cerfengine::BlockCompileStats& stats) override;
 

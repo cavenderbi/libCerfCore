@@ -2,8 +2,6 @@
 
 #include <algorithm>
 
-#include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/core/fatal.h>
 #include "../../execution/guest_cycle_clock.h"
 #include <cerfcore/state/state_stream.h>
 #include "vr41xx_rtcx_ticks.h"
@@ -12,7 +10,8 @@ namespace cerfcore {
 
 namespace {
 
-constexpr uint64_t kAdConversionNs = 10000u;
+constexpr uint64_t kAdConversionNs  = 10000u;
+constexpr uint64_t kScanConversions = 4u;
 
 }
 
@@ -33,6 +32,21 @@ uint64_t Vr41xxPiuScanTiming::ReadyCycle(uint16_t kind, uint16_t stable, uint64_
     return settled + clock_->NsToCycles(static_cast<int64_t>(kAdConversionNs));
 }
 
+uint64_t Vr41xxPiuScanTiming::TicksToCycles(uint64_t ticks) const {
+    const uint64_t now = rtcx_->Now();
+    return rtcx_->CycleOf(now + ticks) - rtcx_->CycleOf(now);
+}
+
+uint64_t Vr41xxPiuScanTiming::SettleCycles(uint16_t stable) const { return TicksToCycles(stable & 0x003Fu); }
+
+uint64_t Vr41xxPiuScanTiming::AdPortScanCycles() const {
+    return clock_->NsToCycles(static_cast<int64_t>(kScanConversions * kAdConversionNs));
+}
+
+uint64_t Vr41xxPiuScanTiming::DataScanCycles(uint16_t stable) const {
+    return TicksToCycles((stable & 0x003Fu) * kScanConversions) + AdPortScanCycles();
+}
+
 void Vr41xxPiuScanTiming::SetReady(uint64_t cycle) {
     const uint64_t now    = clock_->Cycles();
     const int64_t  now_ns = clock_->NowNs();
@@ -43,10 +57,6 @@ void Vr41xxPiuScanTiming::SetReady(uint64_t cycle) {
 
 void Vr41xxPiuScanTiming::Begin(uint16_t kind, uint16_t stable, uint64_t start_tick,
                                 uint64_t start_cycle) {
-    if (kind_ != kIdle) {
-        emu_.Get<Fatal>().Die("VR41xx PIU: scan %u started while scan %u is in flight; "
-                              "PADDLOSTINTR is not modeled", kind, kind_);
-    }
     kind_ = kind;
     SetReady(ReadyCycle(kind, stable, start_tick, start_cycle));
 }

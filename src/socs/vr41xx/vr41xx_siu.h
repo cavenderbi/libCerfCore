@@ -41,6 +41,7 @@ public:
 
 protected:
     void DeliverTx(uint8_t byte) override;
+    bool SerialOutputOnLine() override;
     bool ControlOutputsDriven() override;
 
     uint32_t    RegStride() const override { return 1u; }
@@ -81,6 +82,7 @@ private:
     bool SupplyOn();
     bool Rs232PinsLive();
     bool Rs232Selected();
+    bool Rs232Routed();
     bool TransmitsOnTxd();
     void ApplyModemInputs();
     void ApplyModemInputsLocked();

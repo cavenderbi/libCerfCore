@@ -27,8 +27,6 @@ inline constexpr uint32_t kDacr  = 4u;
 inline constexpr uint16_t kDaoe1 = 0x80u;
 inline constexpr uint16_t kDaoe0 = 0x40u;
 
-inline constexpr uint8_t kStbcr2Mstp6 = 0x08u;
-
 constexpr RegWindowModel WindowOf(OtherReset other_reset) {
     RegWindowModel w{kSh77xxDacBase, 5u, 5u, false, {}, 1u};
     w.reg[kDadr0] = RegSpec{ReadKind::kStored, WriteKind::kStored, 0xFFu, 0x00u, 0x00u, other_reset};
@@ -37,7 +35,7 @@ constexpr RegWindowModel WindowOf(OtherReset other_reset) {
     return w;
 }
 
-template <const std::string_view& Soc, const RegWindowModel& W>
+template <const std::string_view& Soc, const RegWindowModel& W, uint8_t kStbcr2ModuleStop>
 class Sh77xxDacBase : public cerf_reg_window_detail::RegWindowBase<Soc, W, Sh77xxDac> {
     using Base = cerf_reg_window_detail::RegWindowBase<Soc, W, Sh77xxDac>;
 
@@ -51,8 +49,13 @@ public:
         this->emu_.template Get<GuestCpuReset>().RegisterResetReleaseListener([this] { this->NotifyOutputChanged(); });
     }
 
+    void WriteHalf(uint32_t addr, uint16_t value) override {
+        if (value != 0u) this->HaltUnsupportedAccess("WriteHalf of a nonzero value to an 8-bit D/A register", addr, value);
+        this->WriteByte(addr, 0u);
+    }
+
     Sh77xxDac::Output ChannelOutput(uint32_t channel) const override {
-        if (stbcr2_->ModuleStopped(kStbcr2Mstp6)) return held_[channel];
+        if (stbcr2_->ModuleStopped(kStbcr2ModuleStop)) return held_[channel];
         return LiveOutput(channel);
     }
 
@@ -84,8 +87,8 @@ private:
     }
 
     void OnModuleStopChange(uint8_t from, uint8_t to) {
-        const bool was_stopped = (from & kStbcr2Mstp6) != 0u;
-        const bool stopped     = (to & kStbcr2Mstp6) != 0u;
+        const bool was_stopped = (from & kStbcr2ModuleStop) != 0u;
+        const bool stopped     = (to & kStbcr2ModuleStop) != 0u;
         if (!was_stopped && stopped) {
             held_[0] = LiveOutput(0u);
             held_[1] = LiveOutput(1u);

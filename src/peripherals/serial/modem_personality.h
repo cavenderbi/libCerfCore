@@ -22,6 +22,7 @@ public:
 
     void OnGuestTx(const uint8_t* data, size_t n) override;
     void OnControlLines(bool dtr, bool rts) override;
+    void OnBreak(bool on) override;
     void OnOpen() override;
     void OnClose() override;
     void ResendModemInputs() override;

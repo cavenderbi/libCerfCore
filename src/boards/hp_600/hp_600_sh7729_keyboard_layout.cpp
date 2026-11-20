@@ -19,7 +19,7 @@ public:
     }
 
     const std::array<uint8_t, kHp600KeyCells>& CellVk() const override { return kCellVk; }
-    const std::array<uint16_t, Hp600KeyMatrix::kRows>& ScannedColumns() const override { return kScannedColumns; }
+    const std::array<uint16_t, Sh77xxPortKeyMatrix::kRows>& ScannedColumns() const override { return kScannedColumns; }
     std::span<const Hp600HostAlias> HostAliases() const override { return kHostAliases; }
     std::span<const jornada_kbd::LayerKey> AltGrLayer() const override { return kAltGrLayer; }
 
@@ -35,7 +35,7 @@ private:
         0x32u, 0x33u, 0x34u, 0x39u, 0x38u, 0x37u, 0x35u, 0x36u, 0x30u, 0xBDu, 0xBBu, 0x00u, 0x31u, 0x00u, 0x00u, 0x00u,
     };
 
-    static constexpr std::array<uint16_t, Hp600KeyMatrix::kRows> kScannedColumns = {
+    static constexpr std::array<uint16_t, Sh77xxPortKeyMatrix::kRows> kScannedColumns = {
         0x17FFu, 0x17FFu, 0x17FFu, 0x9FFFu, 0x17FFu, 0x17FFu, 0x17FFu, 0x17FFu,
     };
 

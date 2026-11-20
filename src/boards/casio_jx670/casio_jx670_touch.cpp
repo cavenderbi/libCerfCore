@@ -131,7 +131,7 @@ bool CasioJx670Touch::TryWriteHalf(uint32_t, uint16_t)  { return false; }
 
 void CasioJx670Touch::SetPen(bool down, int surface_x, int surface_y) {
     pens_.Track(surface_x, surface_y);
-    pens_.Queue(HostPenInput::Pen{down ? HostPenInput::kPenDown : HostPenInput::kPenUp, surface_x, surface_y});
+    pens_.QueueEdge(down, surface_x, surface_y);
 }
 
 void CasioJx670Touch::OnCaptureLost() {

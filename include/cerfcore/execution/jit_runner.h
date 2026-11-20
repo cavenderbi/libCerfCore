@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <cstdint>
 #include <functional>
 #include <mutex>
 #include <thread>
@@ -24,6 +25,8 @@ public:
 
     void RegisterPreStartHook(std::function<void()> fn);
 
+    void RegisterRunEndListener(std::function<void()> fn);
+
     void Join();
 
     void RequestStop();
@@ -31,6 +34,8 @@ public:
     bool Stopped() const { return stopped_.load(std::memory_order_acquire); }
 
     bool Started() const { return started_.load(std::memory_order_acquire); }
+
+    bool GuestRan();
 
     void Pause();
     void Resume();
@@ -47,6 +52,7 @@ private:
     std::atomic<bool>       stop_requested_{false};
     std::atomic<bool>       stopped_{false};
     std::atomic<bool>       started_{false};
+    uint64_t                start_cycles_ = 0;
 
     std::atomic<bool>       pause_requested_{false};
     bool                    paused_      = false;
@@ -55,6 +61,7 @@ private:
     std::condition_variable pause_cv_;
 
     CallbackList<> pre_start_hooks_;
+    CallbackList<> run_end_listeners_;
 };
 
 }

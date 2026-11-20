@@ -37,6 +37,6 @@ public:
 
 }  /* namespace */
 
-REGISTER_SERVICE_AS(Vr4111Piu, Vr41xxPiu);
+REGISTER_SERVICE_AS_ALSO(Vr4111Piu, Vr41xxPiu, Vr41xxBufferedPiu);
 
 }

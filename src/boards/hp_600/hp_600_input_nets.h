@@ -14,7 +14,7 @@
 
 namespace cerfcore {
 
-class Hp600KeyMatrix;
+class Sh77xxPortKeyMatrix;
 
 enum class Hp600InputNet : uint8_t {
     kAcAdapterOff,
@@ -60,7 +60,7 @@ private:
     void     ReleaseButtons();
 
     Sh77xxIntc*                            intc_   = nullptr;
-    Hp600KeyMatrix*                        matrix_ = nullptr;
+    Sh77xxPortKeyMatrix*                   matrix_ = nullptr;
     std::mutex                             buttons_mtx_;
     std::atomic<uint32_t>                  high_{(1u << kNetCount) - 1u};
     std::array<CallbackList<>, kNetCount>  listeners_;

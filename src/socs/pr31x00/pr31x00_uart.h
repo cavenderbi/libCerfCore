@@ -83,7 +83,8 @@ private:
     void       RaiseRxInts(const Pr31x00UartDma::RxInts& ints);
     void       FireLineConfig();
 
-    uint32_t    ctl1_ = 0;
+    uint32_t    ctl1_     = 0;
+    bool        tx_break_ = false;
     std::string tx_line_;
 
     std::optional<Pr31x00SerialModem> modem_;

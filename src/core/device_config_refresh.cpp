@@ -19,11 +19,10 @@ void DeviceConfigRefresh::RegisterListener(std::function<void()> fn) {
 
 LiveDeviceSettings DeviceConfigRefresh::LoadFiles(const DeviceConfig& config) {
     LiveDeviceSettings loaded;
-    const std::string  dir = GetDeviceDir(config.device_name);
     static const std::pair<const char*, CfgBrokenFile> kFiles[] = {
         {kDeviceConfigFileName, CfgBrokenFile::kHalt}, {kUserConfigFileName, CfgBrokenFile::kSkip}};
     for (const auto& [name, broken] : kFiles) {
-        const std::string path = dir + name;
+        const std::string path = ResolveDeviceFile(config.device_name, name);
         nlohmann::json j = emu_.Get<ConfigReader>().ReadLoggedJsonFile(path, broken);
         if (j.is_null()) continue;
         emu_.Get<ConfigMutableFields>().LoadAll(j, loaded, path);

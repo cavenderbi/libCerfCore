@@ -47,6 +47,9 @@ public:
     bool InterruptRequest() const { return core_.InterruptRequest(); }
     bool Ready() const;
 
+    bool TakeBusyStart();
+    void EndBusy();
+
     void SaveState(StateWriter& w);
     void RestoreState(StateReader& r);
 
@@ -59,12 +62,17 @@ private:
     void    EnterReset();
     void    AfterRead();
     void    AfterWrite();
+    void    HoldPhaseResult();
+    void    ClearBusy();
 
     CompactFlashAtaCore       core_;
     CompactFlashAtaCommandSet commands_;
     bool                      in_reset_      = false;
     bool                      in_card_reset_ = false;
     uint8_t                   card_number_   = 0;
+    bool                      busy_          = false;
+    bool                      busy_started_  = false;
+    uint8_t                   result_status_ = 0;
 };
 
 }

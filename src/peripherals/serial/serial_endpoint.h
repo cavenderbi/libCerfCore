@@ -24,6 +24,7 @@ public:
     /* Guest changed the MCR control outputs. The modem treats a DTR 1->0 edge
        as hang-up; a personality that does not care leaves this default. */
     virtual void OnControlLines(bool dtr, bool rts) { (void)dtr; (void)rts; }
+    virtual void OnBreak(bool on) = 0;
 
     virtual void OnOpen()  {}
     virtual void OnClose() {}

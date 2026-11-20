@@ -17,6 +17,6 @@ public:
 
 }
 
-REGISTER_SERVICE_AS(Sh7729Rtc, Sh77xxRtc);
+REGISTER_SERVICE_AS(Sh7729Rtc, Sh77xxRtcOscillator);
 
 }

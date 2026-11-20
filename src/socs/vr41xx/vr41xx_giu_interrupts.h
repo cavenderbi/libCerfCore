@@ -9,8 +9,9 @@ class StateWriter;
 
 class Vr41xxGiuInterrupts {
 public:
-    explicit Vr41xxGiuInterrupts(bool intstat_sets_while_disabled)
-        : intstat_sets_while_disabled_(intstat_sets_while_disabled) {}
+    Vr41xxGiuInterrupts(bool intstat_sets_while_disabled, bool latches_every_level)
+        : intstat_sets_while_disabled_(intstat_sets_while_disabled),
+          latches_every_level_(latches_every_level) {}
 
     void OnPinLevel(int pin, bool prev, bool level);
     void EvaluateLevels(uint32_t pins, uint32_t levels);
@@ -29,6 +30,7 @@ private:
     void ApplyCondition(int pin, bool met);
 
     bool     intstat_sets_while_disabled_;
+    bool     latches_every_level_;
     uint16_t intstat_l_  = 0, intstat_h_  = 0;
     uint16_t inten_l_    = 0, inten_h_    = 0;
     uint16_t inttyp_l_   = 0, inttyp_h_   = 0;

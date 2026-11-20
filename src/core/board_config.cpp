@@ -45,6 +45,8 @@ void BoardConfig::OnReady() {
     }
 }
 
+bool BoardConfig::Has(std::string_view param_id) const { return values_.find(param_id) != values_.end(); }
+
 const std::string& BoardConfig::EnumId(std::string_view param_id) const { return values_.find(param_id)->second; }
 
 }

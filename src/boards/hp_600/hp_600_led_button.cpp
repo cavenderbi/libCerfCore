@@ -12,7 +12,7 @@
 #include "hp_600_family_id.h"
 #include "hp_600_battery.h"
 #include "hp_600_input_nets.h"
-#include "hp_600_key_matrix.h"
+#include "../sh77xx_port_key_matrix.h"
 #include "hp_600_keyboard_layout.h"
 #include "hp_600_led_colors.h"
 #include "hp_600_notification_led_net.h"
@@ -61,7 +61,7 @@ public:
         notification_ = colors.NotificationColor();
         led_cell_     = emu_.Get<Hp600KeyboardLayout>().ScannedCellOf(kVkLedButton);
         if (led_cell_) {
-            matrix_   = &emu_.Get<Hp600KeyMatrix>();
+            matrix_   = &emu_.Get<Sh77xxPortKeyMatrix>();
             requests_ = &emu_.Get<EngineBridge>().Engine().Get<cerfengine::HostRequestChannel>();
             requests_->RegisterListener([this] { ApplyPress(); });
             hold_.Attach([this] { Release(); });
@@ -93,13 +93,17 @@ public:
 private:
     class Button final : public MachineButton {
     public:
-        explicit Button(Hp600LedButton& owner) : owner_(owner) {}
+        Button(Hp600LedButton& owner, CerfEmulator& emu) : MachineButton(emu), owner_(owner) {}
         std::string ObjectId() const override { return "button"; }
         static constexpr char kObjectName[] = "LED button";
         std::string ObjectName() const override { return kObjectName; }
-        void        Press() override { owner_.Press(); }
 
     private:
+        bool Pressed() override {
+            owner_.Press();
+            return true;
+        }
+
         Hp600LedButton& owner_;
     };
 
@@ -128,14 +132,14 @@ private:
 
     Sh77xxPortWiring*                wiring_   = nullptr;
     Hp600Battery*                    battery_  = nullptr;
-    Hp600KeyMatrix*                  matrix_   = nullptr;
+    Sh77xxPortKeyMatrix*             matrix_   = nullptr;
     cerfengine::HostRequestChannel*  requests_ = nullptr;
     std::optional<uint32_t>          led_cell_;
     Hp600LedColor                    charging_     = Hp600LedColor::kOrange;
     Hp600LedColor                    notification_ = Hp600LedColor::kOrange;
     GuestSampleClock                 hold_{emu_};
     std::atomic<bool>                press_pending_{false};
-    Button                           button_{*this};
+    Button                           button_{*this, emu_};
 };
 
 }

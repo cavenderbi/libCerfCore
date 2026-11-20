@@ -5,6 +5,7 @@
 #include <cerfcore/core/log.h>
 #include "../../platform/host_clock.h"
 #include <cerfcore/state/emulation_freeze.h>
+#include "uart_frame.h"
 
 #include <utility>
 
@@ -71,14 +72,21 @@ void HostSerialForward::OnOpen() {
     }
 
     ApplyLineConfig(uart_ ? uart_->GetLineConfig() : SerialLine::LineConfig{});
+    {
+        std::lock_guard<std::mutex> lk(ctl_mu_);
+        if (break_) ApplyBreak(true);
+    }
 
     last_ms_.store(kModemLinesUnpushed);
 
     port_.StartIo(kReadTimeoutMs, kWriteTimeoutMs);
 
     if (uart_)
-        uart_->SetLineConfigCallback(
-            [this](const SerialLine::LineConfig& c) { ApplyLineConfig(c); });
+        uart_->SetLineConfigCallback([this](const SerialLine::LineConfig& c) {
+            TxItem item{TxItem::Kind::kConfig, 0u};
+            item.cfg = c;
+            Queue(item);
+        });
 
     InstanceThreads& threads = emu_.Get<InstanceThreads>();
     running_ = true;
@@ -116,11 +124,9 @@ void HostSerialForward::ApplyLineConfig(const SerialLine::LineConfig& c) {
             (unsigned)c.parity, (unsigned)c.stop, (int)dtr_, (int)rts_);
         return;
     }
-#if CERF_DEV_MODE
     LOG(Periph, "[SerialFwd] line cfg %s baud=%u bits=%u parity=%u stop=%u "
         "DTR=%d RTS=%d\n", port_name_.c_str(), c.baud, c.data_bits,
         (unsigned)c.parity, (unsigned)c.stop, (int)dtr_, (int)rts_);
-#endif
 }
 
 void HostSerialForward::OnGuestTx(const uint8_t* data, size_t n) {
@@ -131,9 +137,47 @@ void HostSerialForward::OnGuestTx(const uint8_t* data, size_t n) {
 #endif
     {
         std::lock_guard<std::mutex> lk(tx_mu_);
-        tx_buf_.insert(tx_buf_.end(), data, data + n);
+        for (size_t i = 0; i < n; ++i) tx_buf_.push_back({TxItem::Kind::kByte, data[i]});
     }
     tx_cv_.notify_one();
+}
+
+void HostSerialForward::OnBreak(bool on) {
+    {
+        std::lock_guard<std::mutex> lk(ctl_mu_);
+        break_ = on;
+        if (!port_.IsOpen()) return;
+    }
+    LOG(Periph, "[SerialFwd] break %s on host %s\n", on ? "on" : "off", port_name_.c_str());
+    TxItem item{on ? TxItem::Kind::kBreakOn : TxItem::Kind::kBreakOff, 0u};
+    item.at = host_platform::MonotonicTicks();
+    Queue(item);
+}
+
+void HostSerialForward::Queue(const TxItem& item) {
+    {
+        std::lock_guard<std::mutex> lk(tx_mu_);
+        tx_buf_.push_back(item);
+    }
+    tx_cv_.notify_one();
+}
+
+void HostSerialForward::ApplyBreak(bool on) {
+    uint32_t err = 0;
+    if (on && !port_.Drain(err)) {
+        LOG(Caution, "[SerialFwd] %s did not drain its output before a break (err %u)\n", port_name_.c_str(), err);
+    }
+    if (port_.SetBreak(on, err)) return;
+    LOG(Caution, "[SerialFwd] %s refused to turn the break %s (err %u)\n", port_name_.c_str(), on ? "on" : "off",
+        err);
+}
+
+void HostSerialForward::ApplyControlLines(bool dtr, bool rts) {
+    std::lock_guard<std::mutex> lk(ctl_mu_);
+    dtr_ = dtr;
+    rts_ = rts;
+    LOG(Periph, "[SerialFwd] drive host %s DTR=%d RTS=%d\n", port_name_.c_str(), dtr, rts);
+    port_.SetControlLines(dtr, rts);
 }
 
 void HostSerialForward::ResendModemInputs() { last_ms_.store(kModemLinesUnpushed); }
@@ -143,20 +187,25 @@ void HostSerialForward::PostRestore() {
         OnOpen();
         return;
     }
-    ApplyLineConfig(uart_->GetLineConfig());
+    TxItem item{TxItem::Kind::kConfig, 0u};
+    item.cfg = uart_->GetLineConfig();
+    Queue(item);
     ResendModemInputs();
 }
 
 void HostSerialForward::OnControlLines(bool dtr, bool rts) {
-    std::lock_guard<std::mutex> lk(ctl_mu_);
-    dtr_ = dtr;
-    rts_ = rts;
-    if (!port_.IsOpen()) return;
-#if CERF_DEV_MODE
-    LOG(Periph, "[SerialFwd] drive host %s DTR=%d RTS=%d\n",
-        port_name_.c_str(), dtr, rts);
-#endif
-    port_.SetControlLines(dtr, rts);
+    {
+        std::lock_guard<std::mutex> lk(ctl_mu_);
+        if (!port_.IsOpen()) {
+            dtr_ = dtr;
+            rts_ = rts;
+            return;
+        }
+    }
+    TxItem item{TxItem::Kind::kLines, 0u};
+    item.dtr = dtr;
+    item.rts = rts;
+    Queue(item);
 }
 
 void HostSerialForward::ReaderLoop() {
@@ -169,10 +218,8 @@ void HostSerialForward::ReaderLoop() {
                 const bool dsr = (cur & host_platform::kModemDsr)  != 0;
                 const bool ri  = (cur & host_platform::kModemRing) != 0;
                 const bool dcd = (cur & host_platform::kModemDcd)  != 0;
-#if CERF_DEV_MODE
                 LOG(Periph, "[SerialFwd] host modem CTS=%d DSR=%d RI=%d DCD=%d\n",
                     cts, dsr, ri, dcd);
-#endif
                 if (uart_) {
                     if (!WithGuestAccess([&] {
                             uart_->SetModemInputs(cts, dsr, ri, dcd);
@@ -206,7 +253,13 @@ void HostSerialForward::ReaderLoop() {
 void HostSerialForward::WriterLoop() {
     const int64_t freq = host_platform::MonotonicFrequency();
     int64_t next = host_platform::MonotonicTicks();
-    std::vector<uint8_t> local;
+    const auto char_ticks = [freq](const SerialLine::LineConfig& c) {
+        return c.baud ? (int64_t)(UartCharBitTimes(c) * (double)freq / c.baud) : 0;
+    };
+    int64_t byte_ticks     = char_ticks(uart_ ? uart_->GetLineConfig() : SerialLine::LineConfig{});
+    int64_t break_guest_at = 0;
+    int64_t break_host_at  = 0;
+    std::vector<TxItem> local;
     while (true) {
         {
             std::unique_lock<std::mutex> lk(tx_mu_);
@@ -215,30 +268,44 @@ void HostSerialForward::WriterLoop() {
             local.swap(tx_buf_);
         }
 
-        const SerialLine::LineConfig cfg =
-            uart_ ? uart_->GetLineConfig() : SerialLine::LineConfig{};
-        const int64_t byte_ticks =
-            cfg.baud ? (int64_t)(cfg.BitsPerChar() * (double)freq / cfg.baud) : 0;
-
         for (size_t i = 0; i < local.size() && running_.load(); ++i) {
             const int64_t now = host_platform::MonotonicTicks();
             if (next < now) next = now;
             if (next > now && !port_.PaceWait(next - now)) {
-#if CERF_DEV_MODE
                 LOG(Periph, "[SerialFwd] writer pace-wait aborted at byte %zu/%zu\n",
                     i, local.size());
-#endif
                 break;
+            }
+
+            if (local[i].kind == TxItem::Kind::kConfig) {
+                ApplyLineConfig(local[i].cfg);
+                byte_ticks = char_ticks(local[i].cfg);
+                continue;
+            }
+            if (local[i].kind == TxItem::Kind::kLines) {
+                ApplyControlLines(local[i].dtr, local[i].rts);
+                continue;
+            }
+            if (local[i].kind == TxItem::Kind::kBreakOn) {
+                ApplyBreak(true);
+                break_guest_at = local[i].at;
+                break_host_at  = host_platform::MonotonicTicks();
+                continue;
+            }
+            if (local[i].kind == TxItem::Kind::kBreakOff) {
+                const int64_t until = break_host_at + (local[i].at - break_guest_at);
+                const int64_t held  = host_platform::MonotonicTicks();
+                if (until > held && !port_.PaceWait(until - held)) break;
+                ApplyBreak(false);
+                continue;
             }
 
             uint32_t wrote = 0;
             uint32_t err   = 0;
-            const host_platform::SerialIoResult result = port_.WriteByte(local[i], wrote, err);
+            const host_platform::SerialIoResult result = port_.WriteByte(local[i].byte, wrote, err);
             if (result == host_platform::SerialIoResult::kStopped) {
-#if CERF_DEV_MODE
                 LOG(Periph, "[SerialFwd] writer wait aborted at byte %zu/%zu; "
                     "thread exits\n", i, local.size());
-#endif
                 return;
             }
             if (result == host_platform::SerialIoResult::kFailed) {

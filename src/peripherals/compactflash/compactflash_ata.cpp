@@ -1,5 +1,6 @@
 #include "compactflash_ata.h"
 
+#include <cerfcore/core/log.h>
 #include <cerfcore/state/state_stream.h>
 
 namespace cerfcore {
@@ -26,19 +27,51 @@ void CompactFlashAta::PowerOn() {
     core_.PowerOn();
     in_reset_      = false;
     in_card_reset_ = false;
+    ClearBusy();
 }
 
 void CompactFlashAta::PowerOff() {
     core_.PowerOff();
     in_reset_      = false;
     in_card_reset_ = false;
+    ClearBusy();
 }
 
 bool CompactFlashAta::Ready() const {
     return (core_.tf.status & Tf::kStatusBusy) == 0u;
 }
 
+bool CompactFlashAta::TakeBusyStart() {
+    const bool started = busy_started_;
+    busy_started_      = false;
+    return started;
+}
+
+void CompactFlashAta::EndBusy() {
+    if (!busy_) return;
+    busy_           = false;
+    core_.tf.status = result_status_;
+    core_.RaiseIntrq();
+}
+
+void CompactFlashAta::HoldPhaseResult() {
+    if (!core_.phase_done) return;
+    core_.phase_done = false;
+    result_status_   = core_.tf.status;
+    core_.tf.status  = Tf::kStatusBusy;
+    core_.IrqClear();
+    busy_         = true;
+    busy_started_ = true;
+}
+
+void CompactFlashAta::ClearBusy() {
+    busy_            = false;
+    busy_started_    = false;
+    core_.phase_done = false;
+}
+
 void CompactFlashAta::EnterReset() {
+    ClearBusy();
     core_.IrqClear();
     core_.xfer.Stop();
     core_.sectors_left = 0;
@@ -104,29 +137,40 @@ void CompactFlashAta::WriteCommand(uint8_t command) {
     core_.IrqClear();
     if (Resetting() || !Selected())
         return;
+    if (busy_) {
+        LOG(Pcmcia, "[CF] command 0x%02X written while the card is busy is not accepted\n", command);
+        return;
+    }
     core_.tf.error = 0;
     const bool was_sleeping = core_.power.Sleeping();
     core_.power.Wake();
     core_.xfer.Stop();
     commands_.Execute(command, was_sleeping);
+    if ((core_.tf.status & Tf::kStatusDrq) == 0u) {
+        core_.phase_done = false;
+        return;
+    }
+    HoldPhaseResult();
 }
 
 bool CompactFlashAta::DataPortIn() const {
-    return Selected() && core_.xfer.In();
+    return !busy_ && Selected() && core_.xfer.In();
 }
 
 bool CompactFlashAta::DataPortOut() const {
-    return Selected() && core_.xfer.Out();
+    return !busy_ && Selected() && core_.xfer.Out();
 }
 
 void CompactFlashAta::AfterRead() {
-    if (core_.xfer.BufferDone())
-        commands_.OnReadBufferEnd();
+    if (!core_.xfer.BufferDone()) return;
+    commands_.OnReadBufferEnd();
+    HoldPhaseResult();
 }
 
 void CompactFlashAta::AfterWrite() {
-    if (core_.xfer.BufferDone())
-        commands_.OnWriteBufferFull();
+    if (!core_.xfer.BufferDone()) return;
+    commands_.OnWriteBufferFull();
+    HoldPhaseResult();
 }
 
 uint8_t CompactFlashAta::ReadData8() {
@@ -188,6 +232,8 @@ void CompactFlashAta::SaveState(StateWriter& w) {
     core_.SaveState(w);
     w.Write<uint8_t>("soft_reset_held", in_reset_ ? 1u : 0u);
     w.Write<uint8_t>("card_reset_held", in_card_reset_ ? 1u : 0u);
+    w.Write<uint8_t>("phase_busy", busy_ ? 1u : 0u);
+    w.Write("phase_result_status", result_status_);
 }
 
 void CompactFlashAta::RestoreState(StateReader& r) {
@@ -198,6 +244,11 @@ void CompactFlashAta::RestoreState(StateReader& r) {
     uint8_t card_held = 0;
     r.Read("card_reset_held", card_held);
     in_card_reset_ = card_held != 0u;
+    uint8_t phase_busy = 0;
+    r.Read("phase_busy", phase_busy);
+    busy_         = phase_busy != 0u;
+    busy_started_ = false;
+    r.Read("phase_result_status", result_status_);
 }
 
 }

@@ -43,7 +43,7 @@ EmulationSpeedConfig::Multiplier EmulationSpeedConfig::ReadMultiplier(const nloh
 
 void EmulationSpeedConfig::OnReady() {
     const std::string& device = emu_.Get<DeviceConfig>().device_name;
-    Load(GetDeviceDir(device) + kDeviceConfigFileName, CfgBrokenFile::kHalt);
+    Load(ResolveDeviceFile(device, kDeviceConfigFileName), CfgBrokenFile::kHalt);
     Load(UserConfigPath(device), CfgBrokenFile::kSkip);
     LOG(Cfg, "throttle multiplier %llu/%llu, CPU rate multiplier %llu/%llu\n",
         static_cast<unsigned long long>(throttle_.num),

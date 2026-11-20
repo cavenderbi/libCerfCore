@@ -17,6 +17,7 @@ void Uart16550::SaveState(StateWriter& w) {
 }
 
 void Uart16550::RestoreState(StateReader& r) {
+    emu_.Get<KernelDebugSink>().FlushLine(tx_line_, Name());
     Port().RestoreCradleState(r);
     Serial16550::RestoreState(r);
     RestoreLineTimer(r, "line_timer_");
@@ -28,9 +29,12 @@ void Uart16550::PostRestore() {
 }
 
 void Uart16550::DeliverTx(uint8_t byte) {
-    if (Port().DeliverTx(&byte, 1, true)) return;
-    EmitDebugTx(byte);
-    Port().MarkTx();
+    if (emu_.Get<KernelDebugSink>().DeliverOrEmit(Port(), &byte, 1, true, tx_line_, Name())) Port().MarkTx();
+}
+
+void Uart16550::OnShutdown() {
+    Port().OnShutdown();
+    emu_.Get<KernelDebugSink>().FlushLine(tx_line_, Name());
 }
 
 void Uart16550::EmitDebugTx(uint8_t byte) {

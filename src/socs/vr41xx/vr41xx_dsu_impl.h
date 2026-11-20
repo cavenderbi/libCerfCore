@@ -8,8 +8,8 @@
 #include <cerfcore/host/guest_deep_sleep.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
-#include "../../execution/guest_cycle_clock.h"
 #include "../../peripherals/peripheral_dispatcher.h"
+#include "vr41xx_rtcx_deadline.h"
 #include "vr41xx_rtcx_ticks.h"
 
 #include <cstdint>
@@ -42,14 +42,7 @@ public:
     }
 
     void OnReady() override {
-        clock_ = &emu_.Get<GuestCycleClock>();
-        event_ = clock_->Add([this] { OnDeadline(); });
-        rtcx_.Attach();
-        clock_->RegisterRateListener([this] {
-            std::lock_guard<std::mutex> lk(mtx_);
-            rtcx_.Rescale();
-            ArmLocked();
-        });
+        deadline_.Attach([this] { emu_.Get<GuestCpuReset>().WatchdogReset(); });
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
             std::lock_guard<std::mutex> lk(mtx_);
             ResetLocked();
@@ -87,7 +80,7 @@ public:
         std::lock_guard<std::mutex> lk(mtx_);
         w.Write("cnt", cnt_);
         w.Write("set", set_);
-        w.Write("elapsed", ElapsedLocked());
+        w.Write("elapsed", deadline_.Elapsed());
         w.Write<uint8_t>("started", started_ ? 1u : 0u);
     }
 
@@ -100,34 +93,33 @@ public:
         uint8_t started = 0;
         r.Read("started", started);
         started_ = started != 0u;
-        rtcx_.Rebase();
-        anchor_ = rtcx_.Now() - elapsed;
+        deadline_.Restore(Enabled(), PeriodTicks(), elapsed);
     }
 
-    void PostRestore() override {
-        std::lock_guard<std::mutex> lk(mtx_);
-        ArmLocked();
-    }
+    void PostRestore() override { deadline_.Rearm(); }
 
 private:
     bool Enabled() const { return (cnt_ & kCntDswen) != 0u; }
 
     uint64_t PeriodTicks() const { return static_cast<uint64_t>(set_) * Vr41xxRtcxTicks::kHz; }
 
-    uint64_t ElapsedLocked() { return Enabled() ? rtcx_.Now() - anchor_ : 0u; }
-
     void WriteCntLocked(uint32_t addr, uint16_t value) {
         if ((value & ~kCntDswen) != 0u) HaltUnsupportedAccess("VR41xx DSU DSUCNTREG reserved bits", addr, value);
         const bool was_enabled = Enabled();
-        if ((value & kCntDswen) != 0u && !was_enabled) {
-            if (started_) {
-                emu_.Get<Fatal>().Die("VR41xx DSU: DSWEN set again after a disable with no reset between");
-            }
-            started_ = true;
-            anchor_  = rtcx_.Now();
-        }
         cnt_ = value;
-        ArmLocked();
+        if (!Enabled()) {
+            deadline_.Stop();
+            return;
+        }
+        if (was_enabled) return;
+        if (started_) {
+            emu_.Get<Fatal>().Die("VR41xx DSU: DSWEN set again after a disable with no reset between");
+        }
+        if (set_ == 0u) {
+            emu_.Get<Fatal>().Die("VR41xx DSU: DSWEN set with DSUSETREG DEDTIME 0");
+        }
+        started_ = true;
+        deadline_.Start(PeriodTicks());
     }
 
     void WriteSetLocked(uint32_t addr, uint16_t value) {
@@ -136,54 +128,25 @@ private:
             emu_.Get<Fatal>().Die("VR41xx DSU: DSUSETREG write 0x%04X while DSWEN is set", value);
         }
         set_ = value;
-        ArmLocked();
     }
 
     void WriteClrLocked(uint32_t addr, uint16_t value) {
         if ((value & ~kClrDswclr) != 0u) HaltUnsupportedAccess("VR41xx DSU DSUCLRREG reserved bits", addr, value);
-        if ((value & kClrDswclr) != 0u) anchor_ = rtcx_.Now();
-        ArmLocked();
-    }
-
-    void ArmLocked() {
-        if (!Enabled()) {
-            clock_->Disarm(event_);
-            return;
-        }
-        if (set_ == 0u) {
-            emu_.Get<Fatal>().Die("VR41xx DSU: DSWEN set with DSUSETREG DEDTIME 0");
-        }
-        rtcx_.ArmAt(event_, anchor_ + PeriodTicks());
+        if ((value & kClrDswclr) != 0u && Enabled()) deadline_.Restart();
     }
 
     void ResetLocked() {
         cnt_     = 0;
         set_     = 0;
-        anchor_  = 0;
         started_ = false;
-        clock_->Disarm(event_);
+        deadline_.Stop();
     }
 
-    void OnDeadline() {
-        {
-            std::lock_guard<std::mutex> lk(mtx_);
-            if (!Enabled()) return;
-            if (rtcx_.Now() - anchor_ < PeriodTicks()) {
-                ArmLocked();
-                return;
-            }
-        }
-        emu_.Get<GuestCpuReset>().WatchdogReset();
-    }
-
-    std::mutex              mtx_;
-    uint16_t                cnt_    = 0;
-    uint16_t                set_    = 0;
-    uint64_t                anchor_ = 0;
-    bool                    started_ = false;
-    GuestCycleClock*        clock_  = nullptr;
-    GuestCycleClock::Event* event_  = nullptr;
-    Vr41xxRtcxTicks         rtcx_{emu_, Vr41xxRtcxDomain::RtcIcuPmu};
+    std::mutex         mtx_;
+    uint16_t           cnt_     = 0;
+    uint16_t           set_     = 0;
+    bool               started_ = false;
+    Vr41xxRtcxDeadline deadline_{emu_};
 };
 
 }

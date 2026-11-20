@@ -76,24 +76,20 @@ bool Pxa27xKeypad::IsKnown(uint32_t off) {
 }
 
 uint32_t Pxa27xKeypad::SenseRowsLocked() const {
-    uint32_t rows = 0;
     const uint32_t ms = (kpc_ & kKpcMsMask) >> kKpcMsShift;
-    for (uint32_t col = 0; col < 8u; ++col) {
-        if (ms & (1u << col)) rows |= matrix_col_rows_[col];
-    }
-    return rows & 0xFFu;
+    return matrix_.Pressed(ms) & 0xFFu;
 }
 
 void Pxa27xKeypad::RunAutomaticScanLocked() {
     uint32_t pressed = 0;
     for (uint32_t col = 0; col < 8u; ++col) {
-        uint8_t r = matrix_col_rows_[col];
+        uint8_t r = static_cast<uint8_t>(matrix_.Line(col));
         while (r) { r &= (uint8_t)(r - 1u); ++pressed; }
     }
 
     for (uint32_t i = 0; i < 4u; ++i) {
-        const uint32_t even = matrix_col_rows_[i * 2u];
-        const uint32_t odd  = matrix_col_rows_[i * 2u + 1u];
+        const uint32_t even = matrix_.Line(i * 2u);
+        const uint32_t odd  = matrix_.Line(i * 2u + 1u);
         kpasmkp_[i] = (odd << 16) | even;
     }
 
@@ -107,9 +103,9 @@ void Pxa27xKeypad::RunAutomaticScanLocked() {
         return;
     }
     for (uint32_t col = 0; col < 8u; ++col) {
-        if (!matrix_col_rows_[col]) continue;
+        if (!matrix_.Line(col)) continue;
         uint32_t row = 0;
-        while (!(matrix_col_rows_[col] & (1u << row))) ++row;
+        while (!(matrix_.Line(col) & (1u << row))) ++row;
         kpas_ = (1u << kKpasMukpShift) | (row << kKpasRpShift) | col;
         return;
     }
@@ -130,16 +126,11 @@ void Pxa27xKeypad::SetMatrixKey(uint32_t row, uint32_t col, bool pressed) {
     bool irq;
     {
         std::lock_guard<std::mutex> lk(state_mtx_);
-        const uint8_t bit = (uint8_t)(1u << row);
-        const uint8_t before = matrix_col_rows_[col];
-        matrix_col_rows_[col] = pressed ? (uint8_t)(before | bit)
-                                       : (uint8_t)(before & ~bit);
-        if (matrix_col_rows_[col] == before) return;
+        if (!matrix_.Set(col * KeyMatrixCells<kMatrixColumns>::kColumns + row, pressed)) return;
 
         if (!(kpc_ & kKpcMe)) return;
 
-        uint32_t any = 0;
-        for (uint32_t c = 0; c < 8u; ++c) any |= matrix_col_rows_[c];
+        const uint32_t any = matrix_.Pressed(kAllMatrixColumns);
 
         /* Intel PXA27x Developer's Manual 280000-001 Section 18.5.1: if IMKP is
            set, multiple keypresses are ignored; only when all keys are released
@@ -254,7 +245,7 @@ void Pxa27xKeypad::SaveState(StateWriter& w) {
     w.Write("mi", mi_);
     w.Write("di", di_);
     w.Write("imkp_latched", imkp_latched_);
-    for (uint32_t i = 0; i < 8u; ++i) w.Write("matrix_col_rows", matrix_col_rows_[i]);
+    for (uint32_t i = 0; i < kMatrixColumns; ++i) w.Write("matrix_col_rows", static_cast<uint8_t>(matrix_.Line(i)));
 }
 
 void Pxa27xKeypad::RestoreState(StateReader& r) {
@@ -268,7 +259,11 @@ void Pxa27xKeypad::RestoreState(StateReader& r) {
     r.Read("mi", mi_);
     r.Read("di", di_);
     r.Read("imkp_latched", imkp_latched_);
-    for (uint32_t i = 0; i < 8u; ++i) r.Read("matrix_col_rows", matrix_col_rows_[i]);
+    for (uint32_t i = 0; i < kMatrixColumns; ++i) {
+        uint8_t rows = 0u;
+        r.Read("matrix_col_rows", rows);
+        matrix_.SetLine(i, rows);
+    }
 }
 
 void Pxa27xKeypad::PostRestore() {

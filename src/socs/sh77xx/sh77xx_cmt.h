@@ -28,6 +28,10 @@ public:
     void RestoreState(StateReader& r) override;
     void PostRestore() override;
 
+protected:
+    virtual uint16_t CmstrWriteZeroBits() const = 0;
+    virtual uint16_t CmcsrWriteZeroBits() const = 0;
+
 private:
     bool     ClockRuns() const;
     uint64_t Ticks() const;

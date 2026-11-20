@@ -29,6 +29,7 @@ public:
     void   Request(uint32_t sample_rate_hz, uint16_t channels, uint16_t bits);
     void   Clear() { fifo_.Clear(); }
     size_t Take(uint8_t* dst, size_t bytes) { return fifo_.Take(dst, bytes); }
+    size_t TakeIntoSlots(uint8_t* dst, uint32_t slots, uint32_t sample_bytes, uint32_t slot_bytes);
 
 private:
     void Main();

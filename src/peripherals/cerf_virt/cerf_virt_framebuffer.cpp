@@ -4,10 +4,10 @@
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_fb_regs.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_resize_regs.h>
 #include <cerfcore/boards/board_context.h>
-#include <cerfcore/core/board_database.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/fatal.h>
+#include <cerfcore/core/ga_palette_database.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/cpu/emulated_memory.h>
 #include <cerfcore/host/host_presentation.h>
@@ -163,7 +163,7 @@ void CerfVirtFramebuffer::LoadConfiguredPalette() {
     }
     const DbGaPalette* const     preset = (own_depth && !configured.empty())
                                               ? nullptr
-                                              : emu_.Get<BoardDatabase>().DefaultGaPalette(bpp);
+                                              : emu_.Get<GaPaletteDatabase>().DefaultFor(bpp);
     const std::vector<uint32_t>& colors = preset ? preset->colors : configured;
     const size_t                 entries = size_t{1} << bpp;
     if (colors.size() != entries)

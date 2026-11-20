@@ -5,11 +5,13 @@
 #include <cerfcore/host/keyboard_map.h>
 #include <cerfcore/host/keyboard_router.h>
 #include <cerfcore/boards/board_context.h>
+#include "../../peripherals/key_matrix_cells.h"
 #include "nec_mobilepro_900_series_family_id.h"
 #include "nec_mobilepro_900_series_pco_companion.h"
 
 #include <cstdint>
 #include <mutex>
+#include <tuple>
 
 namespace cerfcore {
 
@@ -32,23 +34,24 @@ public:
         LOG(Board, "[NEC-KEY] vk=0x%02X up=%d\n", vk, key_up ? 1 : 0);
         uint32_t code;
         if (!emu_.Get<KeyboardMap>().BaseDeviceCode(vk, code)) return;
-        const uint8_t bit  = static_cast<uint8_t>(code);
-        const uint8_t byte = bit >> 3;
-        const uint8_t mask = static_cast<uint8_t>(1u << (bit & 7u));
+        const uint8_t bit = static_cast<uint8_t>(code);
         NecMobilepro900SeriesPcoCompanion::KeyMatrix state;
         {
             std::lock_guard<std::mutex> lk(mtx_);
-            if (key_up) live_[byte] |= mask;
-            else        live_[byte] &= static_cast<uint8_t>(~mask);
-            state = live_;
+            pressed_.Set((bit >> 3) * Cells::kColumns + (bit & 7u), !key_up);
+            for (uint32_t i = 0; i < kMatrixBytes; ++i) state[i] = static_cast<uint8_t>(~pressed_.Line(i));
         }
         emu_.Get<NecMobilepro900SeriesPcoCompanion>().QueueKeyState(state);
     }
 
 private:
-    std::mutex                                   mtx_;
-    NecMobilepro900SeriesPcoCompanion::KeyMatrix live_ =
-        NecMobilepro900SeriesPcoCompanion::kIdleMatrix;
+    static constexpr uint32_t kMatrixBytes =
+        static_cast<uint32_t>(std::tuple_size_v<NecMobilepro900SeriesPcoCompanion::KeyMatrix>);
+
+    using Cells = KeyMatrixCells<kMatrixBytes>;
+
+    std::mutex mtx_;
+    Cells      pressed_;
 };
 
 }

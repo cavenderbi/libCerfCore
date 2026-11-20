@@ -23,6 +23,8 @@ std::string DbJsonPath() { return GetCerfDir() + kDbJsonFileName; }
 
 std::string HudsJsonPath() { return GetCerfDir() + kHudsJsonFileName; }
 
+std::string PalettesJsonPath() { return GetCerfDir() + kPalettesJsonFileName; }
+
 std::string DevicesDir() { return GetCerfDir() + kDevicesDirName + kSeparator; }
 
 std::string GetDeviceDir(const std::string& device_name) { return DevicesDir() + device_name + kSeparator; }
@@ -32,7 +34,7 @@ std::string CeAppPath(const std::string& arch_dir, const std::string& file) {
 }
 
 std::string UserConfigPath(const std::string& device_name) {
-    return GetDeviceDir(device_name) + kUserConfigFileName;
+    return ResolveDeviceFile(device_name, kUserConfigFileName);
 }
 
 bool IsHostDocumentPath(const std::string& path) { return host_platform::IsHostDocument(path); }

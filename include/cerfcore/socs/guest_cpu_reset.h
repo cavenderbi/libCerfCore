@@ -20,6 +20,7 @@ public:
     virtual void LatchColdReset()     = 0;   /* CPU reset, RAM lost */
     virtual void LatchWatchdogReset() = 0;   /* watchdog expiry */
     virtual void ReportOnlyWarmReset() = 0;
+    virtual bool CpuTookPowerOnReset() const { return false; }
 };
 
 /* A register's reset value depends on which reset line drove it: the VR41xx register
@@ -60,8 +61,11 @@ public:
 
     void OnResetDelivered();
 
+    bool PowerOnReset(ResetLineKind kind) const;
+
     bool DeliveredResetWasResume() const { return delivered_is_resume_; }
     bool DeliveredResetReportedWarm() const { return delivered_reported_warm_; }
+    bool WarmReportPending() const { return report_warm_pending_.load(std::memory_order_acquire); }
     bool LineHeld() const { return line_held_; }
     bool Delivering() const { return delivering_.load(std::memory_order_acquire); }
     ResetLineKind DeliveringKind() const { return delivering_kind_.load(std::memory_order_acquire); }

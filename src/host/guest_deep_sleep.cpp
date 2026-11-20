@@ -7,8 +7,11 @@
 #include "../core/steady_time.h"
 #include "../execution/engine_bridge.h"
 #include "../execution/guest_cycle_clock.h"
+#include "boot_sleep.h"
 #include <cerfcore/host/guest_power_notifier.h>
 #include <cerfcore/host/notification_stack.h>
+#include <cerfcore/socs/guest_cpu_reset.h>
+#include <cerfcore/state/state_stream.h>
 
 namespace cerfcore {
 
@@ -19,6 +22,11 @@ constexpr char kGuestSleepingText[] = "Guest is in sleep mode";
 }
 
 void GuestDeepSleep::OnReady() {
+    boot_sleep_ = emu_.TryGet<BootSleep>();
+    reset_      = &emu_.Get<GuestCpuReset>();
+    reset_->RegisterResetListener([this](ResetLineKind) {
+        if (!reset_->DeliveredResetWasResume()) idled_since_boot_ = false;
+    });
     emu_.Get<GuestCycleClock>().RegisterIdleListener([this] { OnGuestIdle(); });
 }
 
@@ -56,6 +64,10 @@ void GuestDeepSleep::RegisterSleepEntryListener(std::function<void()> fn) {
 
 void GuestDeepSleep::RegisterSleepListener(std::function<void(bool asleep)> fn) {
     sleep_listeners_.Add(std::move(fn));
+}
+
+void GuestDeepSleep::RegisterSuspendListener(std::function<void(bool suspended)> fn) {
+    suspend_listeners_.Add(std::move(fn));
 }
 
 void GuestDeepSleep::RegisterParkClock(std::function<void()> fn) {
@@ -175,11 +187,12 @@ void GuestDeepSleep::Enter() {
         LOG(SocReset, "[DEEPSLEEP] Enter: already asleep, skip\n");
         return;
     }
-    LOG(SocReset, "[DEEPSLEEP] Enter: sleep begin\n");
+    in_boot_sleep_ = boot_sleep_ != nullptr && !idled_since_boot_;
+    LOG(SocReset, "[DEEPSLEEP] Enter: sleep begin, boot sleep %d\n", in_boot_sleep_ ? 1 : 0);
     {
         std::lock_guard<std::mutex> lk(resume_mtx_);
         off_.store(true, std::memory_order_release);
-        wake_requested_ = false;
+        wake_requested_ = in_boot_sleep_ && boot_sleep_->Waker() == ResumeSource::User;
     }
     wake_claimed_.store(false, std::memory_order_release);
     emu_.Get<GuestPowerNotifier>().NotifyPowerDown();
@@ -206,6 +219,10 @@ void GuestDeepSleep::Resume() {
 }
 
 void GuestDeepSleep::OnGuestIdle() {
+    if (!idled_since_boot_) {
+        idled_since_boot_ = true;
+        LOG(SocReset, "[DEEPSLEEP] first guest idle since the boot reset\n");
+    }
     if (!off_.load(std::memory_order_acquire)) return;
     {
         std::lock_guard<std::mutex> lk(resume_mtx_);
@@ -217,12 +234,16 @@ void GuestDeepSleep::OnGuestIdle() {
 
 void GuestDeepSleep::ObserveAsleep(bool asleep) {
     asleep_.store(asleep, std::memory_order_release);
+    sleep_listeners_.Call(asleep);
+    const bool suspended = asleep && !in_boot_sleep_;
+    if (!asleep) in_boot_sleep_ = false;
+    if (suspended_.exchange(suspended, std::memory_order_acq_rel) == suspended) return;
     auto& stack = emu_.Get<NotificationStack>();
-    if (asleep)
+    if (suspended)
         stack.Show(NotificationId::GuestSleeping, NotificationKind::Warning, kGuestSleepingText);
     else
         stack.Close(NotificationId::GuestSleeping);
-    sleep_listeners_.Call(asleep);
+    suspend_listeners_.Call(suspended);
 }
 
 void GuestDeepSleep::ConsumeSleepSpan() {
@@ -265,6 +286,16 @@ void GuestDeepSleep::OnFullRestore() {
     const bool asleep = emu_.Get<EngineBridge>().Guest().DeepSleep();
     wake_claimed_.store(!asleep, std::memory_order_release);
     if (asleep) DeliverWake(ResumeSource::User);
+}
+
+void GuestDeepSleep::SaveState(StateWriter& w) const {
+    w.Write("idled_since_boot", idled_since_boot_);
+    w.Write("in_boot_sleep", in_boot_sleep_);
+}
+
+void GuestDeepSleep::RestoreState(StateReader& r) {
+    r.Read("idled_since_boot", idled_since_boot_);
+    r.Read("in_boot_sleep", in_boot_sleep_);
 }
 
 void GuestDeepSleep::PowerUpClockStop() {

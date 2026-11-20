@@ -56,7 +56,8 @@ Pcic82365::SocketDrive Pcic82365::Drive() const {
         : (reg_power_control_ & kPwrVccPower) != 0u && (!auto_power || card_present_) &&
               (!rules_.vcc_requires_card || card_present_);
     d.outputs = (reg_power_control_ & kPwrOutputEnable) != 0u &&
-                (!rules_.outputs_require_card || card_present_) && !isolated_;
+                (!rules_.outputs_require_card || card_present_) &&
+                (!rules_.outputs_require_vcc || d.vcc) && !isolated_;
     d.reset_released = d.outputs && (reg_interrupt_and_gen_ctrl_ & kIntrCardReset) != 0u;
     return d;
 }
@@ -166,6 +167,7 @@ void Pcic82365::SetInterfaceIsolated(bool on, ExcaWriteEffect* effect) {
     if (!on) {
         if (pin_present_ != card_present_) ApplyCardDetect(pin_present_);
         ready_ireq_low_ = pin_ireq_low_;
+        stschg_low_     = pin_stschg_low_;
     }
     ReportDrive(drive_before, effect);
     TrackPins();
@@ -204,6 +206,13 @@ void Pcic82365::SetReadyIreqLow(bool low) {
     TrackPins();
 }
 
+void Pcic82365::SetStatusChangeLow(bool low) {
+    pin_stschg_low_ = low;
+    if (isolated_) return;
+    stschg_low_ = low;
+    TrackPins();
+}
+
 uint8_t Pcic82365::InterfaceStatus() const {
     if (isolated_)
         return static_cast<uint8_t>(frozen_inputs_ | (Drive().vcc ? kIfsCardPowerOn : 0u));
@@ -214,7 +223,8 @@ uint8_t Pcic82365::InterfaceStatus() const {
     if (vcc)
         v |= kIfsCardPowerOn;
     if (vcc || rules_.card_inputs_high_without_vcc) {
-        v |= kIfsBvd1 | kIfsBvd2;
+        v |= kIfsBvd2;
+        if (!(vcc && stschg_low_)) v |= kIfsBvd1;
         if (!card_present_ || !vcc)
             v |= kIfsWriteProtect;
     }
@@ -239,6 +249,7 @@ void Pcic82365::Reset() {
     frozen_inputs_  = 0u;
     card_present_   = pin_present_;
     ready_ireq_low_ = pin_ireq_low_;
+    stschg_low_     = pin_stschg_low_;
     ready_pin_ = ReadyPin();
     bvd_pins_ = static_cast<uint8_t>(InterfaceStatus() & (kIfsBvd1 | kIfsBvd2));
 }
@@ -343,6 +354,8 @@ void Pcic82365::SaveState(StateWriter& w) const {
     windows_.SaveState(w);
     w.Write<uint8_t>("pin_present", pin_present_ ? 1u : 0u);
     w.Write<uint8_t>("pin_ireq_low", pin_ireq_low_ ? 1u : 0u);
+    w.Write<uint8_t>("stschg_low", stschg_low_ ? 1u : 0u);
+    w.Write<uint8_t>("pin_stschg_low", pin_stschg_low_ ? 1u : 0u);
     w.Write<uint8_t>("isolated", isolated_ ? 1u : 0u);
     w.Write("frozen_inputs", frozen_inputs_);
 }
@@ -372,6 +385,12 @@ void Pcic82365::RestoreState(StateReader& r) {
     uint8_t pin_ireq_low = 0u;
     r.Read("pin_ireq_low", pin_ireq_low);
     pin_ireq_low_ = pin_ireq_low != 0u;
+    uint8_t stschg_low = 0u;
+    r.Read("stschg_low", stschg_low);
+    stschg_low_ = stschg_low != 0u;
+    uint8_t pin_stschg_low = 0u;
+    r.Read("pin_stschg_low", pin_stschg_low);
+    pin_stschg_low_ = pin_stschg_low != 0u;
     uint8_t isolated = 0u;
     r.Read("isolated", isolated);
     isolated_ = isolated != 0u;

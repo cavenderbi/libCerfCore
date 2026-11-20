@@ -20,6 +20,8 @@ void SerialEndpointPort::AttachCradle(CerfEmulator& emu, ObjectIdentity identity
     emu.Get<MachineObjectTree>().Add(cradle_.get());
 }
 
+MachineObject* SerialEndpointPort::CradleObject() const { return cradle_.get(); }
+
 void SerialEndpointPort::OnShutdown() {
     if (cradle_) cradle_->OnShutdown();
 }
@@ -28,6 +30,7 @@ void SerialEndpointPort::SetEndpoint(SerialEndpoint* ep) {
     std::lock_guard<std::recursive_mutex> lk(mu_);
     endpoint_    = ep;
     lines_known_ = false;
+    sent_break_  = false;
     NotifyControlLines();
 }
 
@@ -35,11 +38,15 @@ void SerialEndpointPort::NotifyControlLines() {
     std::lock_guard<std::recursive_mutex> lk(mu_);
     if (endpoint_ == nullptr) return;
     const SerialControlLines lines = control_();
-    if (lines_known_ && lines.dtr == sent_dtr_ && lines.rts == sent_rts_) return;
-    lines_known_ = true;
-    sent_dtr_    = lines.dtr;
-    sent_rts_    = lines.rts;
-    endpoint_->OnControlLines(lines.dtr, lines.rts);
+    if (!lines_known_ || lines.dtr != sent_dtr_ || lines.rts != sent_rts_) {
+        lines_known_ = true;
+        sent_dtr_    = lines.dtr;
+        sent_rts_    = lines.rts;
+        endpoint_->OnControlLines(lines.dtr, lines.rts);
+    }
+    if (lines.in_break == sent_break_) return;
+    sent_break_ = lines.in_break;
+    endpoint_->OnBreak(lines.in_break);
 }
 
 void SerialEndpointPort::ResendModemInputs() {
@@ -114,9 +121,9 @@ void SerialEndpointPort::RestoreEndpointState(StateReader& r) {
 
 void SerialEndpointPort::PostRestore() {
     std::lock_guard<std::recursive_mutex> lk(mu_);
-    if (endpoint_ != nullptr) endpoint_->PostRestore();
     lines_known_ = false;
     NotifyControlLines();
+    if (endpoint_ != nullptr) endpoint_->PostRestore();
 }
 
 }

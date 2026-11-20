@@ -10,19 +10,26 @@ namespace cerfcore {
 
 namespace {
 
+constexpr char kOkLabel[]   = "OK";
+constexpr char kBackLabel[] = "Back";
+constexpr char kApp1Label[] = "App1";
+constexpr char kApp2Label[] = "App2";
+constexpr char kApp3Label[] = "App3";
+constexpr char kApp4Label[] = "App4";
+
 /* Button source pins are keybddr.dll's keymap dword_18C4048 (scan sub_18C16CC):
    MFIO 18/31/16 = Action/Back/Up, I/O pins 0/6/2/3/4 = Down/App1..App4. */
 const std::vector<KeyBinding> kBindings = {
-    { 0x0D, 18,                        "OK",   0, 0 },
-    { 0x27, 18,                        "OK",   0, 0 },
-    { 0x1B, 31,                        "Back", 0, 0 },
-    { 0x25, 31,                        "Back", 0, 0 },
+    { 0x0D, 18,                        kOkLabel,   0, 0 },
+    { 0x27, 18,                        kOkLabel,   0, 0 },
+    { 0x1B, 31,                        kBackLabel, 0, 0 },
+    { 0x25, 31,                        kBackLabel, 0, 0 },
     { 0x26, 16,                        nullptr, 0, 0 },   /* Up    */
     { 0x28, kNinoKeypadIoPinFlag | 0u, nullptr, 0, 0 },   /* Down  */
-    { 0x70, kNinoKeypadIoPinFlag | 6u, "App1", 0, 0 },
-    { 0x71, kNinoKeypadIoPinFlag | 2u, "App2", 0, 0 },
-    { 0x72, kNinoKeypadIoPinFlag | 3u, "App3", 0, 0 },
-    { 0x73, kNinoKeypadIoPinFlag | 4u, "App4", 0, 0 },
+    { 0x70, kNinoKeypadIoPinFlag | 6u, kApp1Label, 0, 0 },
+    { 0x71, kNinoKeypadIoPinFlag | 2u, kApp2Label, 0, 0 },
+    { 0x72, kNinoKeypadIoPinFlag | 3u, kApp3Label, 0, 0 },
+    { 0x73, kNinoKeypadIoPinFlag | 4u, kApp4Label, 0, 0 },
 };
 
 class PhilipsNinoKeyboardMap : public KeyboardMap {

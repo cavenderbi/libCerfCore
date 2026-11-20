@@ -21,15 +21,14 @@ void NecMobilepro900SeriesL1110::OnReady() {
 }
 
 uint16_t NecMobilepro900SeriesL1110::Prs() const {
-    /* PRS bits 9/10 are the PDD's card-present signal (sub_1B038D8 → SS_POWERON,
-       clear = present): SET them for an empty socket or the IST loads a phantom
-       card. A present card also reports BVD good (0x10/0x20); SSP (0x100) + power
-       (0-3) echo. */
     uint16_t s = prc_ & 0x010Fu;
-    if (emu_.Get<NecMobilepro900SeriesPcmcia>().SocketHasCard(Socket()))
-        s |= 0x0010u | 0x0020u;
-    else
+    const NecMobilepro900SeriesPcmcia& pcmcia = emu_.Get<NecMobilepro900SeriesPcmcia>();
+    if (pcmcia.SocketHasCard(Socket())) {
+        s |= 0x0020u;
+        if (!pcmcia.SocketStatusChangeLow(Socket())) s |= 0x0010u;
+    } else {
         s |= 0x0600u;
+    }
     return s;
 }
 

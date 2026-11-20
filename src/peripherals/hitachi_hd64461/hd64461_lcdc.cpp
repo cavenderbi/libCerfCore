@@ -108,7 +108,7 @@ void Hd64461Lcdc::ApplyStandby() {
         std::memset(vram_, 0, kDisplayMemoryBytes);
         refresh_lost_ = false;
     }
-    emu_.Get<EmulatedMemory>().SetBusAccess(kVramPa, MemoryInterfaceRunning());
+    emu_.Get<EmulatedMemory>().SetBusAccess(kVramPa, MemoryInterfaceRunning() && !system_->CpuBusInputsGated());
 }
 
 bool Hd64461Lcdc::MemoryInterfaceRunning() const {

@@ -4,10 +4,13 @@
 #include "trace_manager.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
 namespace cerfcore {
+
+class SerialEndpointPort;
 
 /* Single funnel for guest OS debug text. Every producer - live SoC/board
    UART/serial TX, and hooks on a nulled OEM debug sink - routes finished
@@ -32,6 +35,13 @@ public:
                   std::string_view source = {},
                   bool to_screen = true,
                   size_t cap = 256);
+
+    void FlushLine(std::string& buf, std::string_view source = {}, bool to_screen = true);
+
+    void EmitBytes(const uint8_t* data, size_t n, std::string& buf, std::string_view source);
+
+    bool DeliverOrEmit(SerialEndpointPort& port, const uint8_t* data, size_t n, bool wire_connected,
+                       std::string& buf, std::string_view source);
 
     /* Read a NUL-terminated guest wide string at `va` (printable ASCII only)
        and EmitLine it. */

@@ -12,6 +12,11 @@
 
 namespace cerfcore {
 
+class BootSleep;
+class GuestCpuReset;
+class StateReader;
+class StateWriter;
+
 /* Implemented by the SoC peripheral owning the sleep-wake reset cause (SA-1110
    RCSR.SMR, PXA255 RCSR.SMR). Non-Service so a Peripheral can implement it; the
    implementer self-registers with GuestDeepSleep from its OnReady. */
@@ -96,7 +101,12 @@ public:
     void ObserveAsleep(bool asleep);
     bool Asleep() const { return asleep_.load(std::memory_order_acquire); }
 
+    void RegisterSuspendListener(std::function<void(bool suspended)> fn);
+    bool Suspended() const { return suspended_.load(std::memory_order_acquire); }
+
     void OnFullRestore();
+    void SaveState(StateWriter& w) const;
+    void RestoreState(StateReader& r);
 
 private:
     void OnGuestIdle();
@@ -111,6 +121,7 @@ private:
     CallbackList<>                     user_wake_inputs_;
     CallbackList<>                     sleep_entry_listeners_;
     CallbackList<bool>                 sleep_listeners_;
+    CallbackList<bool>                 suspend_listeners_;
     CallbackList<>                     park_clocks_;
     std::vector<std::function<bool()>> park_wake_sources_;
     std::vector<std::function<int64_t()>> park_wake_dues_;
@@ -122,8 +133,13 @@ private:
     DeepSleepClockStop*        clock_stop_             = nullptr;
     DeepSleepWaker*            waker_                  = nullptr;
     SleepResumeVectorProvider* resume_vector_provider_ = nullptr;
+    BootSleep*                 boot_sleep_             = nullptr;
+    GuestCpuReset*             reset_                  = nullptr;
     bool                       power_on_wake_          = false;
+    bool                       idled_since_boot_       = false;
+    bool                       in_boot_sleep_          = false;
     std::atomic<bool>          asleep_{false};
+    std::atomic<bool>          suspended_{false};
     std::atomic<bool>          off_{false};
     bool                       wake_requested_ = false;
     std::mutex                 resume_mtx_;

@@ -39,9 +39,7 @@ public:
     }
 
     std::optional<uint32_t> MfioDin() const override {
-        auto& batt = emu_.Get<PhilipsNinoBattery>();
-        const bool charging = !batt.IsOnBattery() && batt.FillPercent() < 100;
-        return charging ? 0u : kMfioChargeStatus;
+        return emu_.Get<PhilipsNinoBattery>().Charging() ? 0u : kMfioChargeStatus;
     }
 };
 

@@ -6,12 +6,16 @@ namespace cerfcore {
 namespace {
 
 constexpr sh77xx_bsc::Model kSh7709Bsc{
-    .bcr1_writable           = 0x37FFu,
-    .wcr1_writable           = 0x3FF3u,
-    .mcr_writable            = 0xFF5Fu,
-    .pcr_writable            = 0x00FFu,
-    .pcr_write_zero          = 0x0000u,
-    .tpc_high_codes_reserved = true,
+    .bcr1_writable            = 0x37FFu,
+    .wcr1_writable            = 0x3FF3u,
+    .mcr_writable             = 0xFF5Fu,
+    .pcr_writable             = 0x00FFu,
+    .pcr_write_zero           = 0x0000u,
+    .tpc_high_codes_reserved  = true,
+    .tpc2_high_codes_reserved = false,
+    .sdram                    = true,
+    .dramtp_area2_word        = 0x20u,
+    .mcr_edo_mode             = 0x0001u,
 };
 
 constexpr sh77xx_bsc::RegWindowModel kSh7709BscWindow = sh77xx_bsc::WindowOf(kSh7709Bsc);

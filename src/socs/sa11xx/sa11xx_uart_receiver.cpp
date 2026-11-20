@@ -138,10 +138,7 @@ bool Sa11xxUartReceiver::CycleOfMoved(const Channel& c, uint64_t words, uint64_t
 void Sa11xxUartReceiver::SettleChannel(Channel& c, uint64_t now) {
     const bool rxe = (c.ctl.utcr3 & kUtcr3Rxe) != 0u;
     if (rxe && line_->FrontDue(c.line, now) && line_->Runs(c.line, c.ctl)) {
-        do {
-            Take(c, line_->Front(c.line));
-            line_->PopFront(c.line, now);
-        } while (line_->FrontDue(c.line, now));
+        line_->LandDue(c.line, now, [&](uint16_t entry) { Take(c, entry); });
     }
     line_->Accept(c.line, c.ctl, now);
     /* §11.11.7.3 (printed 11-121): RID "is set when the receiver is enabled (RXE=1), the receive

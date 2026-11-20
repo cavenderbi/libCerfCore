@@ -25,7 +25,6 @@ public:
     void AddChangeListener(std::function<void()> cb) { battery_.AddChangeListener(std::move(cb)); }
 
 private:
-    static bool IsCharging(bool on_ac, int fill_percent);
     bool        PcCardPowered() const;
     uint16_t    LoadSag() const;
 

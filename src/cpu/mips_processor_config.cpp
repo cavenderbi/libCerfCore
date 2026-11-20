@@ -5,6 +5,8 @@
 #include <cerfcore/core/config_json.h>
 #include <cerfcore/core/config_reader.h>
 #include <cerfcore/core/device_config_keys.h>
+#include "../boards/mips16en_param_id.h"
+#include "../core/board_config.h"
 #include "../core/cpu_config.h"
 
 #include <string>
@@ -16,6 +18,11 @@ REGISTER_SERVICE(MipsProcessorConfig);
 namespace {
 
 constexpr char kTlbSize[] = "tlb_size";
+
+constexpr std::pair<std::string_view, bool> kMips16EnLevels[] = {
+    {"low", false},
+    {"high", true},
+};
 
 constexpr std::pair<std::string_view, cerfengine::MipsIsaLevel> kIsaLevels[] = {
     {"mips1", cerfengine::MipsIsaLevel::kMips1},
@@ -44,12 +51,12 @@ void MipsProcessorConfig::OnReady() {
     phys_addr_mask_ = c.Number("phys_addr_mask");
     device_ip_mask_ = c.Number("device_ip_mask");
 
-    config_reset_     = c.Number("config_reset");
-    config_writable_  = c.Number("config_writable");
-    config_zero_only_ = c.Number("config_zero_only");
-    status_reset_     = c.Number("status_reset");
-    status_writable_  = c.Number("status_writable");
-    status_zero_only_ = c.Number("status_zero_only");
+    config_reset_    = c.Number("config_reset");
+    config_writable_ = c.Number("config_writable");
+    config_fixed_    = {c.Number("config_fixed_mask"), c.Number("config_fixed_value")};
+    status_reset_    = c.Number("status_reset");
+    status_writable_ = c.Number("status_writable");
+    status_fixed_    = {c.Number("status_fixed_mask"), c.Number("status_fixed_value")};
 
     if (tlb_size_ == 0u || tlb_size_ > cerfengine::kMipsTlbMax)
         emu_.Get<ConfigReader>().Fail(c.Origin(kTlbSize), "'" + CfgKeyPath({config_key::kCpuConfig, kTlbSize}) +
@@ -61,8 +68,14 @@ void MipsProcessorConfig::OnReady() {
     counter_            = c.Boolean("counter");
     watch_              = c.Boolean("watch");
     vr41xx_power_modes_ = c.Boolean("vr41xx_power_modes");
-    mips16_             = c.Boolean("mips16");
+    const auto& board   = emu_.Get<BoardConfig>();
+    const bool  pin     = !board.Has(BoardConfigParamId::Mips16en) ||
+                          board.Enum(BoardConfigParamId::Mips16en, kMips16EnLevels);
+    mips16_             = c.Boolean("mips16") && pin;
+    mips16_syscall_     = c.Boolean("mips16_syscall");
     tx39_multiply_add_  = c.Boolean("tx39_multiply_add");
+    macc_dmacc_         = c.Boolean("macc_dmacc");
+    madd16_dmadd16_     = c.Boolean("madd16_dmadd16");
     cop1_cop2_unusable_ = c.Boolean("cop1_cop2_unusable");
 }
 

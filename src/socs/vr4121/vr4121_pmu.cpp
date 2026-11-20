@@ -26,9 +26,7 @@ constexpr Vr41xxPmuModel kModel = {
     /*int_sw_rw=*/0x00C0u,     /* D7:6 memo(1:0), "can be used by users freely" */
     /*int_power_on=*/0x0010u,  /* RTCRST column: RTCRST(D4) = 1, every other bit 0 */
     /* PMUCNTREG (UM 16.2.2): D15-12 GPIO(3:0)MSK, D11-8 GPIO(3:0)TRG, D7 STANDBY and
-       D2 HALTIMERRST are R/W; D6:3 and D0 are RFU reading 0. HALTIMERRST is stored
-       with NO HALTimer modeled behind it; UM 16.1.2(1) p398 gives its expiry as a
-       reset of "all peripheral units except for RTC and PMU" plus a CPU cold reset. */
+       D2 HALTIMERRST are R/W; D6:3 and D0 are RFU reading 0. */
     /*cnt_writable=*/0xFF84u,
     /*cnt_fixed_read=*/0x0002u,  /* D1 RFU: "Write 1 to this bit. 1 is returned after a read." */
     /*cnt_power_on=*/0x8802u,    /* RTCRST column: "The GPIO3MSK bit is set to 1 by RTCRST,

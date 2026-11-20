@@ -30,10 +30,8 @@ constexpr int      kMainAdcFull      = 0x200;
 constexpr uint16_t kBackupAdcHealthy = 0x200;
 
 uint16_t MainBatteryAdc(int fill_percent) {
-    if (fill_percent < 0)   fill_percent = 0;
-    if (fill_percent > 100) fill_percent = 100;
     return static_cast<uint16_t>(
-        kMainAdcEmpty + fill_percent * (kMainAdcFull - kMainAdcEmpty) / 100);
+        kMainAdcEmpty + fill_percent * (kMainAdcFull - kMainAdcEmpty) / Battery::kFullPercent);
 }
 
 class SharpMobilonHcUcbBoard : public Ucb1x00SibBoard {

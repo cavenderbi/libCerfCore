@@ -29,6 +29,7 @@ public:
 
     void OnGuestTx(const uint8_t* data, size_t n) override;
     void OnControlLines(bool dtr, bool rts) override;
+    void OnBreak(bool on) override;
     void OnOpen()  override;
     void OnClose() override;
     void StopHostIo() override;
@@ -36,9 +37,22 @@ public:
     void PostRestore() override;
 
 private:
+    struct TxItem {
+        enum class Kind : uint8_t { kByte, kBreakOn, kBreakOff, kLines, kConfig };
+        Kind                   kind;
+        uint8_t                byte;
+        bool                   dtr = false;
+        bool                   rts = false;
+        int64_t                at  = 0;
+        SerialLine::LineConfig cfg{};
+    };
+
     void ReaderLoop();
     void WriterLoop();
     void ApplyLineConfig(const SerialLine::LineConfig& c);
+    void ApplyBreak(bool on);
+    void ApplyControlLines(bool dtr, bool rts);
+    void Queue(const TxItem& item);
     void ReportDead(const char* reason, uint32_t code);
 
     bool WithGuestAccess(const std::function<void()>& touch);
@@ -56,11 +70,12 @@ private:
 
     std::mutex              tx_mu_;
     std::condition_variable tx_cv_;
-    std::vector<uint8_t>    tx_buf_;
+    std::vector<TxItem>     tx_buf_;
 
     std::mutex ctl_mu_;
-    bool       dtr_ = false;
-    bool       rts_ = false;
+    bool       dtr_   = false;
+    bool       rts_   = false;
+    bool       break_ = false;
 
     static constexpr uint8_t kModemLinesUnpushed = 0xFFu;
     std::atomic<uint8_t> last_ms_{kModemLinesUnpushed};

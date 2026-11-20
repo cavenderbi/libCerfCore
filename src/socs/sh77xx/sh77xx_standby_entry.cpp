@@ -18,8 +18,11 @@ void Sh77xxStandbyEntry::OnReady() {
 
 void Sh77xxStandbyEntry::RegisterListener(std::function<void()> listener) { listeners_.Add(std::move(listener)); }
 
+void Sh77xxStandbyEntry::RegisterWakeCheck(std::function<void()> check) { wake_checks_.Add(std::move(check)); }
+
 void Sh77xxStandbyEntry::Enter() {
     listeners_.Call();
+    wake_checks_.Call();
 }
 
 }

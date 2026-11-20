@@ -18,7 +18,7 @@ public:
     }
 
     bool PwrIntAsserted() const override {
-        return !emu_.Get<SharpMobilonHcBattery>().IsOnBattery();
+        return emu_.Get<SharpMobilonHcBattery>().OnExternalPower();
     }
 };
 

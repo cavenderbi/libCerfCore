@@ -2,16 +2,12 @@
 
 #include <cerfcore/core/service.h>
 #include <cerfcore/host/battery.h>
+#include "nec_battery_adc_steps.h"
 
 #include <cstddef>
 #include <cstdint>
 
 namespace cerfcore {
-
-struct NecBatteryAdcStep {
-    uint16_t word;
-    int      percent;
-};
 
 class NecVrc4172Battery : public Service {
 public:
@@ -24,11 +20,7 @@ public:
 
     template <size_t N>
     uint16_t AdcWord(const NecBatteryAdcStep (&table)[N]) const {
-        const int fill = FillPercent();
-        for (const NecBatteryAdcStep& step : table) {
-            if (fill >= step.percent) return step.word;
-        }
-        return table[N - 1u].word;
+        return NecBatteryAdcWord(table, FillPercent());
     }
 
 private:

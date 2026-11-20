@@ -24,6 +24,7 @@ struct Pr31x00SerialModem {
     ObjectIdentity   port;
     Pr31x00SerialPin cts, dcd, dsr, ri;   /* inputs: an endpoint drives these */
     Pr31x00SerialPin dtr, rts;            /* outputs: the guest drives these */
+    Pr31x00SerialPin power;
 };
 
 class Pr31x00SerialWiring : public Service {

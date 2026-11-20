@@ -217,6 +217,21 @@ void HostSerialPort::SetControlLines(bool dtr, bool rts) {
     if (clear != 0) ::ioctl(impl_->fd, TIOCMBIC, &clear);
 }
 
+bool HostSerialPort::Drain(uint32_t& error) {
+    while (::tcdrain(impl_->fd) != 0) {
+        if (errno == EINTR) continue;
+        error = static_cast<uint32_t>(errno);
+        return false;
+    }
+    return true;
+}
+
+bool HostSerialPort::SetBreak(bool on, uint32_t& error) {
+    if (::ioctl(impl_->fd, on ? TIOCSBRK : TIOCCBRK) == 0) return true;
+    error = static_cast<uint32_t>(errno);
+    return false;
+}
+
 bool HostSerialPort::ModemLines(uint8_t& lines) {
     int status = 0;
     if (::ioctl(impl_->fd, TIOCMGET, &status) != 0) return false;

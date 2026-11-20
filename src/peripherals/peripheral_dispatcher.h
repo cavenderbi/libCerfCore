@@ -4,12 +4,14 @@
 #include <cerfcore/core/service.h>
 #include <cerfcore/peripherals/peripheral_base.h>
 #include <cerfengine/mmio_bus_host.h>
+#include "bus_range_set.h"
+#include "floating_bus.h"
 
 #include <atomic>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <mutex>
-#include <unordered_map>
 #include <vector>
 
 namespace cerfcore {
@@ -22,6 +24,7 @@ public:
 
     using DataInversionId = uint32_t;
     using HalfwordPortId  = uint32_t;
+    using BusGateId       = uint32_t;
 
     void Register(Peripheral* p);
 
@@ -34,6 +37,10 @@ public:
     HalfwordPortId InstallHalfwordPort(uint32_t base, uint32_t end, bool active);
 
     void SetHalfwordPort(HalfwordPortId id, bool active);
+
+    BusGateId InstallBusGate(uint32_t base, uint32_t end);
+
+    void SetBusGate(BusGateId id, bool closed);
 
     bool IsPeripheralAddress(uint32_t addr) const;
 
@@ -51,11 +58,6 @@ public:
     cerfengine::MmioBusBinding EngineBinding();
 
 private:
-    struct BusRange {
-        uint32_t base;
-        uint32_t end;
-    };
-
     struct InvertedTarget {
         Peripheral::FastReadFn  read;
         Peripheral::FastWriteFn write;
@@ -67,17 +69,23 @@ private:
         const InvertedTarget* inverted;
     };
 
+    struct GatedTarget {
+        FloatingBus* bus;
+        uint32_t     entry_base;
+    };
+
     using EntryTable = std::vector<Entry>;
+    using RoutingKey = std::vector<bool>;
 
     static uint32_t InvertedRead (void* ctx, uint32_t off, uint32_t width_bytes);
     static void     InvertedWrite(void* ctx, uint32_t off, uint32_t value, uint32_t width_bytes);
+    static uint32_t GatedRead (void* ctx, uint32_t off, uint32_t width_bytes);
+    static void     GatedWrite(void* ctx, uint32_t off, uint32_t value, uint32_t width_bytes);
 
-    static constexpr uint32_t kMaxDataInversions = 32u;
-
-    bool OverlapsDataInversionLocked(uint32_t base, uint64_t end) const;
-    const BusRange* InversionRangeOf(const Entry& entry) const;
-    bool InHalfwordPortLocked(const Entry& entry) const;
-    uint64_t ActiveRoutingLocked() const;
+    uint32_t InstallRange(BusRangeSet& set, uint32_t base, uint32_t end, bool on);
+    bool     SwitchRange(BusRangeSet& set, uint32_t id, bool on);
+    const BusRangeSet::Range* RangeOfLocked(const BusRangeSet& set, const char* kind, const Entry& entry) const;
+    RoutingKey ActiveRoutingLocked() const;
     void PublishLocked();
 
 public:
@@ -144,12 +152,13 @@ private:
 
     mutable std::mutex                            table_mutex_;
     EntryTable                                    entries_;
-    std::vector<BusRange>                         inversions_;
-    std::vector<BusRange>                         halfword_ports_;
-    uint32_t                                      active_inversions_ = 0u;
-    uint32_t                                      active_halfword_ports_ = 0u;
-    std::unordered_map<uint64_t, const EntryTable*> table_by_active_;
+    BusRangeSet                                   inversions_;
+    BusRangeSet                                   halfword_ports_;
+    BusRangeSet                                   gates_;
+    std::map<RoutingKey, const EntryTable*>       table_by_active_;
     std::vector<std::unique_ptr<InvertedTarget>>  inverted_targets_;
+    std::vector<std::unique_ptr<GatedTarget>>     gated_targets_;
+    FloatingBus                                   gated_bus_;
 
     mutable std::atomic<size_t> last_hit_{0};
 

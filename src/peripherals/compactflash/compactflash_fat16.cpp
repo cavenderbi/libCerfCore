@@ -117,7 +117,10 @@ bool CompactFlashFat16Builder::Build(const std::string& out_path,
     bpb.num_heads = kHeads;
     bpb.hidden_sectors = kPartStart;
     fat_volume_layout::WriteBpb(bs, bpb);
-    bs[fat_volume_layout::kBs16DrvNum] = 0x80;
+    fat_volume_layout::WriteFat16VolumeInfo(bs, {.drive_number = 0x80,
+                                                 .volume_id    = fat_volume_layout::NewVolumeId(),
+                                                 .volume_label = fat_volume_layout::kNoVolumeLabel,
+                                                 .fs_type      = "FAT16   "});
     fat_volume_layout::WriteBootSignature(bs);
 
     uint32_t next = 2;

@@ -74,7 +74,7 @@ void PutAtaString(std::array<uint8_t, 512>& block, std::size_t word, std::size_t
 }
 
 void BuildCompactFlashIdentify(std::array<uint8_t, 512>& block, const CompactFlashTaskFile& task_file,
-                               uint64_t total_sectors, bool multiple_enabled) {
+                               uint64_t total_sectors, bool multiple_enabled, const std::string& serial) {
     block.fill(0);
     const CompactFlashGeometry def = CompactFlashTaskFile::kDefaultGeometry;
     const CompactFlashGeometry cur = task_file.geometry;
@@ -91,7 +91,7 @@ void BuildCompactFlashIdentify(std::array<uint8_t, 512>& block, const CompactFla
     PutWord(block, kWordSectors, static_cast<uint16_t>(def.sectors));
     PutWord(block, kWordCardSectorsMsw, static_cast<uint16_t>(card_sectors >> 16));
     PutWord(block, kWordCardSectorsLsw, static_cast<uint16_t>(card_sectors));
-    PutAtaString(block, kWordSerial, kSerialBytes, "CERF00000001", true);
+    PutAtaString(block, kWordSerial, kSerialBytes, serial.c_str(), true);
     PutWord(block, kWordEccCount, kEccByteCount);
     PutAtaString(block, kWordFirmware, kFirmwareBytes, "1.0", false);
     PutAtaString(block, kWordModel, kModelBytes, "CERF CompactFlash", false);

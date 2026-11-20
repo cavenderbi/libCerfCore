@@ -10,6 +10,7 @@
 #include "../../execution/engine_bridge.h"
 #include "../reg_window_impl.h"
 #include "sh77xx_standby_control.h"
+#include "sh77xx_standby_entry.h"
 #include "sh77xx_wdt.h"
 #include <cerfcore/core/callback_list.h>
 
@@ -28,7 +29,6 @@ inline constexpr uint32_t kStbcrPa  = 0x1FFFFF82u;
 inline constexpr uint32_t kStbcr2Pa = 0x1FFFFF88u;
 
 inline constexpr uint16_t kStbcrWritable    = 0x87u;
-inline constexpr uint16_t kStbcrWriteZero   = 0x78u;
 inline constexpr uint16_t kStbcrStby        = 0x80u;
 inline constexpr uint8_t  kStbcrModuleStops = 0x07u;
 
@@ -38,8 +38,8 @@ constexpr RegWindowModel ByteRegister(uint32_t pa, uint16_t writable, uint16_t w
     return w;
 }
 
-constexpr RegWindowModel Stbcr(OtherReset other_reset) {
-    return ByteRegister(kStbcrPa, kStbcrWritable, kStbcrWriteZero, other_reset);
+constexpr RegWindowModel Stbcr(uint16_t write_zero, OtherReset other_reset) {
+    return ByteRegister(kStbcrPa, kStbcrWritable, write_zero, other_reset);
 }
 
 constexpr RegWindowModel Stbcr2(uint16_t writable, uint16_t write_zero, OtherReset other_reset) {
@@ -89,7 +89,7 @@ private:
     uint8_t                        released_ = 0u;
 };
 
-template <const std::string_view& Soc, const RegWindowModel& M>
+template <const std::string_view& Soc, const RegWindowModel& M, bool kExitClearsStby = false>
 class StandbyControlRegister : public ModuleStopRegister<Soc, M, Sh77xxStbcr, kStbcrModuleStops>,
                                public cerfengine::ShSleepHost,
                                public DeepSleepClockStop {
@@ -105,7 +105,8 @@ public:
         wdt_     = &this->emu_.template Get<Sh77xxWdt>();
         channel_->SetSleepHost(this);
         sleep_->RegisterClockStopWaker(this);
-        sleep_->RegisterSleepEntryListener([this] { detected_ = channel_->StandbyWakePending(); });
+        this->emu_.template Get<Sh77xxStandbyEntry>().RegisterWakeCheck(
+            [this] { detected_ = channel_->StandbyWakePending(); });
         sleep_->RegisterParkWakeSource([this] { return Detect(); });
         sleep_->RegisterParkWakeDue([this] {
             return detected_ ? sleep_->SleptNs() : GuestDeepSleep::kNoParkWake;
@@ -123,7 +124,11 @@ public:
 
     void OnPowerUp() override {
         exited_ = Detect();
-        if (exited_) wdt_->CountAfterStandby();
+        if (!exited_) return;
+        if constexpr (kExitClearsStby) {
+            this->SetStoredReg(0u, static_cast<uint16_t>(this->StoredReg(0u) & ~kStbcrStby));
+        }
+        wdt_->CountAfterStandby();
     }
 
     void SaveState(StateWriter& w) override {

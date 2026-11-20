@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vr41xx_giu.h"
+#include "vr41xx_port_giu.h"
 #include "vr41xx_giu_input_pins.h"
 #include "vr41xx_giu_interrupts.h"
 #include "vr41xx_giu_regs.h"
@@ -40,24 +40,34 @@ struct Vr41xxGiuModel {
     uint16_t pull_pins = 0u;
 };
 
-template <const std::string_view& Soc, const Vr41xxGiuModel& M>
-class Vr41xxGiuBase : public Vr41xxGiu {
+template <const std::string_view& Soc, const Vr41xxGiuModel& M, class Iface>
+class Vr41xxGiuCore : public Iface {
 public:
-    using Vr41xxGiu::Vr41xxGiu;
+    using Iface::Iface;
+    using Iface::NotifyOutputDriveChanged;
+
+protected:
+    using Iface::emu_;
+    using Iface::AlternateDrive;
+    using Iface::SavePinDevices;
+    using Iface::RestorePinDevices;
+    using Iface::HaltUnsupportedAccess;
+
+public:
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetSocId() == Soc;
+        return this->emu_.template Get<BoardContext>().GetSocId() == Soc;
     }
 
     void OnReady() override {
-        pmu_ = &emu_.Get<Vr41xxPmu>();
-        emu_.Get<PeripheralDispatcher>().Register(this);
-        emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
+        pmu_ = &this->emu_.template Get<Vr41xxPmu>();
+        this->emu_.template Get<PeripheralDispatcher>().Register(this);
+        this->emu_.template Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
             std::lock_guard<std::mutex> lk(mtx_);
             hibernating_ = false;
             ApplyResetLocked(kind);
         });
-        emu_.Get<GuestDeepSleep>().RegisterSleepEntryListener([this] {
+        this->emu_.template Get<GuestDeepSleep>().RegisterSleepEntryListener([this] {
             {
                 std::lock_guard<std::mutex> lk(mtx_);
                 hibernating_ = true;
@@ -65,7 +75,7 @@ public:
             NotifyOutputDriveChanged();
         });
         if constexpr (M.power_down_high != 0u) {
-            channel_ = &emu_.Get<EngineBridge>().Engine().template Get<cerfengine::MipsInterruptChannel>();
+            channel_ = &this->emu_.template Get<EngineBridge>().Engine().template Get<cerfengine::MipsInterruptChannel>();
             channel_->RegisterSuspendListener([this] {
                 {
                     std::lock_guard<std::mutex> lk(mtx_);
@@ -80,9 +90,6 @@ public:
     uint32_t MmioSize() const override { return M.size; }
 
     bool GetPinLevel(int pin) override {
-        if (pin < 0 || pin > 31) {
-            emu_.Get<Fatal>().Die("Vr41xxGiu::GetPinLevel: pin %d is outside GPIO(31:0)", pin);
-        }
         std::lock_guard<std::mutex> lk(mtx_);
         return ((EffectivePinsLocked() >> pin) & 1u) != 0u;
     }
@@ -104,37 +111,8 @@ public:
         if (SetsOutputDrive(off)) NotifyOutputDriveChanged();
     }
 
-    uint16_t OutputDataLow() override {
-        std::lock_guard<std::mutex> lk(mtx_);
-        return podat_l_;
-    }
-
-    void RegisterOutputDataLowListener(std::function<void(uint16_t previous)> fn) override {
-        podat_l_listeners_.Add(std::move(fn));
-    }
-
-    void RegisterAlternateFunction(int first_gpio, int last_gpio, AlternateFunction fn) override {
-        alternates_.push_back({first_gpio, last_gpio, std::move(fn)});
-    }
-
-    void RegisterOutputDriveListener(std::function<void()> fn) override {
-        drive_listeners_.Add(std::move(fn));
-    }
-
-    void NotifyOutputDriveChanged() override {
-        drive_listeners_.Call();
-    }
-
-    void RegisterPinDeviceState(std::function<void(StateWriter&)> save,
-                                std::function<void(StateReader&)> restore) override {
-        pin_device_states_.push_back({std::move(save), std::move(restore)});
-    }
-
     PinDrive OutputDrive(int gpio) override {
-        for (const auto& a : alternates_) {
-            if (gpio < a.first || gpio > a.last) continue;
-            if (const auto drive = a.fn(gpio)) return *drive;
-        }
+        if (const auto drive = AlternateDrive(gpio)) return *drive;
         std::lock_guard<std::mutex> lk(mtx_);
         const uint64_t pin = uint64_t{1} << gpio;
         if ((hibernating_ || suspended_) && (M.power_down_high & pin) != 0u)
@@ -174,56 +152,22 @@ public:
 
     void SetPinLevel(int pin, bool level) override {
         std::lock_guard<std::mutex> lk(mtx_);
-        const bool prev = InputLevelLocked(pin);
-        inputs_.Drive(pin, level);
-        ApplyPinLevelLocked(pin, prev, level);
+        ApplyPinLevelLocked(pin, inputs_.Drive(pin, level));
     }
 
     void ReleasePin(int pin) override {
         std::lock_guard<std::mutex> lk(mtx_);
-        const bool prev = InputLevelLocked(pin);
-        inputs_.Release(pin);
-        if (((inputs_.Established() >> pin) & 1u) == 0u) return;
-        ApplyPinLevelLocked(pin, prev, InputLevelLocked(pin));
-    }
-
-    uint16_t ReadPullRegister(uint32_t off) override {
-        std::lock_guard<std::mutex> lk(mtx_);
-        switch (off) {
-            case kOffUseUpdn:  return inputs_.UseUpdn();
-            case kOffTermUpdn: return inputs_.TermUpdn();
-            default: emu_.Get<Fatal>().Die("Vr41xxGiu: pull register read at window offset 0x%02X", off);
-        }
-    }
-
-    void WritePullRegister(uint32_t off, uint16_t value) override {
-        std::lock_guard<std::mutex> lk(mtx_);
-        if ((value & ~M.pull_pins) != 0u)
-            emu_.Get<Fatal>().Die("Vr41xxGiu: pull register 0x%02X write 0x%04X sets reserved bits", off, value);
-        const uint32_t before = inputs_.Levels();
-        switch (off) {
-            case kOffUseUpdn:  inputs_.SetUseUpdn(value); break;
-            case kOffTermUpdn: inputs_.SetTermUpdn(value); break;
-            default: emu_.Get<Fatal>().Die("Vr41xxGiu: pull register write 0x%04X at window offset 0x%02X", value, off);
-        }
-        CheckPullsInputOnlyLocked();
-        const uint32_t changed = before ^ inputs_.Levels();
-        for (int pin = 0; pin < 16; ++pin) {
-            if (((changed >> pin) & 1u) == 0u) continue;
-            const bool prev = ((before >> pin) & 1u) != 0u;
-            ApplyPinLevelLocked(pin, prev, !prev);
-        }
-        EvaluateLevelsLocked();
+        if (const auto edge = inputs_.Release(pin)) ApplyPinLevelLocked(pin, *edge);
     }
 
     void SaveState(StateWriter& w) override {
         SaveRegisters(w);
-        for (const auto& d : pin_device_states_) d.save(w);
+        SavePinDevices(w);
     }
 
     void RestoreState(StateReader& r) override {
         RestoreRegisters(r);
-        for (const auto& d : pin_device_states_) d.restore(r);
+        RestorePinDevices(r);
     }
 
     void PostRestore() override {
@@ -232,12 +176,49 @@ public:
         DriveIcuLocked();
     }
 
-private:
-    bool InputLevelLocked(int pin) const { return ((inputs_.Levels() >> pin) & 1u) != 0u; }
+protected:
+    uint16_t PortDataLow() {
+        std::lock_guard<std::mutex> lk(mtx_);
+        return podat_l_;
+    }
 
-    void ApplyPinLevelLocked(int pin, bool prev, bool level) {
-        pmu_->OnGpioLevel(pin, prev, level);
-        irq_.OnPinLevel(pin, prev, level);
+    void AddPortDataLowListener(std::function<void(uint16_t previous)> fn) {
+        podat_l_listeners_.Add(std::move(fn));
+    }
+
+    uint16_t ReadPull(uint32_t off) {
+        std::lock_guard<std::mutex> lk(mtx_);
+        switch (off) {
+            case kOffUseUpdn:  return inputs_.UseUpdn();
+            case kOffTermUpdn: return inputs_.TermUpdn();
+            default: this->emu_.template Get<Fatal>().Die("Vr41xxGiu: pull register read at window offset 0x%02X", off);
+        }
+    }
+
+    void WritePull(uint32_t off, uint16_t value) {
+        std::lock_guard<std::mutex> lk(mtx_);
+        if ((value & ~M.pull_pins) != 0u)
+            this->emu_.template Get<Fatal>().Die("Vr41xxGiu: pull register 0x%02X write 0x%04X sets reserved bits", off, value);
+        const uint32_t before = inputs_.Levels();
+        switch (off) {
+            case kOffUseUpdn:  inputs_.SetUseUpdn(value); break;
+            case kOffTermUpdn: inputs_.SetTermUpdn(value); break;
+            default: this->emu_.template Get<Fatal>().Die("Vr41xxGiu: pull register write 0x%04X at window offset 0x%02X", value, off);
+        }
+        CheckPullsInputOnlyLocked();
+        const uint32_t changed = before ^ inputs_.Levels();
+        for (int pin = 0; pin < 16; ++pin) {
+            if (((changed >> pin) & 1u) == 0u) continue;
+            const bool prev = ((before >> pin) & 1u) != 0u;
+            ApplyPinLevelLocked(pin, Vr41xxGiuPinEdge{prev, !prev});
+        }
+        EvaluateLevelsLocked();
+    }
+
+private:
+    void ApplyPinLevelLocked(int pin, Vr41xxGiuPinEdge edge) {
+        pmu_->OnGpioLevel(pin, edge.prev, edge.level);
+        irq_.OnPinLevel(pin, edge.prev, edge.level);
         DriveIcuLocked();
     }
 
@@ -248,7 +229,7 @@ private:
 
     void CheckPullsInputOnlyLocked() {
         if (inputs_.UseUpdn() != 0u && iosel_l_ != 0u)
-            emu_.Get<Fatal>().Die("Vr41xxGiu: GIUUSEUPDN 0x%04X with GIUIOSELL 0x%04X", inputs_.UseUpdn(), iosel_l_);
+            this->emu_.template Get<Fatal>().Die("Vr41xxGiu: GIUUSEUPDN 0x%04X with GIUIOSELL 0x%04X", inputs_.UseUpdn(), iosel_l_);
     }
 
     void SaveRegisters(StateWriter& w) {
@@ -281,7 +262,7 @@ private:
     uint32_t EffectivePinsLocked() const {
         const uint32_t out = (static_cast<uint32_t>(piod_out_h_) << 16) | piod_out_l_;
         const uint32_t sel = (static_cast<uint32_t>(iosel_h_) << 16) | iosel_l_;
-        return (out & sel) | (inputs_.Levels() & ~sel);
+        return inputs_.Merged(out, sel);
     }
 
     uint16_t ReadHalfLocked(uint32_t off) {
@@ -350,7 +331,7 @@ private:
     }
 
     void DriveIcuLocked() {
-        auto& icu = emu_.Get<Vr41xxIcu>();
+        auto& icu = this->emu_.template Get<Vr41xxIcu>();
         icu.SetGiuLow(irq_.IcuLow(M.inten_gates_icu_input));
         icu.SetGiuHigh(irq_.IcuHigh(M.inten_gates_icu_input));
     }
@@ -368,26 +349,12 @@ private:
                off == kOffPoDatL || off == kOffPoDatH;
     }
 
-    struct Alternate {
-        int               first;
-        int               last;
-        AlternateFunction fn;
-    };
-
-    struct PinDeviceState {
-        std::function<void(StateWriter&)> save;
-        std::function<void(StateReader&)> restore;
-    };
-    std::vector<PinDeviceState> pin_device_states_;
-
     mutable std::mutex mtx_;
     Vr41xxPmu*         pmu_ = nullptr;
     cerfengine::MipsInterruptChannel* channel_ = nullptr;
     bool               hibernating_ = false;
     bool               suspended_   = false;
     CallbackList<uint16_t>                     podat_l_listeners_;
-    std::vector<Alternate>                     alternates_;
-    CallbackList<>                             drive_listeners_;
 
     /* Every GIU register's RTCRST column is 0 except GIUPODATL's (VR4121 UM
        19.2.1-19.2.16, VR4102 UM 18.2.1-18.2.16). */
@@ -395,8 +362,26 @@ private:
     uint16_t piod_out_l_ = 0, piod_out_h_ = 0;
     uint16_t podat_l_    = M.podat_l_power_on;
     uint16_t podat_h_    = 0;
-    Vr41xxGiuInterrupts irq_{M.intstat_sets_while_disabled};
+    Vr41xxGiuInterrupts irq_{M.intstat_sets_while_disabled, false};
     Vr41xxGiuInputPins  inputs_{M.pull_pins};
+};
+
+template <const std::string_view& Soc, const Vr41xxGiuModel& M>
+class Vr41xxGiuBase : public Vr41xxGiuCore<Soc, M, Vr41xxPortGiu> {
+    using Core = Vr41xxGiuCore<Soc, M, Vr41xxPortGiu>;
+
+public:
+    using Core::Core;
+
+    uint16_t OutputDataLow() override { return this->PortDataLow(); }
+
+    void RegisterOutputDataLowListener(std::function<void(uint16_t previous)> fn) override {
+        this->AddPortDataLowListener(std::move(fn));
+    }
+
+    uint16_t ReadPullRegister(uint32_t off) override { return this->ReadPull(off); }
+
+    void WritePullRegister(uint32_t off, uint16_t value) override { this->WritePull(off, value); }
 };
 
 }  /* namespace cerf_vr41xx_giu_detail */

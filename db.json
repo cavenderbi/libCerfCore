@@ -12,159 +12,6 @@
     "ddi_vgx.dll",
     "ddi_perm3.dll"
   ],
-  "ga_palettes": [
-    {
-      "id": "black_and_white",
-      "name": "Black and white",
-      "bpp": 1,
-      "values": [
-        [0, 0, 0], [255, 255, 255]
-      ]
-    },
-    {
-      "id": "microsoft_gray",
-      "name": "Microsoft / Gray",
-      "bpp": 2,
-      "values": [
-        [0, 0, 0], [128, 128, 128], [192, 192, 192], [255, 255, 255]
-      ]
-    },
-    {
-      "id": "microsoft_4bpp",
-      "name": "Microsoft / Colored",
-      "bpp": 4,
-      "values": [
-        [0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0], [0, 0, 128], [128, 0, 128], [0, 128, 128], [192, 192, 192],
-        [128, 128, 128], [255, 0, 0], [0, 255, 0], [255, 255, 0], [0, 0, 255], [255, 0, 255], [0, 255, 255], [255, 255, 255]
-      ]
-    },
-    {
-      "id": "sharp_mobilon_4bpp",
-      "name": "Sharp Mobilon / Gray",
-      "bpp": 4,
-      "values": [
-        [0, 0, 0], [32, 32, 32], [48, 48, 48], [64, 64, 64], [80, 80, 80], [96, 96, 96], [112, 112, 112], [128, 128, 128],
-        [144, 144, 144], [160, 160, 160], [176, 176, 176], [192, 192, 192], [208, 208, 208], [224, 224, 224], [240, 240, 240], [255, 255, 255]
-      ]
-    },
-    {
-      "id": "microsoft_8bpp",
-      "name": "Microsoft / Colored",
-      "bpp": 8,
-      "values": [
-        [0, 0, 0], [128, 0, 0], [0, 128, 0], [128, 128, 0], [0, 0, 128], [128, 0, 128], [0, 128, 128], [192, 192, 192],
-        [192, 220, 192], [166, 202, 240], [4, 4, 4], [8, 8, 8], [12, 12, 12], [17, 17, 17], [22, 22, 22], [28, 28, 28],
-        [34, 34, 34], [41, 41, 41], [85, 85, 85], [77, 77, 77], [66, 66, 66], [57, 57, 57], [255, 124, 128], [255, 80, 80],
-        [214, 0, 147], [204, 236, 255], [239, 214, 198], [231, 231, 214], [173, 169, 144], [51, 0, 0], [102, 0, 0], [153, 0, 0],
-        [204, 0, 0], [0, 51, 0], [51, 51, 0], [102, 51, 0], [153, 51, 0], [204, 51, 0], [255, 51, 0], [0, 102, 0],
-        [51, 102, 0], [102, 102, 0], [153, 102, 0], [204, 102, 0], [255, 102, 0], [0, 153, 0], [51, 153, 0], [102, 153, 0],
-        [153, 153, 0], [204, 153, 0], [255, 153, 0], [0, 204, 0], [51, 204, 0], [102, 204, 0], [153, 204, 0], [204, 204, 0],
-        [255, 204, 0], [102, 255, 0], [153, 255, 0], [204, 255, 0], [0, 0, 51], [51, 0, 51], [102, 0, 51], [153, 0, 51],
-        [204, 0, 51], [255, 0, 51], [0, 51, 51], [51, 51, 51], [102, 51, 51], [153, 51, 51], [204, 51, 51], [255, 51, 51],
-        [0, 102, 51], [51, 102, 51], [102, 102, 51], [153, 102, 51], [204, 102, 51], [255, 102, 51], [0, 153, 51], [51, 153, 51],
-        [102, 153, 51], [153, 153, 51], [204, 153, 51], [255, 153, 51], [0, 204, 51], [51, 204, 51], [102, 204, 51], [153, 204, 51],
-        [204, 204, 51], [255, 204, 51], [51, 255, 51], [102, 255, 51], [153, 255, 51], [204, 255, 51], [255, 255, 51], [0, 0, 102],
-        [51, 0, 102], [102, 0, 102], [153, 0, 102], [204, 0, 102], [255, 0, 102], [0, 51, 102], [51, 51, 102], [102, 51, 102],
-        [153, 51, 102], [204, 51, 102], [255, 51, 102], [0, 102, 102], [51, 102, 102], [102, 102, 102], [153, 102, 102], [204, 102, 102],
-        [0, 153, 102], [51, 153, 102], [102, 153, 102], [153, 153, 102], [204, 153, 102], [255, 153, 102], [0, 204, 102], [51, 204, 102],
-        [153, 204, 102], [204, 204, 102], [255, 204, 102], [0, 255, 102], [51, 255, 102], [153, 255, 102], [204, 255, 102], [255, 0, 204],
-        [204, 0, 255], [0, 153, 153], [153, 51, 153], [153, 0, 153], [204, 0, 153], [0, 0, 153], [51, 51, 153], [102, 0, 153],
-        [204, 51, 153], [255, 0, 153], [0, 102, 153], [51, 102, 153], [102, 51, 153], [153, 102, 153], [204, 102, 153], [255, 51, 153],
-        [51, 153, 153], [102, 153, 153], [153, 153, 153], [204, 153, 153], [255, 153, 153], [0, 204, 153], [51, 204, 153], [102, 204, 102],
-        [153, 204, 153], [204, 204, 153], [255, 204, 153], [0, 255, 153], [51, 255, 153], [102, 204, 153], [153, 255, 153], [204, 255, 153],
-        [255, 255, 153], [0, 0, 204], [51, 0, 153], [102, 0, 204], [153, 0, 204], [204, 0, 204], [0, 51, 153], [51, 51, 204],
-        [102, 51, 204], [153, 51, 204], [204, 51, 204], [255, 51, 204], [0, 102, 204], [51, 102, 204], [102, 102, 153], [153, 102, 204],
-        [204, 102, 204], [255, 102, 153], [0, 153, 204], [51, 153, 204], [102, 153, 204], [153, 153, 204], [204, 153, 204], [255, 153, 204],
-        [0, 204, 204], [51, 204, 204], [102, 204, 204], [153, 204, 204], [204, 204, 204], [255, 204, 204], [0, 255, 204], [51, 255, 204],
-        [102, 255, 153], [153, 255, 204], [204, 255, 204], [255, 255, 204], [51, 0, 204], [102, 0, 255], [153, 0, 255], [0, 51, 204],
-        [51, 51, 255], [102, 51, 255], [153, 51, 255], [204, 51, 255], [255, 51, 255], [0, 102, 255], [51, 102, 255], [102, 102, 204],
-        [153, 102, 255], [204, 102, 255], [255, 102, 204], [0, 153, 255], [51, 153, 255], [102, 153, 255], [153, 153, 255], [204, 153, 255],
-        [255, 153, 255], [0, 204, 255], [51, 204, 255], [102, 204, 255], [153, 204, 255], [204, 204, 255], [255, 204, 255], [51, 255, 255],
-        [102, 255, 204], [153, 255, 255], [204, 255, 255], [255, 102, 102], [102, 255, 102], [255, 255, 102], [102, 102, 255], [255, 102, 255],
-        [102, 255, 255], [165, 0, 33], [95, 95, 95], [119, 119, 119], [134, 134, 134], [150, 150, 150], [203, 203, 203], [178, 178, 178],
-        [215, 215, 215], [221, 221, 221], [227, 227, 227], [234, 234, 234], [241, 241, 241], [248, 248, 248], [255, 251, 240], [160, 160, 164],
-        [128, 128, 128], [255, 0, 0], [0, 255, 0], [255, 255, 0], [0, 0, 255], [255, 0, 255], [0, 255, 255], [255, 255, 255]
-      ]
-    },
-    {
-      "id": "rgb332",
-      "name": "RGB332",
-      "bpp": 8,
-      "values": [
-        [0, 0, 0], [0, 0, 85], [0, 0, 170], [0, 0, 255], [0, 36, 0], [0, 36, 85], [0, 36, 170], [0, 36, 255],
-        [0, 73, 0], [0, 73, 85], [0, 73, 170], [0, 73, 255], [0, 109, 0], [0, 109, 85], [0, 109, 170], [0, 109, 255],
-        [0, 145, 0], [0, 145, 85], [0, 145, 170], [0, 145, 255], [0, 182, 0], [0, 182, 85], [0, 182, 170], [0, 182, 255],
-        [0, 218, 0], [0, 218, 85], [0, 218, 170], [0, 218, 255], [0, 255, 0], [0, 255, 85], [0, 255, 170], [0, 255, 255],
-        [36, 0, 0], [36, 0, 85], [36, 0, 170], [36, 0, 255], [36, 36, 0], [36, 36, 85], [36, 36, 170], [36, 36, 255],
-        [36, 73, 0], [36, 73, 85], [36, 73, 170], [36, 73, 255], [36, 109, 0], [36, 109, 85], [36, 109, 170], [36, 109, 255],
-        [36, 145, 0], [36, 145, 85], [36, 145, 170], [36, 145, 255], [36, 182, 0], [36, 182, 85], [36, 182, 170], [36, 182, 255],
-        [36, 218, 0], [36, 218, 85], [36, 218, 170], [36, 218, 255], [36, 255, 0], [36, 255, 85], [36, 255, 170], [36, 255, 255],
-        [73, 0, 0], [73, 0, 85], [73, 0, 170], [73, 0, 255], [73, 36, 0], [73, 36, 85], [73, 36, 170], [73, 36, 255],
-        [73, 73, 0], [73, 73, 85], [73, 73, 170], [73, 73, 255], [73, 109, 0], [73, 109, 85], [73, 109, 170], [73, 109, 255],
-        [73, 145, 0], [73, 145, 85], [73, 145, 170], [73, 145, 255], [73, 182, 0], [73, 182, 85], [73, 182, 170], [73, 182, 255],
-        [73, 218, 0], [73, 218, 85], [73, 218, 170], [73, 218, 255], [73, 255, 0], [73, 255, 85], [73, 255, 170], [73, 255, 255],
-        [109, 0, 0], [109, 0, 85], [109, 0, 170], [109, 0, 255], [109, 36, 0], [109, 36, 85], [109, 36, 170], [109, 36, 255],
-        [109, 73, 0], [109, 73, 85], [109, 73, 170], [109, 73, 255], [109, 109, 0], [109, 109, 85], [109, 109, 170], [109, 109, 255],
-        [109, 145, 0], [109, 145, 85], [109, 145, 170], [109, 145, 255], [109, 182, 0], [109, 182, 85], [109, 182, 170], [109, 182, 255],
-        [109, 218, 0], [109, 218, 85], [109, 218, 170], [109, 218, 255], [109, 255, 0], [109, 255, 85], [109, 255, 170], [109, 255, 255],
-        [145, 0, 0], [145, 0, 85], [145, 0, 170], [145, 0, 255], [145, 36, 0], [145, 36, 85], [145, 36, 170], [145, 36, 255],
-        [145, 73, 0], [145, 73, 85], [145, 73, 170], [145, 73, 255], [145, 109, 0], [145, 109, 85], [145, 109, 170], [145, 109, 255],
-        [145, 145, 0], [145, 145, 85], [145, 145, 170], [145, 145, 255], [145, 182, 0], [145, 182, 85], [145, 182, 170], [145, 182, 255],
-        [145, 218, 0], [145, 218, 85], [145, 218, 170], [145, 218, 255], [145, 255, 0], [145, 255, 85], [145, 255, 170], [145, 255, 255],
-        [182, 0, 0], [182, 0, 85], [182, 0, 170], [182, 0, 255], [182, 36, 0], [182, 36, 85], [182, 36, 170], [182, 36, 255],
-        [182, 73, 0], [182, 73, 85], [182, 73, 170], [182, 73, 255], [182, 109, 0], [182, 109, 85], [182, 109, 170], [182, 109, 255],
-        [182, 145, 0], [182, 145, 85], [182, 145, 170], [182, 145, 255], [182, 182, 0], [182, 182, 85], [182, 182, 170], [182, 182, 255],
-        [182, 218, 0], [182, 218, 85], [182, 218, 170], [182, 218, 255], [182, 255, 0], [182, 255, 85], [182, 255, 170], [182, 255, 255],
-        [218, 0, 0], [218, 0, 85], [218, 0, 170], [218, 0, 255], [218, 36, 0], [218, 36, 85], [218, 36, 170], [218, 36, 255],
-        [218, 73, 0], [218, 73, 85], [218, 73, 170], [218, 73, 255], [218, 109, 0], [218, 109, 85], [218, 109, 170], [218, 109, 255],
-        [218, 145, 0], [218, 145, 85], [218, 145, 170], [218, 145, 255], [218, 182, 0], [218, 182, 85], [218, 182, 170], [218, 182, 255],
-        [218, 218, 0], [218, 218, 85], [218, 218, 170], [218, 218, 255], [218, 255, 0], [218, 255, 85], [218, 255, 170], [218, 255, 255],
-        [255, 0, 0], [255, 0, 85], [255, 0, 170], [255, 0, 255], [255, 36, 0], [255, 36, 85], [255, 36, 170], [255, 36, 255],
-        [255, 73, 0], [255, 73, 85], [255, 73, 170], [255, 73, 255], [255, 109, 0], [255, 109, 85], [255, 109, 170], [255, 109, 255],
-        [255, 145, 0], [255, 145, 85], [255, 145, 170], [255, 145, 255], [255, 182, 0], [255, 182, 85], [255, 182, 170], [255, 182, 255],
-        [255, 218, 0], [255, 218, 85], [255, 218, 170], [255, 218, 255], [255, 255, 0], [255, 255, 85], [255, 255, 170], [255, 255, 255]
-      ]
-    },
-    {
-      "id": "cerf_gray",
-      "name": "CERF / Gray",
-      "bpp": 8,
-      "values": [
-        [0, 0, 0], [1, 1, 1], [2, 2, 2], [3, 3, 3], [4, 4, 4], [5, 5, 5], [6, 6, 6], [7, 7, 7],
-        [8, 8, 8], [9, 9, 9], [10, 10, 10], [11, 11, 11], [12, 12, 12], [13, 13, 13], [14, 14, 14], [15, 15, 15],
-        [16, 16, 16], [17, 17, 17], [18, 18, 18], [19, 19, 19], [20, 20, 20], [21, 21, 21], [22, 22, 22], [23, 23, 23],
-        [24, 24, 24], [25, 25, 25], [26, 26, 26], [27, 27, 27], [28, 28, 28], [29, 29, 29], [30, 30, 30], [31, 31, 31],
-        [32, 32, 32], [33, 33, 33], [34, 34, 34], [35, 35, 35], [36, 36, 36], [37, 37, 37], [38, 38, 38], [39, 39, 39],
-        [40, 40, 40], [41, 41, 41], [42, 42, 42], [43, 43, 43], [44, 44, 44], [45, 45, 45], [46, 46, 46], [47, 47, 47],
-        [48, 48, 48], [49, 49, 49], [50, 50, 50], [51, 51, 51], [52, 52, 52], [53, 53, 53], [54, 54, 54], [55, 55, 55],
-        [56, 56, 56], [57, 57, 57], [58, 58, 58], [59, 59, 59], [60, 60, 60], [61, 61, 61], [62, 62, 62], [63, 63, 63],
-        [64, 64, 64], [65, 65, 65], [66, 66, 66], [67, 67, 67], [68, 68, 68], [69, 69, 69], [70, 70, 70], [71, 71, 71],
-        [72, 72, 72], [73, 73, 73], [74, 74, 74], [75, 75, 75], [76, 76, 76], [77, 77, 77], [78, 78, 78], [79, 79, 79],
-        [80, 80, 80], [81, 81, 81], [82, 82, 82], [83, 83, 83], [84, 84, 84], [85, 85, 85], [86, 86, 86], [87, 87, 87],
-        [88, 88, 88], [89, 89, 89], [90, 90, 90], [91, 91, 91], [92, 92, 92], [93, 93, 93], [94, 94, 94], [95, 95, 95],
-        [96, 96, 96], [97, 97, 97], [98, 98, 98], [99, 99, 99], [100, 100, 100], [101, 101, 101], [102, 102, 102], [103, 103, 103],
-        [104, 104, 104], [105, 105, 105], [106, 106, 106], [107, 107, 107], [108, 108, 108], [109, 109, 109], [110, 110, 110], [111, 111, 111],
-        [112, 112, 112], [113, 113, 113], [114, 114, 114], [115, 115, 115], [116, 116, 116], [117, 117, 117], [118, 118, 118], [119, 119, 119],
-        [120, 120, 120], [121, 121, 121], [122, 122, 122], [123, 123, 123], [124, 124, 124], [125, 125, 125], [126, 126, 126], [127, 127, 127],
-        [128, 128, 128], [129, 129, 129], [130, 130, 130], [131, 131, 131], [132, 132, 132], [133, 133, 133], [134, 134, 134], [135, 135, 135],
-        [136, 136, 136], [137, 137, 137], [138, 138, 138], [139, 139, 139], [140, 140, 140], [141, 141, 141], [142, 142, 142], [143, 143, 143],
-        [144, 144, 144], [145, 145, 145], [146, 146, 146], [147, 147, 147], [148, 148, 148], [149, 149, 149], [150, 150, 150], [151, 151, 151],
-        [152, 152, 152], [153, 153, 153], [154, 154, 154], [155, 155, 155], [156, 156, 156], [157, 157, 157], [158, 158, 158], [159, 159, 159],
-        [160, 160, 160], [161, 161, 161], [162, 162, 162], [163, 163, 163], [164, 164, 164], [165, 165, 165], [166, 166, 166], [167, 167, 167],
-        [168, 168, 168], [169, 169, 169], [170, 170, 170], [171, 171, 171], [172, 172, 172], [173, 173, 173], [174, 174, 174], [175, 175, 175],
-        [176, 176, 176], [177, 177, 177], [178, 178, 178], [179, 179, 179], [180, 180, 180], [181, 181, 181], [182, 182, 182], [183, 183, 183],
-        [184, 184, 184], [185, 185, 185], [186, 186, 186], [187, 187, 187], [188, 188, 188], [189, 189, 189], [190, 190, 190], [191, 191, 191],
-        [192, 192, 192], [193, 193, 193], [194, 194, 194], [195, 195, 195], [196, 196, 196], [197, 197, 197], [198, 198, 198], [199, 199, 199],
-        [200, 200, 200], [201, 201, 201], [202, 202, 202], [203, 203, 203], [204, 204, 204], [205, 205, 205], [206, 206, 206], [207, 207, 207],
-        [208, 208, 208], [209, 209, 209], [210, 210, 210], [211, 211, 211], [212, 212, 212], [213, 213, 213], [214, 214, 214], [215, 215, 215],
-        [216, 216, 216], [217, 217, 217], [218, 218, 218], [219, 219, 219], [220, 220, 220], [221, 221, 221], [222, 222, 222], [223, 223, 223],
-        [224, 224, 224], [225, 225, 225], [226, 226, 226], [227, 227, 227], [228, 228, 228], [229, 229, 229], [230, 230, 230], [231, 231, 231],
-        [232, 232, 232], [233, 233, 233], [234, 234, 234], [235, 235, 235], [236, 236, 236], [237, 237, 237], [238, 238, 238], [239, 239, 239],
-        [240, 240, 240], [241, 241, 241], [242, 242, 242], [243, 243, 243], [244, 244, 244], [245, 245, 245], [246, 246, 246], [247, 247, 247],
-        [248, 248, 248], [249, 249, 249], [250, 250, 250], [251, 251, 251], [252, 252, 252], [253, 253, 253], [254, 254, 254], [255, 255, 255]
-      ]
-    }
-  ],
   "soc_families": [
     {
       "id": "strongarm",
@@ -284,6 +131,11 @@
       "family_id": "scorpion"
     },
     {
+      "id": "vr4101",
+      "name": "NEC VR4101",
+      "family_id": "mips3"
+    },
+    {
       "id": "vr4102",
       "name": "NEC VR4102",
       "family_id": "mips3"
@@ -327,6 +179,16 @@
       "id": "sh7729",
       "name": "Hitachi SH7729",
       "family_id": "sh3_dsp"
+    },
+    {
+      "id": "sh7707",
+      "name": "Hitachi SH7707",
+      "family_id": "sh3"
+    },
+    {
+      "id": "hd6417096",
+      "name": "Hitachi HD6417096",
+      "family_id": "sh3"
     }
   ],
   "cpu_config_params": [
@@ -617,8 +479,14 @@
       "type": "hex"
     },
     {
-      "id": "config_zero_only",
-      "name": "Config fields that CERF supports at 0 only",
+      "id": "config_fixed_mask",
+      "name": "Config fields that CERF supports at one value only",
+      "arch": "MIPS",
+      "type": "hex"
+    },
+    {
+      "id": "config_fixed_value",
+      "name": "The value of the Config fields that CERF supports at one value only",
       "arch": "MIPS",
       "type": "hex"
     },
@@ -635,8 +503,14 @@
       "type": "hex"
     },
     {
-      "id": "status_zero_only",
-      "name": "Status fields that CERF supports at 0 only",
+      "id": "status_fixed_mask",
+      "name": "Status fields that CERF supports at one value only",
+      "arch": "MIPS",
+      "type": "hex"
+    },
+    {
+      "id": "status_fixed_value",
+      "name": "The value of the Status fields that CERF supports at one value only",
       "arch": "MIPS",
       "type": "hex"
     },
@@ -731,8 +605,26 @@
       "type": "boolean"
     },
     {
+      "id": "mips16_syscall",
+      "name": "MIPS16 SYSCALL",
+      "arch": "MIPS",
+      "type": "boolean"
+    },
+    {
       "id": "tx39_multiply_add",
       "name": "TX39 multiply-add",
+      "arch": "MIPS",
+      "type": "boolean"
+    },
+    {
+      "id": "macc_dmacc",
+      "name": "MACC / DMACC",
+      "arch": "MIPS",
+      "type": "boolean"
+    },
+    {
+      "id": "madd16_dmadd16",
+      "name": "MADD16 / DMADD16",
       "arch": "MIPS",
       "type": "boolean"
     },
@@ -1011,13 +903,31 @@
         "watch": true,
         "vr41xx_power_modes": true,
         "mips16": false,
+        "mips16_syscall": false,
         "tx39_multiply_add": false,
+        "macc_dmacc": false,
+        "madd16_dmadd16": false,
         "cop1_cop2_unusable": true,
         "config_writable": "0x00000007",
-        "config_zero_only": "0x0F800000",
+        "config_fixed_mask": "0x0F800000",
+        "config_fixed_value": "0x00000000",
         "status_reset": "0x00400004",
         "status_writable": "0x1057FFFF",
-        "status_zero_only": "0x02000000"
+        "status_fixed_mask": "0x02000000",
+        "status_fixed_value": "0x00000000"
+      }
+    },
+    {
+      "soc_id": "vr4101",
+      "inherits_cpu_config_id": "vr41xx",
+      "values": {
+        "prid": "0x00000C00",
+        "device_ip_mask": "0x00000C00",
+        "madd16_dmadd16": true,
+        "config_reset": "0x00024000",
+        "config_writable": "0x0F000007",
+        "config_fixed_mask": "0x0F800000",
+        "config_fixed_value": "0x03000000"
       }
     },
     {
@@ -1025,6 +935,7 @@
       "inherits_cpu_config_id": "vr41xx",
       "values": {
         "prid": "0x00000C00",
+        "madd16_dmadd16": true,
         "config_reset": "0x00025400"
       }
     },
@@ -1033,6 +944,8 @@
       "inherits_cpu_config_id": "vr41xx",
       "values": {
         "prid": "0x00000C50",
+        "mips16": true,
+        "madd16_dmadd16": true,
         "config_reset": "0x000258C0"
       }
     },
@@ -1041,6 +954,8 @@
       "inherits_cpu_config_id": "vr41xx",
       "values": {
         "prid": "0x00000C60",
+        "mips16": true,
+        "macc_dmacc": true,
         "config_reset": "0x000258C0"
       }
     },
@@ -1051,6 +966,8 @@
         "prid": "0x00000C70",
         "device_ip_mask": "0x00001C00",
         "mips16": true,
+        "mips16_syscall": true,
+        "macc_dmacc": true,
         "config_reset": "0x00025B00",
         "config_writable": "0x80010027"
       }
@@ -1069,14 +986,19 @@
         "watch": false,
         "vr41xx_power_modes": false,
         "mips16": false,
+        "mips16_syscall": false,
         "tx39_multiply_add": true,
+        "macc_dmacc": false,
+        "madd16_dmadd16": false,
         "cop1_cop2_unusable": false,
         "config_reset": "0x00100030",
         "config_writable": "0x00000FFF",
-        "config_zero_only": "0x00000000",
+        "config_fixed_mask": "0x00000000",
+        "config_fixed_value": "0x00000000",
         "status_reset": "0x00600000",
         "status_writable": "0xF040FF3F",
-        "status_zero_only": "0x02000000"
+        "status_fixed_mask": "0x02000000",
+        "status_fixed_value": "0x00000000"
       }
     },
     {
@@ -1108,14 +1030,19 @@
         "watch": true,
         "vr41xx_power_modes": false,
         "mips16": false,
+        "mips16_syscall": false,
         "tx39_multiply_add": false,
+        "macc_dmacc": false,
+        "madd16_dmadd16": false,
         "cop1_cop2_unusable": false,
         "config_reset": "0x003266F0",
         "config_writable": "0x0F000007",
-        "config_zero_only": "0x00C00000",
+        "config_fixed_mask": "0x00C00000",
+        "config_fixed_value": "0x00000000",
         "status_reset": "0x00400004",
         "status_writable": "0xF557FFFF",
-        "status_zero_only": "0x00000000"
+        "status_fixed_mask": "0x00000000",
+        "status_fixed_value": "0x00000000"
       }
     },
     {
@@ -1128,6 +1055,18 @@
       "soc_id": "sh7729",
       "values": {
         "sh_dsp": true
+      }
+    },
+    {
+      "soc_id": "sh7707",
+      "values": {
+        "sh_dsp": false
+      }
+    },
+    {
+      "soc_id": "hd6417096",
+      "values": {
+        "sh_dsp": false
       }
     }
   ],
@@ -1211,8 +1150,24 @@
           "name": "2 MB"
         },
         {
+          "id": "3mb",
+          "name": "3 MB"
+        },
+        {
           "id": "4mb",
           "name": "4 MB"
+        },
+        {
+          "id": "5mb",
+          "name": "5 MB"
+        },
+        {
+          "id": "6mb",
+          "name": "6 MB"
+        },
+        {
+          "id": "7mb",
+          "name": "7 MB"
         },
         {
           "id": "8mb",
@@ -1233,8 +1188,28 @@
       "name": "RAM",
       "enum_values": [
         {
+          "id": "2mb",
+          "name": "2 MB"
+        },
+        {
+          "id": "3mb",
+          "name": "3 MB"
+        },
+        {
           "id": "4mb",
           "name": "4 MB"
+        },
+        {
+          "id": "5mb",
+          "name": "5 MB"
+        },
+        {
+          "id": "6mb",
+          "name": "6 MB"
+        },
+        {
+          "id": "7mb",
+          "name": "7 MB"
         },
         {
           "id": "8mb",
@@ -1287,6 +1262,34 @@
         {
           "id": "installed",
           "name": "Installed"
+        }
+      ]
+    },
+    {
+      "id": "main_batteries",
+      "name": "Main batteries",
+      "enum_values": [
+        {
+          "id": "alkaline",
+          "name": "Alkaline"
+        },
+        {
+          "id": "nicd_nimh",
+          "name": "NiCd / NiMH"
+        }
+      ]
+    },
+    {
+      "id": "mips16en",
+      "name": "MIPS16EN pin",
+      "enum_values": [
+        {
+          "id": "low",
+          "name": "Low"
+        },
+        {
+          "id": "high",
+          "name": "High"
         }
       ]
     }
@@ -1398,11 +1401,18 @@
       "board_config": {
         "ram": {
           "default": "32mb",
-          "values": ["16mb", "32mb", "64mb"]
+          "values": [
+            "16mb",
+            "32mb",
+            "64mb"
+          ]
         },
         "lcd_panel": {
           "default": "color_tft",
-          "values": ["color_tft", "monochrome_stn"]
+          "values": [
+            "color_tft",
+            "monochrome_stn"
+          ]
         }
       },
       "device_features": [
@@ -1502,7 +1512,16 @@
         "height": 320
       },
       "ga_window_size": 50331648,
-      "rom_placing_mode": "flat_container"
+      "rom_placing_mode": "flat_container",
+      "board_config": {
+        "mips16en": {
+          "default": "low",
+          "values": [
+            "low",
+            "high"
+          ]
+        }
+      }
     },
     {
       "id": "hp_jornada_820",
@@ -1571,7 +1590,10 @@
       "board_config": {
         "ram": {
           "default": "16mb",
-          "values": ["16mb", "32mb"]
+          "values": [
+            "16mb",
+            "32mb"
+          ]
         }
       },
       "device_features": [
@@ -1621,6 +1643,72 @@
         "width": 640,
         "height": 240
       },
+      "ga_window_size": 50331648,
+      "rom_placing_mode": "flat_container"
+    },
+    {
+      "id": "hp_300",
+      "name": "HP 300 series",
+      "soc_id": "sh7707",
+      "device_year": 1997,
+      "board_config": {
+        "ram": {
+          "default": "4mb",
+          "values": [
+            "2mb",
+            "4mb",
+            "8mb",
+            "16mb"
+          ]
+        },
+        "main_batteries": {
+          "default": "alkaline",
+          "values": [
+            "alkaline",
+            "nicd_nimh"
+          ]
+        }
+      },
+      "device_features": [
+        {
+          "feature_id": "sound",
+          "supported": true
+        },
+        {
+          "feature_id": "touch",
+          "supported": true
+        },
+        {
+          "feature_id": "keyboard",
+          "supported": true
+        },
+        {
+          "feature_id": "pcmcia",
+          "supported": true
+        },
+        {
+          "feature_id": "battery",
+          "supported": true
+        },
+        {
+          "feature_id": "suspend",
+          "supported": true
+        },
+        {
+          "feature_id": "guest_additions",
+          "supported": true
+        },
+        {
+          "feature_id": "serial",
+          "supported": true
+        }
+      ],
+      "notes": [],
+      "lcd_panel_size": {
+        "width": 640,
+        "height": 240
+      },
+      "ga_color_depth": 8,
       "ga_window_size": 50331648,
       "rom_placing_mode": "flat_container"
     },
@@ -1940,6 +2028,57 @@
       "rom_placing_mode": "flat_container"
     },
     {
+      "id": "nec_mobilepro_200",
+      "name": "NEC MobilePro 200",
+      "soc_id": "vr4101",
+      "device_year": 1996,
+      "board_config": {
+        "ram": {
+          "default": "2mb",
+          "values": [
+            "2mb",
+            "4mb"
+          ]
+        }
+      },
+      "device_features": [
+        {
+          "feature_id": "touch",
+          "supported": true
+        },
+        {
+          "feature_id": "keyboard",
+          "supported": true
+        },
+        {
+          "feature_id": "sound",
+          "supported": true
+        },
+        {
+          "feature_id": "pcmcia",
+          "supported": true
+        },
+        {
+          "feature_id": "serial",
+          "supported": true
+        },
+        {
+          "feature_id": "battery",
+          "supported": true
+        },
+        {
+          "feature_id": "suspend",
+          "supported": true
+        }
+      ],
+      "notes": [],
+      "lcd_panel_size": {
+        "width": 480,
+        "height": 240
+      },
+      "rom_placing_mode": "flat_container"
+    },
+    {
       "id": "nec_cronos3e",
       "name": "NEC CRONOS3E",
       "soc_id": "vr4121",
@@ -1992,7 +2131,16 @@
         "height": 240
       },
       "ga_window_size": 50331648,
-      "rom_placing_mode": "flat_container"
+      "rom_placing_mode": "flat_container",
+      "board_config": {
+        "mips16en": {
+          "default": "low",
+          "values": [
+            "low",
+            "high"
+          ]
+        }
+      }
     },
     {
       "id": "casio_tomcat",
@@ -2048,7 +2196,16 @@
       },
       "ga_color_depth": 8,
       "ga_window_size": 50331648,
-      "rom_placing_mode": "flat_container"
+      "rom_placing_mode": "flat_container",
+      "board_config": {
+        "mips16en": {
+          "default": "low",
+          "values": [
+            "low",
+            "high"
+          ]
+        }
+      }
     },
     {
       "id": "casio_jx670",
@@ -2070,23 +2227,15 @@
         },
         {
           "feature_id": "suspend",
-          "supported": false
+          "supported": true
         },
         {
           "feature_id": "keyboard",
-          "supported": false
+          "supported": true
         },
         {
           "feature_id": "mic",
-          "supported": false
-        },
-        {
-          "feature_id": "network",
-          "supported": false
-        },
-        {
-          "feature_id": "serial",
-          "supported": false
+          "supported": true
         },
         {
           "feature_id": "battery",
@@ -2100,7 +2249,16 @@
       },
       "ga_color_depth": 24,
       "ga_window_size": 100663296,
-      "rom_placing_mode": "flat_container"
+      "rom_placing_mode": "flat_container",
+      "board_config": {
+        "mips16en": {
+          "default": "high",
+          "values": [
+            "low",
+            "high"
+          ]
+        }
+      }
     },
     {
       "id": "casio_pocketpostpet",
@@ -2147,6 +2305,79 @@
       },
       "ga_color_depth": 24,
       "ga_window_size": 100663296,
+      "rom_placing_mode": "flat_container",
+      "board_config": {
+        "mips16en": {
+          "default": "low",
+          "values": [
+            "low",
+            "high"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a10",
+      "name": "Casio Cassiopeia A-10",
+      "soc_id": "hd6417096",
+      "device_year": 1996,
+      "board_config": {
+        "ram": {
+          "default": "4mb",
+          "values": [
+            "2mb",
+            "3mb",
+            "4mb",
+            "5mb",
+            "6mb"
+          ]
+        }
+      },
+      "device_features": [
+        {
+          "feature_id": "touch",
+          "supported": true
+        },
+        {
+          "feature_id": "keyboard",
+          "supported": true
+        },
+        {
+          "feature_id": "suspend",
+          "supported": true
+        },
+        {
+          "feature_id": "guest_additions",
+          "supported": true
+        },
+        {
+          "feature_id": "sound",
+          "supported": true
+        },
+        {
+          "feature_id": "mic",
+          "supported": true
+        },
+        {
+          "feature_id": "pcmcia",
+          "supported": true
+        },
+        {
+          "feature_id": "battery",
+          "supported": true
+        },
+        {
+          "feature_id": "serial",
+          "supported": true
+        }
+      ],
+      "notes": [],
+      "lcd_panel_size": {
+        "width": 480,
+        "height": 240
+      },
+      "ga_color_depth": 8,
+      "ga_window_size": 67108864,
       "rom_placing_mode": "flat_container"
     },
     {
@@ -2157,7 +2388,17 @@
       "board_config": {
         "dram_card": {
           "default": "none",
-          "values": ["none", "32mb"]
+          "values": [
+            "none",
+            "32mb"
+          ]
+        },
+        "mips16en": {
+          "default": "low",
+          "values": [
+            "low",
+            "high"
+          ]
         }
       },
       "device_features": [
@@ -2319,7 +2560,14 @@
       "board_config": {
         "dram_card": {
           "default": "none",
-          "values": ["none", "1mb", "2mb", "4mb", "8mb", "16mb"]
+          "values": [
+            "none",
+            "1mb",
+            "2mb",
+            "4mb",
+            "8mb",
+            "16mb"
+          ]
         }
       },
       "device_features": [
@@ -2380,15 +2628,26 @@
       "board_config": {
         "ram": {
           "default": "12mb",
-          "values": ["4mb", "8mb", "12mb", "16mb"]
+          "values": [
+            "4mb",
+            "8mb",
+            "12mb",
+            "16mb"
+          ]
         },
         "lcd_panel": {
           "default": "monochrome_stn",
-          "values": ["monochrome_stn", "color_dstn"]
+          "values": [
+            "monochrome_stn",
+            "color_dstn"
+          ]
         },
         "backlight": {
           "default": "none",
-          "values": ["none", "installed"]
+          "values": [
+            "none",
+            "installed"
+          ]
         }
       },
       "device_features": [
@@ -3064,7 +3323,13 @@
       "board_config": {
         "ram": {
           "default": "16mb",
-          "values": ["4mb", "8mb", "12mb", "16mb", "32mb"]
+          "values": [
+            "4mb",
+            "8mb",
+            "12mb",
+            "16mb",
+            "32mb"
+          ]
         }
       },
       "ga_color_depth": 8
@@ -3080,7 +3345,13 @@
       "board_config": {
         "ram": {
           "default": "16mb",
-          "values": ["4mb", "8mb", "12mb", "16mb", "32mb"]
+          "values": [
+            "4mb",
+            "8mb",
+            "12mb",
+            "16mb",
+            "32mb"
+          ]
         }
       },
       "ga_color_depth": 8
@@ -3096,10 +3367,92 @@
       "board_config": {
         "ram": {
           "default": "32mb",
-          "values": ["4mb", "8mb", "12mb", "16mb", "32mb"]
+          "values": [
+            "4mb",
+            "8mb",
+            "12mb",
+            "16mb",
+            "32mb"
+          ]
         }
       },
       "ga_color_depth": 8
+    },
+    {
+      "id": "hp_320lx",
+      "name": "HP 320LX",
+      "short_name": "320LX",
+      "board_family_id": "hp_300",
+      "support_level": "bootable_full"
+    },
+    {
+      "id": "hp_300lx",
+      "name": "HP 300LX",
+      "short_name": "300LX",
+      "board_family_id": "hp_300",
+      "support_level": "bootable_full",
+      "internal__spec_divergences": "2 MB RAM, no backlight, no CompactFlash slot",
+      "board_config": {
+        "ram": {
+          "default": "2mb"
+        }
+      }
+    },
+    {
+      "id": "hp_340lx",
+      "name": "HP 340LX",
+      "short_name": "340LX",
+      "board_family_id": "hp_300",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Asia-Pacific market"
+    },
+    {
+      "id": "hp_360lx",
+      "name": "HP 360LX",
+      "short_name": "360LX",
+      "board_family_id": "hp_300",
+      "support_level": "bootable_full",
+      "internal__spec_divergences": "8 MB RAM, 60 MHz clock, 16-grey panel, white backlight",
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "2mb",
+            "4mb",
+            "8mb",
+            "16mb",
+            "32mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "ericsson_mc12",
+      "name": "Ericsson MC12",
+      "short_name": "MC12",
+      "board_family_id": "hp_300",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Ericsson brand"
+    },
+    {
+      "id": "ericsson_mc16",
+      "name": "Ericsson MC16",
+      "short_name": "MC16",
+      "board_family_id": "hp_300",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Ericsson brand, 8 MB RAM, 60 MHz clock, 16-grey panel, white backlight",
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "2mb",
+            "4mb",
+            "8mb",
+            "16mb",
+            "32mb"
+          ]
+        }
+      }
     },
     {
       "id": "jornada_720",
@@ -3251,6 +3604,40 @@
       "short_name": "MobilePro 700",
       "board_family_id": "nec_mobilepro_700",
       "support_level": "bootable_full"
+    },
+    {
+      "id": "nec_mobilepro_200",
+      "name": "NEC MobilePro 200",
+      "short_name": "MobilePro 200",
+      "board_family_id": "nec_mobilepro_200",
+      "support_level": "unknown_partial"
+    },
+    {
+      "id": "nec_mobilepro_400",
+      "name": "NEC MobilePro 400",
+      "short_name": "MobilePro 400",
+      "board_family_id": "nec_mobilepro_200",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "4 MB RAM",
+      "board_config": {
+        "ram": {
+          "default": "4mb"
+        }
+      }
+    },
+    {
+      "id": "nec_mobilepro_450",
+      "name": "NEC MobilePro 450",
+      "short_name": "MobilePro 450",
+      "board_family_id": "nec_mobilepro_200",
+      "support_level": "bootable_full",
+      "internal__spec_divergences": "4 MB RAM, backlight",
+      "device_year": 1997,
+      "board_config": {
+        "ram": {
+          "default": "4mb"
+        }
+      }
     },
     {
       "id": "nec_mobilepro_790",
@@ -3447,6 +3834,614 @@
       "board_family_id": "casio_pocketpostpet",
       "support_level": "bootable_full",
       "internal__spec_divergences": "no camera, keyboard, IrDA, 4096-colour panel, PDC phone interface"
+    },
+    {
+      "id": "casio_cassiopeia_a11",
+      "name": "Casio Cassiopeia A-11",
+      "short_name": "A-11",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "bootable_full",
+      "board_config": {
+        "dram_card": {
+          "default": "none",
+          "values": [
+            "none",
+            "1mb",
+            "2mb",
+            "3mb",
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a10",
+      "name": "Casio Cassiopeia A-10",
+      "short_name": "A-10",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "2 MB RAM",
+      "board_config": {
+        "ram": {
+          "default": "2mb"
+        },
+        "dram_card": {
+          "default": "none",
+          "values": [
+            "none",
+            "1mb",
+            "2mb",
+            "3mb",
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a11a",
+      "name": "Casio Cassiopeia A-11A",
+      "short_name": "A-11A",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "other bundled software",
+      "board_config": {
+        "dram_card": {
+          "default": "none",
+          "values": [
+            "none",
+            "1mb",
+            "2mb",
+            "3mb",
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a11_plus",
+      "name": "Casio Cassiopeia A-11+",
+      "short_name": "A-11+",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "6 MB RAM",
+      "device_year": 1997,
+      "board_config": {
+        "ram": {
+          "default": "6mb"
+        },
+        "dram_card": {
+          "default": "none",
+          "values": [
+            "none",
+            "1mb",
+            "2mb",
+            "3mb",
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a11j",
+      "name": "Casio Cassiopeia A-11J",
+      "short_name": "A-11J",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Japanese market",
+      "board_config": {
+        "dram_card": {
+          "default": "none",
+          "values": [
+            "none",
+            "1mb",
+            "2mb",
+            "3mb",
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "compaq_pc_companion_c120",
+      "name": "Compaq PC Companion C120",
+      "short_name": "PC Companion C120",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Compaq brand, 2 MB RAM",
+      "board_config": {
+        "ram": {
+          "default": "2mb"
+        },
+        "dram_card": {
+          "default": "none",
+          "values": [
+            "none",
+            "1mb",
+            "2mb",
+            "3mb",
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "compaq_pc_companion_c120_plus_2",
+      "name": "Compaq PC Companion C120+2",
+      "short_name": "PC Companion C120+2",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Compaq brand, 2 MB RAM, 2 MB RAM expansion module",
+      "board_config": {
+        "ram": {
+          "default": "4mb"
+        },
+        "dram_card": {
+          "default": "none",
+          "values": [
+            "none",
+            "1mb",
+            "2mb",
+            "3mb",
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "compaq_pc_companion_c120_plus_4",
+      "name": "Compaq PC Companion C120+4",
+      "short_name": "PC Companion C120+4",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Compaq brand, 6 MB RAM",
+      "device_year": 1997,
+      "board_config": {
+        "ram": {
+          "default": "6mb"
+        },
+        "dram_card": {
+          "default": "none",
+          "values": [
+            "none",
+            "1mb",
+            "2mb",
+            "3mb",
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "compaq_pc_companion_c140",
+      "name": "Compaq PC Companion C140",
+      "short_name": "PC Companion C140",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Compaq brand",
+      "board_config": {
+        "dram_card": {
+          "default": "none",
+          "values": [
+            "none",
+            "1mb",
+            "2mb",
+            "3mb",
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a51",
+      "name": "Casio Cassiopeia A-51",
+      "short_name": "A-51",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "bootable_full",
+      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, 8 MB RAM, JIS keyboard, CompactFlash slot",
+      "device_year": 1997,
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a50",
+      "name": "Casio Cassiopeia A-50",
+      "short_name": "A-50",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, JIS keyboard, CompactFlash slot",
+      "device_year": 1997,
+      "board_config": {
+        "ram": {
+          "default": "4mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_pa_2000",
+      "name": "Casio Cassiopeia PA-2000",
+      "short_name": "PA-2000",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, 8 MB RAM, JIS keyboard, CompactFlash slot, corporate market",
+      "device_year": 1997,
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_pa_2100",
+      "name": "Casio Cassiopeia PA-2100",
+      "short_name": "PA-2100",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, 8 MB RAM, no keyboard, CompactFlash slot, corporate market",
+      "device_year": 1997,
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a51v",
+      "name": "Casio Cassiopeia A-51V",
+      "short_name": "A-51V",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, 8 MB RAM, JIS keyboard, CompactFlash slot, 80 MHz CPU",
+      "device_year": 1997,
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_pa_2000v",
+      "name": "Casio Cassiopeia PA-2000V",
+      "short_name": "PA-2000V",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, 8 MB RAM, JIS keyboard, CompactFlash slot, 80 MHz CPU, corporate market",
+      "device_year": 1997,
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_pa_2300v",
+      "name": "Casio Cassiopeia PA-2300V",
+      "short_name": "PA-2300V",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, 8 MB RAM, no keyboard, CompactFlash slot, 80 MHz CPU, corporate market",
+      "device_year": 1997,
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a55v",
+      "name": "Casio Cassiopeia A-55V",
+      "short_name": "A-55V",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Japanese Windows CE 2.0 ROM, 24 MB ROM, separate video RAM, 8 MB RAM, JIS keyboard, CompactFlash slot, 80 MHz CPU",
+      "device_year": 1998,
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a60",
+      "name": "Casio Cassiopeia A-60",
+      "short_name": "A-60",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Japanese Windows CE 2.0 ROM, 24 MB ROM, separate video RAM, 8 MB RAM, 640x240 panel, JIS keyboard, CompactFlash slot, 80 MHz CPU",
+      "device_year": 1998,
+      "lcd_panel_size": {
+        "width": 640,
+        "height": 240
+      },
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a20",
+      "name": "Casio Cassiopeia A-20",
+      "short_name": "A-20",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Windows CE 2.0 ROM, 8 MB ROM, separate video RAM, 8 MB RAM, 640x240 panel, CompactFlash slot, 80 MHz CPU",
+      "device_year": 1997,
+      "lcd_panel_size": {
+        "width": 640,
+        "height": 240
+      },
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a20j",
+      "name": "Casio Cassiopeia A-20J",
+      "short_name": "A-20J",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Windows CE 2.0 ROM, 8 MB ROM, separate video RAM, 8 MB RAM, 640x240 panel, CompactFlash slot, 80 MHz CPU, Japanese market",
+      "device_year": 1997,
+      "lcd_panel_size": {
+        "width": 640,
+        "height": 240
+      },
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a20f",
+      "name": "Casio Cassiopeia A-20F",
+      "short_name": "A-20F",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Windows CE 2.0 ROM, 8 MB ROM, separate video RAM, 8 MB RAM, 640x240 panel, AZERTY keyboard, CompactFlash slot, 80 MHz CPU",
+      "device_year": 1998,
+      "lcd_panel_size": {
+        "width": 640,
+        "height": 240
+      },
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a21s",
+      "name": "Casio Cassiopeia A-21S",
+      "short_name": "A-21S",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Windows CE 2.0 ROM, 8 MB ROM, separate video RAM, 16 MB RAM, 640x240 panel, no backlight, CompactFlash slot, 80 MHz CPU, education market",
+      "device_year": 1998,
+      "lcd_panel_size": {
+        "width": 640,
+        "height": 240
+      },
+      "board_config": {
+        "ram": {
+          "default": "16mb",
+          "values": [
+            "8mb",
+            "16mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a22t",
+      "name": "Casio Cassiopeia A-22T",
+      "short_name": "A-22T",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Windows CE 2.0 ROM, 8 MB ROM, separate video RAM, 16 MB RAM, 640x240 panel, no backlight, CompactFlash slot, 80 MHz CPU, education market",
+      "device_year": 1998,
+      "lcd_panel_size": {
+        "width": 640,
+        "height": 240
+      },
+      "board_config": {
+        "ram": {
+          "default": "16mb",
+          "values": [
+            "8mb",
+            "16mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_a23g",
+      "name": "Casio Cassiopeia A-23G",
+      "short_name": "A-23G",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Windows CE 2.0 ROM, 8 MB ROM, separate video RAM, 16 MB RAM, 640x240 panel, QWERTZ keyboard, CompactFlash slot, 80 MHz CPU",
+      "device_year": 1999,
+      "lcd_panel_size": {
+        "width": 640,
+        "height": 240
+      },
+      "board_config": {
+        "ram": {
+          "default": "16mb",
+          "values": [
+            "8mb",
+            "16mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_pa2400",
+      "name": "Casio Cassiopeia PA-2400U",
+      "short_name": "PA-2400U",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "bootable_full",
+      "internal__spec_divergences": "Windows CE 2.0 ROM, 16 MB ROM, separate video RAM, 8 MB RAM, no keyboard, CompactFlash slot, 80 MHz CPU, corporate market",
+      "device_year": 1998,
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
+    },
+    {
+      "id": "casio_cassiopeia_pa2400w",
+      "name": "Casio Cassiopeia PA-2400W",
+      "short_name": "PA-2400W",
+      "board_family_id": "casio_cassiopeia_a10",
+      "support_level": "unknown_partial",
+      "internal__spec_divergences": "Windows CE 2.11 ROM, 16 MB ROM, separate video RAM, 8 MB RAM, no keyboard, CompactFlash slot, 80 MHz CPU, corporate market",
+      "device_year": 1999,
+      "board_config": {
+        "ram": {
+          "default": "8mb",
+          "values": [
+            "4mb",
+            "5mb",
+            "6mb",
+            "7mb",
+            "8mb"
+          ]
+        }
+      }
     },
     {
       "id": "ibm_workpad_z50",

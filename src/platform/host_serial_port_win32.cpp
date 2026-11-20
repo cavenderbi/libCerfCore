@@ -103,6 +103,18 @@ void HostSerialPort::SetControlLines(bool dtr, bool rts) {
     EscapeCommFunction(impl_->handle, rts ? SETRTS : CLRRTS);
 }
 
+bool HostSerialPort::Drain(uint32_t& error) {
+    if (FlushFileBuffers(impl_->handle) != FALSE) return true;
+    error = GetLastError();
+    return false;
+}
+
+bool HostSerialPort::SetBreak(bool on, uint32_t& error) {
+    if ((on ? SetCommBreak(impl_->handle) : ClearCommBreak(impl_->handle)) != FALSE) return true;
+    error = GetLastError();
+    return false;
+}
+
 bool HostSerialPort::ModemLines(uint8_t& lines) {
     DWORD ms = 0;
     if (!GetCommModemStatus(impl_->handle, &ms)) return false;

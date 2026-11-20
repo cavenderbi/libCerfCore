@@ -29,14 +29,14 @@ public:
 
     void Configure(uint32_t stprep_zero_count, bool scanstart_auto_clear,
                    bool keyen_scanline_interlock, bool keyen_stop_deferred,
-                   bool scanstart_while_running_defined);
+                   bool scanstart_while_running_defined, bool scanstp_completes_when_idle);
     void Reset();
 
     uint16_t ScanRep() const { return scanrep_; }
     uint16_t State() const { return sstat_; }
     bool     Enabled() const { return (scanrep_ & cerf_vr41xx_kiu_regs::kKeyen) != 0u; }
 
-    void WriteScanRep(uint16_t value);
+    void WriteScanRep(uint16_t value, uint16_t written);
     void ReevaluateWaitKeyIn();
     void CompleteScan(bool key_data);
     void EnterScanning();
@@ -56,7 +56,8 @@ private:
     bool     keyen_scanline_interlock_ = false;
     bool     keyen_stop_deferred_      = false;
     bool     scanstart_while_running_defined_ = false;
-    uint16_t scanrep_    = cerf_vr41xx_kiu_regs::kScanRepPowerOn;
+    bool     scanstp_completes_when_idle_     = false;
+    uint16_t scanrep_   = cerf_vr41xx_kiu_regs::kScanRepPowerOn;
     uint16_t sstat_       = cerf_vr41xx_kiu_regs::kSStatStopped;
     uint16_t zero_scans_  = 0;
     bool     stop_after_scan_             = false;

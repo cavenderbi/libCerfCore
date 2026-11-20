@@ -70,7 +70,7 @@ void IbmWorkpadZ50Battery::OnReady() {
     emu_.Get<MachineObjectTree>().Add(&battery_);
 }
 
-bool IbmWorkpadZ50Battery::OnAc() const { return !battery_.OnBattery(); }
+bool IbmWorkpadZ50Battery::OnAc() const { return battery_.OnExternalPower(); }
 
 int IbmWorkpadZ50Battery::FillPercent() const { return battery_.ChargePercent(); }
 
@@ -78,14 +78,12 @@ bool IbmWorkpadZ50Battery::ChargerDisabled() const {
     return giu_->OutputDrive(kChargerDisableGpio) == PinDrive::kHigh;
 }
 
-bool IbmWorkpadZ50Battery::Charging() const {
-    return OnAc() && !ChargerDisabled() && FillPercent() < 100;
-}
+bool IbmWorkpadZ50Battery::Charging() const { return battery_.Charging() && !ChargerDisabled(); }
 
 bool IbmWorkpadZ50Battery::Discharging() const { return !OnAc() || ChargerDisabled(); }
 
 bool IbmWorkpadZ50Battery::ChargeComplete() const {
-    return OnAc() && !ChargerDisabled() && FillPercent() >= 100;
+    return OnAc() && !ChargerDisabled() && FillPercent() >= Battery::kFullPercent;
 }
 
 uint16_t IbmWorkpadZ50Battery::DesignCapacityMah() const { return kDesignCapacityMah; }

@@ -74,6 +74,10 @@ bool NecMobilepro900SeriesPcmcia::SocketHasCard(int socket) const {
     return (socket == 1 ? slot1_ : slot0_).HasCard();
 }
 
+bool NecMobilepro900SeriesPcmcia::SocketStatusChangeLow(int socket) const {
+    return (socket == 1 ? slot1_ : slot0_).StatusChangeLow();
+}
+
 void NecMobilepro900SeriesPcmcia::OnCardDetectChanged(PcmciaSlot& slot) {
     const int  socket  = SocketOf(slot);
     const bool present = slot.HasCard();

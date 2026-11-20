@@ -50,7 +50,15 @@ public:
     void PostRestore() override;
 
 protected:
-    virtual bool ChannelsHeldInStandby() const = 0;
+    enum class StandbyEffect : uint8_t {
+        kInitializes,
+        kClearsDmaor,
+        kHolds,
+    };
+
+    virtual StandbyEffect Standby() const                = 0;
+    virtual uint32_t      ExternalRequestControls() const = 0;
+    virtual uint8_t       Stbcr2ModuleStop() const        = 0;
 
 private:
     static constexpr uint32_t kChannels = 4u;
@@ -73,6 +81,7 @@ private:
     uint32_t ReadChannel(Channel& ch, Field field);
     void     WriteChannel(Channel& ch, Field field, uint32_t value);
     void     WriteChcr(Channel& ch, uint32_t value);
+    uint32_t ChcrStored(uint32_t channel) const;
     void     WriteDmaor(uint16_t value);
     uint32_t Index(const Channel& ch) const;
     bool     Armed(const Channel& ch) const;

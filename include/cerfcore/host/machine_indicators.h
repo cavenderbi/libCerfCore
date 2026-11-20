@@ -9,6 +9,8 @@
 
 namespace cerfcore {
 
+class CerfEmulator;
+
 struct ObjectRgb {
     uint8_t r = 0;
     uint8_t g = 0;
@@ -62,7 +64,14 @@ class MachineButton : public MachineObject {
 public:
     MachineObjectKind ObjectKind() const override { return MachineObjectKind::kButton; }
 
-    virtual void Press() = 0;
+    void Press();
+
+protected:
+    explicit MachineButton(CerfEmulator& emu) : emu_(emu) {}
+
+    virtual bool Pressed() = 0;
+
+    CerfEmulator& emu_;
 };
 
 class MachineCharacterDisplay : public MachineObject {

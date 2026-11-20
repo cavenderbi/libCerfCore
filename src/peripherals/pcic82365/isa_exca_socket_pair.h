@@ -1,9 +1,11 @@
 #pragma once
 
 #include <cerfcore/core/service.h>
+#include <cerfcore/socs/guest_cpu_reset.h>
 #include "../floating_bus.h"
 #include "../pcmcia/pcmcia_slot.h"
 #include "exca_socket_sequencer.h"
+#include "isa_host_bus_rule.h"
 #include "pcic82365.h"
 
 #include <cstdint>
@@ -20,6 +22,15 @@ class IsaExcaSocketPair : public Service, public PcmciaSlotHost {
 public:
     IsaExcaSocketPair(CerfEmulator& emu, ExcaPartRules rules);
 
+    uint8_t  ReadCardMem8  (const IsaHostBusRule& host, uint32_t off);
+    uint16_t ReadCardMem16 (const IsaHostBusRule& host, uint32_t off);
+    void     WriteCardMem8 (const IsaHostBusRule& host, uint32_t off, uint8_t  value);
+    void     WriteCardMem16(const IsaHostBusRule& host, uint32_t off, uint16_t value);
+    uint8_t  ReadCardIo8   (const IsaHostBusRule& host, uint32_t off);
+    uint16_t ReadCardIo16  (const IsaHostBusRule& host, uint32_t off);
+    void     WriteCardIo8  (const IsaHostBusRule& host, uint32_t off, uint8_t  value);
+    void     WriteCardIo16 (const IsaHostBusRule& host, uint32_t off, uint16_t value);
+
     void OnShutdown() override;
 
     uint8_t ReadPcicByte (uint32_t port);
@@ -35,6 +46,8 @@ public:
     void     WriteCardIo8 (uint32_t off, uint8_t  value);
     void     WriteCardIo16(uint32_t off, uint16_t value);
 
+    bool CardIoDecodes(uint32_t off);
+
     void SaveState(StateWriter& w);
     void RestoreState(StateReader& r);
     void PostRestore();
@@ -42,6 +55,7 @@ public:
     void OnCardDetectChanged(PcmciaSlot& slot) override;
     void OnReadyIreqLow     (PcmciaSlot& slot) override;
     void OnReadyIreqHigh    (PcmciaSlot& slot) override;
+    void OnStatusChange     (PcmciaSlot& slot, bool low) override;
     uint8_t UndrivenDataLane() const override { return 0u; }
 
 protected:
@@ -73,6 +87,9 @@ protected:
     virtual uint32_t    MaskIoReadLocked(int bank, uint32_t off, uint32_t value, unsigned bytes) = 0;
     virtual bool        Memcs16AssertedLocked(uint32_t off) = 0;
     virtual void        UpdateIrqLineLocked() = 0;
+    virtual bool        SelectedLocked() const { return true; }
+    virtual void        IndexWrittenLocked(uint8_t) {}
+    virtual bool        ResetLineResets(ResetLineKind) { return true; }
     virtual void        SaveChipGlobal(StateWriter& w) const = 0;
     virtual void        RestoreChipGlobal(StateReader& r) = 0;
     virtual void        SaveChipBank(StateWriter& w, int bank) const = 0;
@@ -104,6 +121,17 @@ private:
     bool    DecodeIo (uint32_t off, CardIoHit* hit);
     bool    Memcs16Asserted(uint32_t off);
     uint32_t MaskIoRead(int bank, uint32_t off, uint32_t value, unsigned bytes);
+    void    RefuseHostCycle(bool sixteen_bit_device, unsigned bytes, uint32_t off);
+    auto    HostCheck(const IsaHostBusRule& host, uint32_t off);
+
+    template <class Check> uint8_t  ReadMem8  (uint32_t off, Check&& check);
+    template <class Check> uint16_t ReadMem16 (uint32_t off, Check&& check);
+    template <class Check> void     WriteMem8 (uint32_t off, uint8_t value, Check&& check);
+    template <class Check> void     WriteMem16(uint32_t off, uint16_t value, Check&& check);
+    template <class Check> uint8_t  ReadIo8   (uint32_t off, Check&& check);
+    template <class Check> uint16_t ReadIo16  (uint32_t off, Check&& check);
+    template <class Check> void     WriteIo8  (uint32_t off, uint8_t value, Check&& check);
+    template <class Check> void     WriteIo16 (uint32_t off, uint16_t value, Check&& check);
 
     PcmciaSlot slot0_;
     PcmciaSlot slot1_;

@@ -2,7 +2,7 @@
 
 #include <cerfcore/core/service.h>
 #include "../../execution/guest_cycle_clock.h"
-#include "../uart_rx_line.h"
+#include "../timed_uart_rx_line.h"
 
 #include <array>
 #include <cstddef>
@@ -12,7 +12,6 @@
 #include <mutex>
 #include <vector>
 
-namespace cerfengine { class HostRequestChannel; }
 
 namespace cerfcore {
 
@@ -69,7 +68,7 @@ private:
     static constexpr uint32_t kPorts = 2u;
 
     struct Channel {
-        explicit Channel(const char* src) : source(src), line(src) {}
+        Channel(CerfEmulator& emu, const char* src) : source(src), rx(emu, src) {}
 
         const char* source;
         RxIntFn     raise_ints;
@@ -89,17 +88,19 @@ private:
         bool    prxhold_full    = false;
         bool    prxhold_overrun = false;
 
-        LineTiming              timing;
-        UartRxLine              line;
-        GuestCycleClock::Event* event = nullptr;
+        LineTiming      timing;
+        TimedUartRxLine rx;
     };
 
     static UartRxLine::Frame FrameOf(const LineTiming& t);
 
-    Channel&              Ch(uint32_t port);
-    const Channel&        Ch(uint32_t port) const;
-    void                  OnHostRequest();
-    void                  OnCharEvent(Channel& c);
+    Channel&                Ch(uint32_t port);
+    const Channel&          Ch(uint32_t port) const;
+    TimedUartRxLine::Timing RxTimingLocked(Channel& c);
+    static bool             ArmWantedLocked(const Channel& c) { return c.armed || !c.rxhold_full; }
+    void                    OnHostRequest(Channel& c);
+    void                    OnRate(Channel& c);
+    void                    OnCharEvent(Channel& c);
     GuestCycleClock::Rate BitRateLocked(const Channel& c);
     bool                  RetimeLocked(Channel& c, const LineTiming& old, uint64_t now);
     bool                  IdleLocked(const Channel& c) const;
@@ -113,9 +114,8 @@ private:
     std::array<std::unique_ptr<Channel>, kPorts> ch_;
     uint32_t                                     count_ = 0;
 
-    EmulatedMemory*     mem_           = nullptr;
-    GuestCycleClock*    clock_         = nullptr;
-    cerfengine::HostRequestChannel* host_requests_ = nullptr;
+    EmulatedMemory*  mem_   = nullptr;
+    GuestCycleClock* clock_ = nullptr;
 };
 
 }

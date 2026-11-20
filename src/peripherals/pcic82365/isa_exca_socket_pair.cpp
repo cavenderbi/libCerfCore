@@ -42,7 +42,9 @@ void IsaExcaSocketPair::StartSockets(ObjectIdentity slot0, std::optional<ObjectI
     }
     ResetController();
     auto& reset = emu_.Get<GuestCpuReset>();
-    reset.RegisterResetListener([this](ResetLineKind) { ResetController(); });
+    reset.RegisterResetListener([this](ResetLineKind kind) {
+        if (ResetLineResets(kind)) ResetController();
+    });
     reset.RegisterResetReleaseListener([this] {
         std::lock_guard<std::mutex> lk(state_mutex_);
         UpdateIrqLineLocked();
@@ -64,7 +66,7 @@ void IsaExcaSocketPair::ResetController() {
 uint8_t IsaExcaSocketPair::ReadPcicByte(uint32_t port) {
     std::lock_guard<std::mutex> lk(state_mutex_);
     if (port == kPortIndex) {
-        if ((index_ >> kIndexBankShift) >= kSockets) return UnbankedIndexReadLocked(port);
+        if (!SelectedLocked() || (index_ >> kIndexBankShift) >= kSockets) return UnbankedIndexReadLocked(port);
         return index_;
     }
     const uint8_t result = ReadDataLocked(port);
@@ -76,13 +78,14 @@ void IsaExcaSocketPair::WritePcicByte(uint32_t port, uint8_t value) {
     if (port == kPortIndex) {
         std::lock_guard<std::mutex> lk(state_mutex_);
         index_ = value;
+        IndexWrittenLocked(value);
         return;
     }
     sequencer_.Run([&] {
         ExcaSocketUpdates updates{};
         std::lock_guard<std::mutex> lk(state_mutex_);
         const int bank = index_ >> kIndexBankShift;
-        if (bank >= kSockets) {
+        if (!SelectedLocked() || bank >= kSockets) {
             UnbankedDataWriteLocked(value);
             return updates;
         }
@@ -95,7 +98,7 @@ void IsaExcaSocketPair::WritePcicByte(uint32_t port, uint8_t value) {
 
 uint8_t IsaExcaSocketPair::ReadDataLocked(uint32_t port) {
     const int bank = index_ >> kIndexBankShift;
-    if (bank >= kSockets)
+    if (!SelectedLocked() || bank >= kSockets)
         return UnbankedDataReadLocked(port);
     const uint8_t sub = index_ & kIndexSubMask;
     if ((sub == kRegInterfaceStatus || sub == kRegCardStatusChange) && !SocketWired(bank))
@@ -157,6 +160,16 @@ bool IsaExcaSocketPair::DecodeIo(uint32_t off, CardIoHit* hit) {
     return false;
 }
 
+bool IsaExcaSocketPair::CardIoDecodes(uint32_t off) {
+    CardIoHit hit;
+    return DecodeIo(off, &hit);
+}
+
+void IsaExcaSocketPair::RefuseHostCycle(bool sixteen_bit_device, unsigned bytes, uint32_t off) {
+    emu_.Get<Fatal>().Die("[%s] host refuses a %u-byte cycle at offset 0x%08X to a %u-bit card window", ChipName(),
+                          bytes, off, sixteen_bit_device ? 16u : 8u);
+}
+
 bool IsaExcaSocketPair::Memcs16Asserted(uint32_t off) {
     std::lock_guard<std::mutex> lk(state_mutex_);
     return Memcs16AssertedLocked(off);
@@ -167,10 +180,12 @@ uint32_t IsaExcaSocketPair::MaskIoRead(int bank, uint32_t off, uint32_t value, u
     return MaskIoReadLocked(bank, off, value, bytes);
 }
 
-uint8_t IsaExcaSocketPair::ReadCardMem8(uint32_t off) {
+template <class Check>
+uint8_t IsaExcaSocketPair::ReadMem8(uint32_t off, Check&& check) {
     CardMemHit hit;
     if (!DecodeMem(off, &hit) || hit.isolated)
         return floating_.Read8("ISA ExCA memory", off);
+    check([&] { return hit.sixteen_bit; }, 1u);
     const uint8_t card = static_cast<uint8_t>(
         ReadCardMemory(Slot(hit.bank), hit.addr, hit.attribute, hit.sixteen_bit, 1u));
     if (!hit.sixteen_bit && (off & 1u) != 0u && Memcs16Asserted(off))
@@ -178,10 +193,12 @@ uint8_t IsaExcaSocketPair::ReadCardMem8(uint32_t off) {
     return card;
 }
 
-uint16_t IsaExcaSocketPair::ReadCardMem16(uint32_t off) {
+template <class Check>
+uint16_t IsaExcaSocketPair::ReadMem16(uint32_t off, Check&& check) {
     CardMemHit hit;
     if (!DecodeMem(off, &hit) || hit.isolated)
         return floating_.Read16("ISA ExCA memory", off);
+    check([&] { return hit.sixteen_bit; }, 2u);
     if (hit.sixteen_bit)
         return static_cast<uint16_t>(ReadCardMemory(Slot(hit.bank), hit.addr, hit.attribute, true, 2u));
     if (!Memcs16Asserted(off))
@@ -191,24 +208,32 @@ uint16_t IsaExcaSocketPair::ReadCardMem16(uint32_t off) {
     return static_cast<uint16_t>(low | (high << 8));
 }
 
-void IsaExcaSocketPair::WriteCardMem8(uint32_t off, uint8_t value) {
+template <class Check>
+void IsaExcaSocketPair::WriteMem8(uint32_t off, uint8_t value, Check&& check) {
     CardMemHit hit;
     if (!DecodeMem(off, &hit)) {
         floating_.Write("ISA ExCA memory", 8u, off);
         return;
     }
-    if (!hit.writable || hit.isolated)
+    if (hit.isolated)
+        return;
+    check([&] { return hit.sixteen_bit; }, 1u);
+    if (!hit.writable)
         return;
     WriteCardMemory(Slot(hit.bank), hit.addr, hit.attribute, hit.sixteen_bit, 1u, value);
 }
 
-void IsaExcaSocketPair::WriteCardMem16(uint32_t off, uint16_t value) {
+template <class Check>
+void IsaExcaSocketPair::WriteMem16(uint32_t off, uint16_t value, Check&& check) {
     CardMemHit hit;
     if (!DecodeMem(off, &hit)) {
         floating_.Write("ISA ExCA memory", 16u, off);
         return;
     }
-    if (!hit.writable || hit.isolated)
+    if (hit.isolated)
+        return;
+    check([&] { return hit.sixteen_bit; }, 2u);
+    if (!hit.writable)
         return;
     if (hit.sixteen_bit) {
         WriteCardMemory(Slot(hit.bank), hit.addr, hit.attribute, true, 2u, value);
@@ -221,27 +246,32 @@ void IsaExcaSocketPair::WriteCardMem16(uint32_t off, uint16_t value) {
     WriteCardMemory(Slot(hit.bank), hit.addr, hit.attribute, false, 1u, value & 0xFFu);
 }
 
-uint8_t IsaExcaSocketPair::ReadCardIo8(uint32_t off) {
+template <class Check>
+uint8_t IsaExcaSocketPair::ReadIo8(uint32_t off, Check&& check) {
     CardIoHit hit;
     if (!DecodeIo(off, &hit) || hit.isolated)
         return floating_.Read8("ISA ExCA I/O", off);
+    check([&] { return SixteenBitCardCycle(Slot(hit.bank), hit.io, hit.width); }, 1u);
     const uint32_t v = ReadCardIo(Slot(hit.bank), hit.io, hit.width, 1u);
     if (hit.inpack_gated && !Slot(hit.bank).InputAcknowledge(hit.io))
         return floating_.Read8("ISA ExCA I/O read without INPACK#", off);
     return static_cast<uint8_t>(MaskIoRead(hit.bank, off, v, 1u));
 }
 
-uint16_t IsaExcaSocketPair::ReadCardIo16(uint32_t off) {
+template <class Check>
+uint16_t IsaExcaSocketPair::ReadIo16(uint32_t off, Check&& check) {
     CardIoHit hit;
     if (!DecodeIo(off, &hit) || hit.isolated)
         return floating_.Read16("ISA ExCA I/O", off);
+    check([&] { return SixteenBitCardCycle(Slot(hit.bank), hit.io, hit.width); }, 2u);
     const uint32_t v = ReadCardIo(Slot(hit.bank), hit.io, hit.width, 2u);
     if (hit.inpack_gated && !Slot(hit.bank).InputAcknowledge(hit.io))
         return floating_.Read16("ISA ExCA I/O read without INPACK#", off);
     return static_cast<uint16_t>(MaskIoRead(hit.bank, off, v, 2u));
 }
 
-void IsaExcaSocketPair::WriteCardIo8(uint32_t off, uint8_t value) {
+template <class Check>
+void IsaExcaSocketPair::WriteIo8(uint32_t off, uint8_t value, Check&& check) {
     CardIoHit hit;
     if (!DecodeIo(off, &hit)) {
         floating_.Write("ISA ExCA I/O", 8u, off);
@@ -249,10 +279,12 @@ void IsaExcaSocketPair::WriteCardIo8(uint32_t off, uint8_t value) {
     }
     if (hit.isolated)
         return;
+    check([&] { return SixteenBitCardCycle(Slot(hit.bank), hit.io, hit.width); }, 1u);
     WriteCardIo(Slot(hit.bank), hit.io, hit.width, 1u, value);
 }
 
-void IsaExcaSocketPair::WriteCardIo16(uint32_t off, uint16_t value) {
+template <class Check>
+void IsaExcaSocketPair::WriteIo16(uint32_t off, uint16_t value, Check&& check) {
     CardIoHit hit;
     if (!DecodeIo(off, &hit)) {
         floating_.Write("ISA ExCA I/O", 16u, off);
@@ -260,7 +292,55 @@ void IsaExcaSocketPair::WriteCardIo16(uint32_t off, uint16_t value) {
     }
     if (hit.isolated)
         return;
+    check([&] { return SixteenBitCardCycle(Slot(hit.bank), hit.io, hit.width); }, 2u);
     WriteCardIo(Slot(hit.bank), hit.io, hit.width, 2u, value);
+}
+
+namespace {
+
+constexpr auto kAnyHostCycle = [](auto&&, unsigned) {};
+
+}
+
+auto IsaExcaSocketPair::HostCheck(const IsaHostBusRule& host, uint32_t off) {
+    return [this, &host, off](auto&& sixteen_bit_device, unsigned bytes) {
+        const bool sixteen = sixteen_bit_device();
+        if (!host.AllowsCycle(sixteen, bytes, off)) RefuseHostCycle(sixteen, bytes, off);
+    };
+}
+
+uint8_t  IsaExcaSocketPair::ReadCardMem8 (uint32_t off) { return ReadMem8(off, kAnyHostCycle); }
+uint16_t IsaExcaSocketPair::ReadCardMem16(uint32_t off) { return ReadMem16(off, kAnyHostCycle); }
+void     IsaExcaSocketPair::WriteCardMem8 (uint32_t off, uint8_t  value) { WriteMem8(off, value, kAnyHostCycle); }
+void     IsaExcaSocketPair::WriteCardMem16(uint32_t off, uint16_t value) { WriteMem16(off, value, kAnyHostCycle); }
+uint8_t  IsaExcaSocketPair::ReadCardIo8 (uint32_t off) { return ReadIo8(off, kAnyHostCycle); }
+uint16_t IsaExcaSocketPair::ReadCardIo16(uint32_t off) { return ReadIo16(off, kAnyHostCycle); }
+void     IsaExcaSocketPair::WriteCardIo8 (uint32_t off, uint8_t  value) { WriteIo8(off, value, kAnyHostCycle); }
+void     IsaExcaSocketPair::WriteCardIo16(uint32_t off, uint16_t value) { WriteIo16(off, value, kAnyHostCycle); }
+
+uint8_t IsaExcaSocketPair::ReadCardMem8(const IsaHostBusRule& host, uint32_t off) {
+    return ReadMem8(off, HostCheck(host, off));
+}
+uint16_t IsaExcaSocketPair::ReadCardMem16(const IsaHostBusRule& host, uint32_t off) {
+    return ReadMem16(off, HostCheck(host, off));
+}
+void IsaExcaSocketPair::WriteCardMem8(const IsaHostBusRule& host, uint32_t off, uint8_t value) {
+    WriteMem8(off, value, HostCheck(host, off));
+}
+void IsaExcaSocketPair::WriteCardMem16(const IsaHostBusRule& host, uint32_t off, uint16_t value) {
+    WriteMem16(off, value, HostCheck(host, off));
+}
+uint8_t IsaExcaSocketPair::ReadCardIo8(const IsaHostBusRule& host, uint32_t off) {
+    return ReadIo8(off, HostCheck(host, off));
+}
+uint16_t IsaExcaSocketPair::ReadCardIo16(const IsaHostBusRule& host, uint32_t off) {
+    return ReadIo16(off, HostCheck(host, off));
+}
+void IsaExcaSocketPair::WriteCardIo8(const IsaHostBusRule& host, uint32_t off, uint8_t value) {
+    WriteIo8(off, value, HostCheck(host, off));
+}
+void IsaExcaSocketPair::WriteCardIo16(const IsaHostBusRule& host, uint32_t off, uint16_t value) {
+    WriteIo16(off, value, HostCheck(host, off));
 }
 
 void IsaExcaSocketPair::OnCardDetectChanged(PcmciaSlot& slot) {
@@ -285,6 +365,12 @@ void IsaExcaSocketPair::OnReadyIreqLow(PcmciaSlot& slot) {
 void IsaExcaSocketPair::OnReadyIreqHigh(PcmciaSlot& slot) {
     std::lock_guard<std::mutex> lk(state_mutex_);
     Exca(BankOf(slot)).SetReadyIreqLow(false);
+    UpdateIrqLineLocked();
+}
+
+void IsaExcaSocketPair::OnStatusChange(PcmciaSlot& slot, bool low) {
+    std::lock_guard<std::mutex> lk(state_mutex_);
+    Exca(BankOf(slot)).SetStatusChangeLow(low);
     UpdateIrqLineLocked();
 }
 

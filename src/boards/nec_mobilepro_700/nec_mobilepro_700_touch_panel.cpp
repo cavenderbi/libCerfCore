@@ -33,6 +33,6 @@ protected:
 
 }
 
-REGISTER_SERVICE_AS(NecMobilepro700TouchPanel, Vr41xxPiuPanel);
+REGISTER_SERVICE_AS_ALSO(NecMobilepro700TouchPanel, Vr41xxPiuScreen, Vr41xxPiuPanel);
 
 }

@@ -12,7 +12,7 @@ namespace {
 constexpr uint8_t  kFlag    = 0x7E;
 constexpr uint8_t  kEsc     = 0x7D;
 
-}  /* namespace */
+}
 
 void PppHdlc::Feed(const uint8_t* data, size_t n) {
     for (size_t i = 0; i < n; ++i) {
@@ -24,7 +24,7 @@ void PppHdlc::Feed(const uint8_t* data, size_t n) {
             in_escape_ = false;
             continue;
         }
-        if (!in_frame_) continue;          /* inter-frame fill before a flag */
+        if (!in_frame_) continue;
         if (b == kEsc) { in_escape_ = true; continue; }
         uint8_t v = b;
         if (in_escape_) { v = (uint8_t)(b ^ 0x20); in_escape_ = false; }
@@ -32,18 +32,24 @@ void PppHdlc::Feed(const uint8_t* data, size_t n) {
     }
 }
 
+void PppHdlc::LineError() {
+    rx_.clear();
+    in_frame_  = false;
+    in_escape_ = false;
+}
+
 void PppHdlc::EndFrame() {
-    if (rx_.size() < 3) return;            /* proto(1, PFC) + FCS(2) minimum */
+    if (rx_.size() < 3) return;
     if (HdlcFcs16::Update(HdlcFcs16::kInit, rx_.data(), rx_.size()) != HdlcFcs16::kGood) return;
 
     const uint8_t* p = rx_.data();
-    size_t len = rx_.size() - 2;           /* drop the trailing FCS */
+    size_t len = rx_.size() - 2;
 
-    if (len >= 2 && p[0] == 0xFF && p[1] == 0x03) { p += 2; len -= 2; }  /* ACFC */
+    if (len >= 2 && p[0] == 0xFF && p[1] == 0x03) { p += 2; len -= 2; }
     if (len < 1) return;
 
     uint16_t proto;
-    if (p[0] & 0x01) { proto = p[0]; p += 1; len -= 1; }   /* PFC single octet */
+    if (p[0] & 0x01) { proto = p[0]; p += 1; len -= 1; }
     else {
         if (len < 2) return;
         proto = cerf::be::U16(p);

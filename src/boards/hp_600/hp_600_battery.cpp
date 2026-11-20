@@ -17,7 +17,6 @@ namespace {
 
 constexpr int kTopLevel        = 6;
 constexpr int kPercentPerLevel = 16;
-constexpr int kFullPercent     = 100;
 
 }
 
@@ -33,11 +32,9 @@ void Hp600Battery::OnReady() {
     DriveAcLine();
 }
 
-bool Hp600Battery::Charging() const {
-    return !battery_.OnBattery() && battery_.ChargePercent() < kFullPercent;
-}
+bool Hp600Battery::Charging() const { return battery_.Charging(); }
 
-bool Hp600Battery::OnExternalPower() const { return !battery_.OnBattery(); }
+bool Hp600Battery::OnExternalPower() const { return battery_.OnExternalPower(); }
 
 uint16_t Hp600Battery::MainBatteryAdc() const {
     const int level = std::min((battery_.ChargePercent() + kPercentPerLevel / 2) / kPercentPerLevel, kTopLevel);

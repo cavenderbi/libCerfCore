@@ -61,16 +61,19 @@ constexpr uint32_t kT2CntShift  = 5u;
 constexpr uint32_t kT3CntShift  = 10u;
 constexpr uint16_t kWintvlBits  = 0x03FFu;
 
-constexpr uint32_t SlotTicks(uint16_t wks) {
-    const uint32_t t1 = wks & kCntBits;
-    const uint32_t t2 = (wks >> kT2CntShift) & kCntBits;
-    const uint32_t t3 = (wks >> kT3CntShift) & kCntBits;
-    return t1 + t2 + t3 + 3u;
+constexpr uint32_t T1Count(uint16_t wks) { return wks & kCntBits; }
+constexpr uint32_t T2Count(uint16_t wks) { return (wks >> kT2CntShift) & kCntBits; }
+constexpr uint32_t T3Count(uint16_t wks) { return (wks >> kT3CntShift) & kCntBits; }
+
+constexpr uint32_t SlotTicks(uint16_t wks, uint32_t bias) {
+    return T1Count(wks) + T2Count(wks) + T3Count(wks) + 3u * bias;
 }
 
-constexpr uint32_t SampleTicks(uint16_t wks) { return (wks & kCntBits) + 1u; }
+constexpr uint32_t SampleTicks(uint16_t wks, uint32_t bias) { return T1Count(wks) + bias; }
 
-constexpr uint32_t ScanPeriodTicks(uint16_t wks, uint32_t lines) { return lines * SlotTicks(wks); }
+constexpr uint32_t ScanPeriodTicks(uint16_t wks, uint32_t lines, uint32_t bias) {
+    return lines * SlotTicks(wks, bias);
+}
 
 /* SCANLINE LINE[1:0]: 00 twelve pins, 01 ten, 10 eight, 11 SCAN pins are output ports
    (VR4111 UM 22.2.9 p472, VR4102 UM 21.2.9 p434, VR4121 UM 22.2.9 p524). KSCAN[2n] and

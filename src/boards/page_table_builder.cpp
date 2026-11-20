@@ -16,4 +16,10 @@ DramRegion PageTableBuilder::EntryXipRomRegion() const {
     emu_.Get<Fatal>().Die("%s declares no entry-XIP ROM region", typeid(*this).name());
 }
 
+std::vector<DramRegion> PageTableBuilder::MappedVaSpans() const {
+    emu_.Get<Fatal>().Die("%s declares no mapped VA spans", typeid(*this).name());
+}
+
+uint32_t PageTableBuilder::UnmappedWindowVa(uint32_t, uint32_t) const { return 0u; }
+
 }

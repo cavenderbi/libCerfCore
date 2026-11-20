@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cerfcore/core/service.h>
+#include "../../peripherals/key_matrix_cells.h"
 #include "vr41xx_kiu_regs.h"
 
 #include <cstdint>
@@ -25,7 +26,7 @@ public:
 
 private:
     std::mutex          mtx_;
-    uint16_t            held_[kRegs] = {0, 0, 0, 0, 0, 0};
+    KeyMatrixCells<kRegs> held_;
     bool                dirty_ = false;
     cerfengine::HostRequestChannel* host_requests_ = nullptr;
 };

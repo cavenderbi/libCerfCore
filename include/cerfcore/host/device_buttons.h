@@ -44,14 +44,14 @@ protected:
 private:
     class WiredButton final : public MachineButton {
     public:
-        WiredButton(CerfEmulator& emu, ButtonSpec spec) : emu_(emu), spec_(std::move(spec)) {}
+        WiredButton(CerfEmulator& emu, ButtonSpec spec) : MachineButton(emu), spec_(std::move(spec)) {}
         std::string ObjectId() const override { return spec_.id; }
         std::string ObjectName() const override { return spec_.name; }
-        void        Press() override;
 
     private:
-        CerfEmulator& emu_;
-        ButtonSpec    spec_;
+        bool Pressed() override;
+
+        ButtonSpec spec_;
     };
 
     std::vector<std::unique_ptr<WiredButton>> buttons_;

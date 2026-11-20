@@ -1,11 +1,17 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 namespace cerfcore {
 
 class StateReader;
 class StateWriter;
+
+struct Vr41xxGiuPinEdge {
+    bool prev  = false;
+    bool level = false;
+};
 
 class Vr41xxGiuInputPins {
 public:
@@ -13,8 +19,11 @@ public:
 
     uint32_t Levels() const;
     uint32_t Established() const;
-    void     Drive(int pin, bool level);
-    void     Release(int pin);
+    bool     Level(int pin) const;
+    uint32_t Merged(uint32_t driven_out, uint32_t outputs) const;
+
+    Vr41xxGiuPinEdge                Drive(int pin, bool level);
+    std::optional<Vr41xxGiuPinEdge> Release(int pin);
 
     uint16_t UseUpdn() const { return useupdn_; }
     uint16_t TermUpdn() const { return termupdn_; }

@@ -45,6 +45,8 @@ public:
 
     SerialConfigureResult Configure(const SerialPortSettings& settings, uint32_t& error);
     void SetControlLines(bool dtr, bool rts);
+    bool SetBreak(bool on, uint32_t& error);
+    bool Drain(uint32_t& error);
     bool ModemLines(uint8_t& lines);
 
     SerialIoResult Read(uint8_t* buf, uint32_t size, uint32_t& got, uint32_t& error);

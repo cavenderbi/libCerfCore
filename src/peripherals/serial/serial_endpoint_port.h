@@ -21,8 +21,9 @@ class StateWriter;
 class StateReader;
 
 struct SerialControlLines {
-    bool dtr = false;
-    bool rts = false;
+    bool dtr      = false;
+    bool rts      = false;
+    bool in_break = false;
 };
 
 class SerialEndpointPort {
@@ -34,6 +35,7 @@ public:
 
     void AttachCradle(CerfEmulator& emu, ObjectIdentity identity);
     void SetActivityObject(MachineObject* object) { activity_ = object; }
+    MachineObject* CradleObject() const;
     void OnShutdown();
 
     void SetEndpoint(SerialEndpoint* ep);
@@ -71,6 +73,7 @@ private:
     bool                         lines_known_ = false;
     bool                         sent_dtr_    = false;
     bool                         sent_rts_    = false;
+    bool                         sent_break_  = false;
 
     std::unique_ptr<SerialCradle> cradle_;
 };

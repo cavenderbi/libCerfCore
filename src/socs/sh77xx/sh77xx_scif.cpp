@@ -4,15 +4,17 @@
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
+#include "../../core/deferred_jobs.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../tracing/kernel_debug_sink.h"
 #include "sh77xx_cpg.h"
 #include "sh77xx_frqcr.h"
-#include "sh77xx_pfc.h"
+#include "sh77xx_scif_external_clock.h"
+#include "sh77xx_scif_pins.h"
+#include "sh77xx_serial_format.h"
 #include "sh77xx_serial_wiring.h"
 #include "sh77xx_standby_entry.h"
 
-#include <algorithm>
 #include <optional>
 #include <utility>
 
@@ -28,10 +30,6 @@ constexpr uint32_t kOffFifoCtl  = 0xCu;
 constexpr uint32_t kOffFifoData = 0xEu;
 
 constexpr uint8_t kModeChr      = 0x40u;
-constexpr uint8_t kModeParity   = 0x20u;
-constexpr uint8_t kModeOdd      = 0x10u;
-constexpr uint8_t kModeTwoStop  = 0x08u;
-constexpr uint8_t kModeClock    = 0x03u;
 constexpr uint8_t kModeIrda     = 0x80u;
 constexpr uint8_t kModeWritable = 0x7Bu;
 
@@ -39,63 +37,58 @@ constexpr uint8_t kCtlTie       = 0x80u;
 constexpr uint8_t kCtlRie       = 0x40u;
 constexpr uint8_t kCtlTe        = 0x20u;
 constexpr uint8_t kCtlRe        = 0x10u;
-constexpr uint8_t kCtlUnmodeled = 0x0Fu;
+constexpr uint8_t kCtlReserved  = 0x0Cu;
+constexpr uint8_t kCtlClockBits = 0x03u;
+constexpr uint8_t kCtlCke1      = 0x02u;
+constexpr uint8_t kCtlClockOut  = 0x01u;
 
-constexpr uint8_t kStatusTend      = 0x40u;
-constexpr uint8_t kStatusTdfe      = 0x20u;
-constexpr uint8_t kStatusRdf       = 0x02u;
-constexpr uint8_t kStatusDr        = 0x01u;
-constexpr uint8_t kStatusClearable = 0xF3u;
+constexpr uint32_t kExternalClocksPerBit = 16u;
 
-constexpr uint8_t kFifoMce   = 0x08u;
 constexpr uint8_t kFifoTfrst = 0x04u;
 constexpr uint8_t kFifoRfrst = 0x02u;
 constexpr uint8_t kFifoLoop  = 0x01u;
-
-constexpr size_t kTxTriggers[4] = {8u, 4u, 2u, 1u};
-constexpr size_t kRxTriggers[4] = {1u, 4u, 8u, 14u};
-
-constexpr uint64_t kClocksPerBitBase = 32u;
 
 }
 
 Sh77xxScif::Sh77xxScif(CerfEmulator& emu)
     : Peripheral(emu),
       endpoint_timer_(emu, [this] { port_.OnTimer(); }),
-      port_(*this, endpoint_timer_, [this] { return wiring_->Control(Channel().base); }) {}
+      port_(*this, endpoint_timer_, [this] { return ControlLines(); }) {}
 
 Sh77xxScif::~Sh77xxScif() = default;
 
 void Sh77xxScif::OnReady() {
     intc_   = &emu_.Get<Sh77xxIntc>();
-    pfc_    = &emu_.Get<Sh77xxPfc>();
+    pins_   = &emu_.Get<Sh77xxScifPins>();
+    stbcr2_ = emu_.TryGet<Sh77xxStbcr2>();
     cpg_    = &emu_.Get<Sh77xxCpg>();
     frqcr_  = &emu_.Get<Sh77xxFrqcr>();
-    stbcr2_ = &emu_.Get<Sh77xxStbcr2>();
     wiring_ = emu_.TryGet<Sh77xxSerialWiring>();
+    clock_  = emu_.TryGet<Sh77xxScifExternalClock>();
+    jobs_   = &emu_.Get<DeferredJobs>();
     endpoint_timer_.AttachLineTimer();
+    if (clock_ != nullptr) clock_->AddChangeListener([this] { FireLineConfig(); });
 
-    stbcr2_->RegisterChangeListener([this](uint8_t from, uint8_t to) {
-        const bool stopping = (from & Channel().mstp) == 0u && (to & Channel().mstp) != 0u;
-        if (stopping) Initialize();
-        RefreshClockStop();
-        if (stopping) FireLineConfig();
-    });
+    if (stbcr2_ != nullptr) {
+        stbcr2_->RegisterChangeListener([this](uint8_t from, uint8_t to) {
+            const bool stopping = (from & Channel().mstp) == 0u && (to & Channel().mstp) != 0u;
+            if (stopping) EnterStandby();
+            RefreshClockStop();
+            if (stopping) FireLineConfig();
+        });
+    }
     frqcr_->RegisterChangeListener([this](uint16_t, uint16_t) { FireLineConfig(); });
-    pfc_->AddControlListener([this] { RefreshConnection(); });
     emu_.Get<Sh77xxStandbyEntry>().RegisterListener([this] {
-        Initialize();
+        EnterStandby();
         FireLineConfig();
     });
     GuestCpuReset& reset = emu_.Get<GuestCpuReset>();
     reset.RegisterResetListener([this](ResetLineKind) { Initialize(); });
-    reset.RegisterResetReleaseListener([this] {
-        RefreshClockStop();
-        RefreshConnection();
-        FireLineConfig();
-    });
+    reset.RegisterResetReleaseListener([this] { Resync(); });
 
     Initialize();
+    PublishEnables();
+    modem_.Attach(*pins_, *jobs_, Channel(), [this] { return RtsHigh(); });
     RefreshClockStop();
     RefreshConnection();
     {
@@ -106,19 +99,54 @@ void Sh77xxScif::OnReady() {
 
     if (wiring_ == nullptr) return;
     std::optional<ObjectIdentity> cradle = wiring_->Cradle(Channel().base);
-    if (!cradle) return;
+    MachineObject*                shared = cradle ? nullptr : wiring_->ShareLine(Channel().base, *this);
+    if (!cradle && shared == nullptr) return;
     wiring_->SetControlListener(Channel().base, [this] {
         RefreshConnection();
         port_.NotifyControlLines();
     });
-    port_.AttachCradle(emu_, std::move(*cradle));
+    RefreshTxLine();
+    pins_->AddPinListener([this] {
+        RefreshTxLine();
+        port_.NotifyControlLines();
+        PostRelease();
+    });
+    if (cradle) port_.AttachCradle(emu_, std::move(*cradle));
+    if (shared != nullptr) port_.SetActivityObject(shared);
 }
 
-void Sh77xxScif::OnShutdown() { port_.OnShutdown(); }
+void Sh77xxScif::OnShutdown() {
+    port_.OnShutdown();
+    emu_.Get<KernelDebugSink>().FlushLine(tx_line_, Channel().name);
+}
+
+SerialControlLines Sh77xxScif::ControlLines() {
+    SerialControlLines lines   = wiring_->Control(Channel().base);
+    bool               powered = false;
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        powered = powered_;
+    }
+    lines.in_break = powered && tx_low_.load(std::memory_order_acquire);
+    return lines;
+}
+
+void Sh77xxScif::RefreshTxLine() {
+    tx_low_.store(pins_->TxdLow(Channel()), std::memory_order_release);
+}
+
+void Sh77xxScif::Resync() {
+    RefreshClockStop();
+    RefreshConnection();
+    PublishEnables();
+    RefreshTxLine();
+    modem_.RefreshRts();
+    FireLineConfig();
+}
 
 void Sh77xxScif::RequireRunning(const char* reg, uint32_t value, uint32_t held) const {
     if (!stopped_ || value == held) return;
-    emu_.Get<Fatal>().Die("Sh77xxScif: %s write 0x%X at 0x%08X while STBCR2 stops the module clock", reg, value,
+    emu_.Get<Fatal>().Die("Sh77xxScif: %s write 0x%X at 0x%08X while the module clock is stopped", reg, value,
                           Channel().base);
 }
 
@@ -151,7 +179,7 @@ uint16_t Sh77xxScif::ReadHalf(uint32_t addr) {
         case kOffStatus: return ReadStatus();
         case kOffFifoData: {
             std::lock_guard<std::mutex> lk(mu_);
-            return static_cast<uint16_t>((tx_.size() << 8) | RxCountLocked());
+            return fifo_.DataCounts();
         }
         default: HaltUnsupportedAccess("ReadHalf", addr, 0u);
     }
@@ -182,72 +210,70 @@ void Sh77xxScif::WriteBitRate(uint8_t value) {
 }
 
 void Sh77xxScif::WriteControl(uint8_t value) {
-    if ((value & kCtlUnmodeled) != 0u) {
-        emu_.Get<Fatal>().Die("Sh77xxScif: SCSCR write 0x%02X at 0x%08X sets bits 3-0", value, Channel().base);
+    const uint8_t clock_bits = static_cast<uint8_t>(value & kCtlClockBits);
+    if ((value & kCtlReserved) != 0u || clock_bits == kCtlClockOut ||
+        ((value & kCtlCke1) != 0u && clock_ == nullptr)) {
+        emu_.Get<Fatal>().Die("Sh77xxScif: SCSCR write 0x%02X at 0x%08X", value, Channel().base);
     }
     std::vector<uint8_t> out;
-    bool                 tx_wired = false;
+    bool                 powered       = false;
+    bool                 clock_changed = false;
     {
         std::lock_guard<std::mutex> lk(mu_);
         RequireRunning("SCSCR", value, scr_);
-        if ((scr_ & kCtlTe) != 0u && (value & kCtlTe) == 0u) tend_ = true;
-        scr_ = value;
+        if ((scr_ & kCtlTe) != 0u && (value & kCtlTe) == 0u) fifo_.EndTransmit();
+        clock_changed = ((scr_ ^ value) & kCtlCke1) != 0u;
+        scr_          = value;
         TakeTransmitLocked(out);
-        tx_wired = tx_wired_;
+        powered = powered_;
         DriveLocked();
     }
-    DeliverTx(out, tx_wired);
+    PublishEnables();
+    if (clock_changed) FireLineConfig();
+    DeliverTx(out, powered);
 }
 
 void Sh77xxScif::WriteFifoControl(uint8_t value) {
-    if ((value & (kFifoMce | kFifoLoop)) != 0u) {
-        emu_.Get<Fatal>().Die("Sh77xxScif: SCFCR write 0x%02X at 0x%08X enables modem control or loopback", value,
-                              Channel().base);
+    if ((value & kFifoLoop) != 0u || (Sh77xxScifModemLines::Enabled(value) && !Channel().modem_control)) {
+        emu_.Get<Fatal>().Die("Sh77xxScif: SCFCR write 0x%02X at 0x%08X", value, Channel().base);
     }
-    bool drained = false;
+    std::vector<uint8_t> out;
+    bool                 drained = false;
+    bool                 powered = false;
     {
         std::lock_guard<std::mutex> lk(mu_);
         RequireRunning("SCFCR", value, fcr_);
         fcr_ = value;
-        if ((value & kFifoTfrst) != 0u) tx_.clear();
-        if ((value & kFifoRfrst) != 0u) {
-            drained = !RxEmptyLocked();
-            rx_.clear();
-            rx_pos_ = 0u;
-        }
+        if ((value & kFifoTfrst) != 0u) fifo_.ClearTransmit();
+        if ((value & kFifoRfrst) != 0u) drained = fifo_.ClearReceive();
+        TakeTransmitLocked(out);
+        powered = powered_;
         DriveLocked();
     }
     if (drained) port_.NotifyRxDrained();
+    modem_.RefreshRts();
+    DeliverTx(out, powered);
 }
 
 void Sh77xxScif::WriteStatus(uint16_t value) {
     std::lock_guard<std::mutex> lk(mu_);
     if (stopped_) return;
-    const uint8_t cleared = static_cast<uint8_t>(~value & read_ones_ & kStatusClearable);
-    if ((cleared & kStatusTend) != 0u) tend_ = false;
-    if ((cleared & kStatusTdfe) != 0u && tx_.size() > TxTriggerLocked()) tdfe_ = false;
-    if ((cleared & kStatusRdf) != 0u && RxCountLocked() < RxTriggerLocked()) rdf_ = false;
-    if ((cleared & kStatusDr) != 0u) dr_ = false;
-    read_ones_ = static_cast<uint8_t>(read_ones_ & ~cleared);
-    UpdateRxFlagsLocked();
+    fifo_.WriteStatus(value, fcr_);
     DriveLocked();
 }
 
 uint16_t Sh77xxScif::ReadStatus() {
     std::lock_guard<std::mutex> lk(mu_);
-    const uint8_t v = static_cast<uint8_t>((tend_ ? kStatusTend : 0u) | (tdfe_ ? kStatusTdfe : 0u) |
-                                           (rdf_ ? kStatusRdf : 0u) | (dr_ ? kStatusDr : 0u));
-    if (!stopped_) read_ones_ = static_cast<uint8_t>(read_ones_ | v);
-    return v;
+    return fifo_.ReadStatus(!stopped_);
 }
 
 void Sh77xxScif::WriteTransmitData(uint8_t value) {
     std::vector<uint8_t> out;
-    bool                 tx_wired = false;
+    bool                 powered = false;
     {
         std::lock_guard<std::mutex> lk(mu_);
         if (stopped_) {
-            emu_.Get<Fatal>().Die("Sh77xxScif: SCFTDR write 0x%02X at 0x%08X while STBCR2 stops the module clock",
+            emu_.Get<Fatal>().Die("Sh77xxScif: SCFTDR write 0x%02X at 0x%08X while the module clock is stopped",
                                   value, Channel().base);
         }
         if ((fcr_ & kFifoTfrst) != 0u) {
@@ -255,15 +281,12 @@ void Sh77xxScif::WriteTransmitData(uint8_t value) {
                                   "reset",
                                   value, Channel().base);
         }
-        if (tx_.size() >= kFifoBytes) return;
-        tx_.push_back(value);
-        tend_      = false;
-        read_ones_ = static_cast<uint8_t>(read_ones_ & ~kStatusTend);
+        if (!fifo_.PushTransmit(value)) return;
         TakeTransmitLocked(out);
-        tx_wired = tx_wired_;
+        powered = powered_;
         DriveLocked();
     }
-    DeliverTx(out, tx_wired);
+    DeliverTx(out, powered);
 }
 
 uint8_t Sh77xxScif::ReadReceiveData() {
@@ -271,57 +294,61 @@ uint8_t Sh77xxScif::ReadReceiveData() {
     bool    drained = false;
     {
         std::lock_guard<std::mutex> lk(mu_);
-        if (RxEmptyLocked()) {
+        if (fifo_.RxEmpty()) {
             emu_.Get<Fatal>().Die("Sh77xxScif: SCFRDR read at 0x%08X with the receive FIFO empty", Channel().base);
         }
-        value = rx_[rx_pos_++];
-        if (rx_pos_ == rx_.size()) {
-            rx_.clear();
-            rx_pos_ = 0u;
-            drained = true;
-        }
-        UpdateRxFlagsLocked();
+        value = fifo_.PopReceive(fcr_, drained);
         DriveLocked();
     }
     if (drained) port_.NotifyRxDrained();
+    modem_.RefreshRts();
     return value;
 }
 
-bool Sh77xxScif::RxEmptyLocked() const { return rx_pos_ == rx_.size(); }
-
-size_t Sh77xxScif::RxCountLocked() const { return std::min(rx_.size() - rx_pos_, kFifoBytes); }
-
-size_t Sh77xxScif::TxTriggerLocked() const { return kTxTriggers[(fcr_ >> 4) & 3u]; }
-
-size_t Sh77xxScif::RxTriggerLocked() const { return kRxTriggers[(fcr_ >> 6) & 3u]; }
-
-void Sh77xxScif::UpdateRxFlagsLocked() {
-    const size_t count = RxCountLocked();
-    if (count >= RxTriggerLocked()) rdf_ = true;
-    else if (count > 0u) dr_ = true;
-}
-
 void Sh77xxScif::TakeTransmitLocked(std::vector<uint8_t>& out) {
-    if ((scr_ & kCtlTe) == 0u || tx_.empty()) return;
-    out.swap(tx_);
+    if ((scr_ & kCtlTe) == 0u) return;
+    if (modem_.HoldsTransmit(fcr_)) return;
+    fifo_.TakeTransmit(out);
     if (!IrdaModeLocked() && (smr_ & kModeChr) != 0u) {
         for (uint8_t& b : out) b = static_cast<uint8_t>(b & 0x7Fu);
     }
-    tend_ = true;
-    tdfe_ = true;
+}
+
+void Sh77xxScif::PostRelease() {
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        if (!Sh77xxScifModemLines::Enabled(fcr_) || !fifo_.TxHeld()) return;
+    }
+    jobs_->PostToGuestThread([this] { ReleaseHeldTransmit(); });
+}
+
+void Sh77xxScif::ReleaseHeldTransmit() {
+    std::vector<uint8_t> out;
+    bool                 powered = false;
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        TakeTransmitLocked(out);
+        powered = powered_;
+        DriveLocked();
+    }
+    DeliverTx(out, powered);
+}
+
+bool Sh77xxScif::RtsHigh() const {
+    std::lock_guard<std::mutex> lk(mu_);
+    return Sh77xxScifModemLines::RtsHigh(fcr_, fifo_.RxFull());
 }
 
 bool Sh77xxScif::IrdaModeLocked() const { return Channel().irda && (smr_ & kModeIrda) != 0u; }
 
-void Sh77xxScif::DeliverTx(const std::vector<uint8_t>& bytes, bool tx_wired) {
-    if (bytes.empty() || port_.DeliverTx(bytes.data(), bytes.size(), tx_wired)) return;
-    KernelDebugSink& sink = emu_.Get<KernelDebugSink>();
-    for (const uint8_t b : bytes) sink.EmitChar(static_cast<char>(b), tx_line_, Channel().name);
+void Sh77xxScif::DeliverTx(const std::vector<uint8_t>& bytes, bool powered) {
+    if (bytes.empty()) return;
+    emu_.Get<KernelDebugSink>().DeliverOrEmit(port_, bytes.data(), bytes.size(), powered, tx_line_, Channel().name);
 }
 
 void Sh77xxScif::DriveLocked() {
-    intc_->SetSourceRequest(Channel().txi, (scr_ & kCtlTie) != 0u && tdfe_);
-    intc_->SetSourceRequest(Channel().rxi, (scr_ & kCtlRie) != 0u && (rdf_ || dr_));
+    intc_->SetSourceRequest(Channel().txi, (scr_ & kCtlTie) != 0u && fifo_.TransmitRequest());
+    intc_->SetSourceRequest(Channel().rxi, (scr_ & kCtlRie) != 0u && fifo_.ReceiveRequest());
     intc_->SetSourceRequest(Channel().eri, false);
     intc_->SetSourceRequest(Channel().bri, false);
 }
@@ -332,35 +359,29 @@ void Sh77xxScif::PushRx(const uint8_t* data, size_t n) {
         std::lock_guard<std::mutex> lk(mu_);
         if ((scr_ & kCtlRe) == 0u || (fcr_ & kFifoRfrst) != 0u || stopped_ || !powered_) return;
         if (IrdaModeLocked() && (scr_ & kCtlTe) != 0u) return;
-        rx_.insert(rx_.end(), data, data + n);
-        UpdateRxFlagsLocked();
+        fifo_.PushReceive(data, n, fcr_);
         DriveLocked();
     }
     port_.MarkRx();
+    modem_.PostRtsRefresh();
 }
 
 bool Sh77xxScif::RxEmpty() const {
     std::lock_guard<std::mutex> lk(mu_);
-    return RxEmptyLocked();
+    return fifo_.RxEmpty();
 }
 
 void Sh77xxScif::SetRxDrainCallback(RxDrainFn cb) { port_.SetRxDrainCallback(std::move(cb)); }
 
 void Sh77xxScif::SetModemInputs(bool cts, bool dsr, bool ri, bool dcd) {
     wiring_->SetModemInputs(Channel().base, cts, dsr, ri, dcd);
+    PostRelease();
 }
 
 SerialLine::LineConfig Sh77xxScif::LineConfigLocked() const {
-    LineConfig c;
-    if (!IrdaModeLocked()) {
-        c.data_bits = (smr_ & kModeChr) != 0u ? 7u : 8u;
-        if ((smr_ & kModeParity) == 0u) c.parity = LineConfig::Parity::None;
-        else c.parity = (smr_ & kModeOdd) != 0u ? LineConfig::Parity::Odd : LineConfig::Parity::Even;
-        c.stop = (smr_ & kModeTwoStop) != 0u ? LineConfig::Stop::Two : LineConfig::Stop::One;
-    }
-    const GuestCycleClock::Rate pclk   = cpg_->PeripheralRate(frqcr_->Value());
-    const uint64_t              divide = kClocksPerBitBase << (2u * (smr_ & kModeClock));
-    c.baud = static_cast<uint32_t>(pclk.num / (pclk.den * divide * (static_cast<uint64_t>(brr_) + 1u)));
+    LineConfig c = IrdaModeLocked() ? LineConfig{} : Sh77xxSerialFrameFormat(smr_);
+    c.baud       = (scr_ & kCtlCke1) != 0u ? clock_->ClockHz(Channel()) / kExternalClocksPerBit
+                                           : Sh77xxSerialBaud(smr_, brr_, cpg_->PeripheralRate(frqcr_->Value()));
     return c;
 }
 
@@ -382,17 +403,24 @@ void Sh77xxScif::FireLineConfig() {
 }
 
 void Sh77xxScif::RefreshClockStop() {
-    const bool stopped = stbcr2_->ModuleStopped(Channel().mstp);
+    const bool stopped = stbcr2_ != nullptr && stbcr2_->ModuleStopped(Channel().mstp);
     std::lock_guard<std::mutex> lk(mu_);
     stopped_ = stopped;
 }
 
 void Sh77xxScif::RefreshConnection() {
-    const bool powered  = wiring_ != nullptr && wiring_->DriverPowered(Channel().base);
-    const bool tx_wired = powered && pfc_->PinMode(kSh77xxPortSc, Channel().data_pin) == kSh77xxPinModeOther;
+    const bool powered = wiring_ != nullptr && wiring_->DriverPowered(Channel().base);
     std::lock_guard<std::mutex> lk(mu_);
-    powered_  = powered;
-    tx_wired_ = tx_wired;
+    powered_ = powered;
+}
+
+void Sh77xxScif::PublishEnables() {
+    uint8_t control = 0u;
+    {
+        std::lock_guard<std::mutex> lk(mu_);
+        control = scr_;
+    }
+    pins_->PublishEnables(Channel(), (control & kCtlTe) != 0u, (control & kCtlRe) != 0u);
 }
 
 void Sh77xxScif::SetEndpoint(SerialEndpoint* ep) { port_.SetEndpoint(ep); }
@@ -402,19 +430,11 @@ void Sh77xxScif::ArmEndpointTimer(int64_t delay_ns) { port_.ArmTimer(delay_ns); 
 void Sh77xxScif::DisarmEndpointTimer() { port_.DisarmTimer(); }
 
 bool Sh77xxScif::InitializeLocked() {
-    const bool had_rx = !RxEmptyLocked();
-    smr_       = 0x00u;
-    brr_       = 0xFFu;
-    scr_       = 0x00u;
-    fcr_       = 0x00u;
-    read_ones_ = 0u;
-    tend_      = true;
-    tdfe_      = true;
-    rdf_       = false;
-    dr_        = false;
-    tx_.clear();
-    rx_.clear();
-    rx_pos_ = 0u;
+    smr_              = 0x00u;
+    brr_              = 0xFFu;
+    scr_              = 0x00u;
+    fcr_              = 0x00u;
+    const bool had_rx = fifo_.Reset();
     DriveLocked();
     return had_rx;
 }
@@ -428,6 +448,12 @@ void Sh77xxScif::Initialize() {
     if (had_rx) port_.NotifyRxDrained();
 }
 
+void Sh77xxScif::EnterStandby() {
+    Initialize();
+    PublishEnables();
+    modem_.RefreshRts();
+}
+
 void Sh77xxScif::SaveState(StateWriter& w) {
     port_.SaveCradleState(w);
     {
@@ -436,21 +462,14 @@ void Sh77xxScif::SaveState(StateWriter& w) {
         w.Write("brr", brr_);
         w.Write("scr", scr_);
         w.Write("fcr", fcr_);
-        w.Write("read_ones", read_ones_);
-        w.Write("tend", tend_);
-        w.Write("tdfe", tdfe_);
-        w.Write("rdf", rdf_);
-        w.Write("dr", dr_);
-        w.Write<uint64_t>("tx_count", tx_.size());
-        if (!tx_.empty()) w.WriteBytes("tx", tx_.data(), tx_.size());
-        w.Write<uint64_t>("rx_count", rx_.size() - rx_pos_);
-        if (!RxEmptyLocked()) w.WriteBytes("rx", rx_.data() + rx_pos_, rx_.size() - rx_pos_);
+        fifo_.SaveState(w);
     }
     endpoint_timer_.SaveLineTimer(w, "endpoint_timer_");
     port_.SaveEndpointState(w);
 }
 
 void Sh77xxScif::RestoreState(StateReader& r) {
+    emu_.Get<KernelDebugSink>().FlushLine(tx_line_, Channel().name);
     port_.RestoreCradleState(r);
     {
         std::lock_guard<std::mutex> lk(mu_);
@@ -458,20 +477,7 @@ void Sh77xxScif::RestoreState(StateReader& r) {
         r.Read("brr", brr_);
         r.Read("scr", scr_);
         r.Read("fcr", fcr_);
-        r.Read("read_ones", read_ones_);
-        r.Read("tend", tend_);
-        r.Read("tdfe", tdfe_);
-        r.Read("rdf", rdf_);
-        r.Read("dr", dr_);
-        uint64_t tx_count = 0u;
-        r.Read("tx_count", tx_count);
-        tx_.assign(static_cast<size_t>(tx_count), 0u);
-        if (!tx_.empty()) r.ReadBytes("tx", tx_.data(), tx_.size());
-        uint64_t rx_count = 0u;
-        r.Read("rx_count", rx_count);
-        rx_.assign(static_cast<size_t>(rx_count), 0u);
-        rx_pos_ = 0u;
-        if (!rx_.empty()) r.ReadBytes("rx", rx_.data(), rx_.size());
+        fifo_.RestoreState(r);
     }
     endpoint_timer_.RestoreLineTimer(r, "endpoint_timer_");
     port_.RestoreEndpointState(r);
@@ -479,13 +485,12 @@ void Sh77xxScif::RestoreState(StateReader& r) {
 
 void Sh77xxScif::PostRestore() {
     endpoint_timer_.ResumeLineTimer();
-    RefreshClockStop();
-    RefreshConnection();
     {
         std::lock_guard<std::mutex> lk(mu_);
         DriveLocked();
     }
-    FireLineConfig();
+    Resync();
+    PostRelease();
     port_.PostRestore();
 }
 

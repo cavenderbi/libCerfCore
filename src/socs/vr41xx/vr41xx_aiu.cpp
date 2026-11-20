@@ -3,7 +3,6 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/boards/board_context.h>
-#include "../../execution/engine_bridge.h"
 #include "../../execution/guest_cycle_clock.h"
 #include "../vr4102/vr4102_id.h"
 #include "../vr4111/vr4111_id.h"
@@ -12,12 +11,12 @@
 #include <cerfcore/state/hibernation.h>
 #include <cerfcore/state/state_stream.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
-#include <cerfengine/mips/mips_interrupt_channel.h>
+#include "vr41xx_aiu_interrupts.h"
 #include "vr41xx_aiu_mic.h"
 #include "vr41xx_aiu_speaker.h"
 #include "vr41xx_audio_switch.h"
 #include "vr41xx_cmu.h"
-#include "vr41xx_icu.h"
+#include "vr41xx_unit_clock_gate.h"
 
 #include <cstdint>
 
@@ -73,10 +72,10 @@ public:
     uint16_t ReadHalf(uint32_t addr) override;
     void     WriteHalf(uint32_t addr, uint16_t value) override;
 
-    uint8_t  ReadByte (uint32_t addr) override { HaltUnsupportedAccess("AIU ReadByte", addr, 0); }
-    uint32_t ReadWord (uint32_t addr) override { HaltUnsupportedAccess("AIU ReadWord", addr, 0); }
-    void WriteByte(uint32_t addr, uint8_t  v) override { HaltUnsupportedAccess("AIU WriteByte", addr, v); }
-    void WriteWord(uint32_t addr, uint32_t v) override { HaltUnsupportedAccess("AIU WriteWord", addr, v); }
+    uint32_t ReadWord  (uint32_t addr) override { return ReadWordAsHalves(addr); }
+    uint64_t ReadDword (uint32_t addr) override { return ReadDwordAsHalves(addr); }
+    void     WriteWord (uint32_t addr, uint32_t v) override { WriteWordAsHalves(addr, v); }
+    void     WriteDword(uint32_t addr, uint64_t v) override { WriteDwordAsHalves(addr, v); }
 
     void SyncDma() override {
         speaker_.CatchUp();
@@ -96,12 +95,8 @@ private:
         speaker_.Settle();
         mic_.Settle();
     }
-    void RaiseAiuInt(uint16_t bits) override {
-        if ((int_ | bits) == int_) return;
-        int_ = static_cast<uint16_t>(int_ | bits);
-        Publish();
-    }
-    bool AiuIntPending(uint16_t bits) const override { return (int_ & bits) == bits; }
+    void RaiseAiuInt(uint16_t bits) override { ints_.Raise(bits); }
+    bool AiuIntPending(uint16_t bits) const override { return ints_.Pending(bits); }
     bool StopAfterOnePage(Vr41xxAiuChannel channel) const override { return (CntReg(channel) & kCntStopOpen) != 0u; }
     bool ConverterEnabled(Vr41xxAiuChannel channel) const override { return (CntReg(channel) & kCntEnable) != 0u; }
     uint16_t CntReg(Vr41xxAiuChannel channel) const { return channel == Vr41xxAiuChannel::Out ? scnt_ : mcnt_; }
@@ -110,41 +105,24 @@ private:
     void WriteSeq(uint16_t value);
     void ClearInt(uint16_t value);
     void ResetUnit();
-    void RefreshClock();
     void ApplyClock();
-    void Publish() { icu_->SetAiuSource(int_); }
 
-    Vr41xxAiuSpeaker                  speaker_;
-    Vr41xxAiuMic                      mic_;
-    Vr41xxIcu*                        icu_     = nullptr;
-    Vr41xxCmu*                        cmu_     = nullptr;
-    cerfengine::MipsInterruptChannel* channel_ = nullptr;
-    uint16_t                          scnt_    = 0u;
-    uint16_t                          mcnt_    = 0u;
-    uint16_t                          int_     = 0u;
-    bool                              clock_supplied_ = false;
-    bool                              suspended_      = false;
+    Vr41xxAiuSpeaker    speaker_;
+    Vr41xxAiuMic        mic_;
+    Vr41xxAiuInterrupts ints_{emu_};
+    Vr41xxUnitClockGate gate_{emu_};
+    uint16_t            scnt_ = 0u;
+    uint16_t            mcnt_ = 0u;
 };
 
 void Vr41xxAiu::OnReady() {
     emu_.Get<PeripheralDispatcher>().Register(this);
-    icu_     = &emu_.Get<Vr41xxIcu>();
-    cmu_     = &emu_.Get<Vr41xxCmu>();
-    channel_ = &emu_.Get<EngineBridge>().Engine().Get<cerfengine::MipsInterruptChannel>();
+    ints_.Attach();
     speaker_.AttachHost();
     mic_.AttachHost();
 
-    auto& reset = emu_.Get<GuestCpuReset>();
-    reset.RegisterResetListener([this](ResetLineKind) { ResetUnit(); });
-    reset.RegisterResetReleaseListener([this] { RefreshClock(); });
-    cmu_->RegisterClockListener(kCmuMskAiu, [this](bool supplied_after) {
-        clock_supplied_ = supplied_after;
-        ApplyClock();
-    });
-    channel_->RegisterSuspendListener([this] {
-        suspended_ = channel_->Suspended();
-        ApplyClock();
-    });
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) { ResetUnit(); });
+    gate_.Attach(kCmuMskAiu, [this] { ApplyClock(); });
     emu_.Get<GuestCycleClock>().RegisterRateListener([this] {
         speaker_.RescaleClock();
         mic_.RescaleClock();
@@ -154,7 +132,7 @@ void Vr41xxAiu::OnReady() {
         mic_.SwitchChanged();
     });
     emu_.Get<Hibernation>().RegisterPreSaveListener([this] { SyncDma(); });
-    RefreshClock();
+    gate_.Refresh();
 }
 
 uint16_t Vr41xxAiu::ReadHalf(uint32_t addr) {
@@ -171,7 +149,7 @@ uint16_t Vr41xxAiu::ReadHalf(uint32_t addr) {
         case kOffDvalid:  return static_cast<uint16_t>(speaker_.ValidBits() | mic_.ValidBits());
         case kOffSeq:
             return static_cast<uint16_t>((mic_.Enabled() ? kSeqAiumen : 0u) | (speaker_.Enabled() ? kSeqAiusen : 0u));
-        case kOffInt:     return int_;
+        case kOffInt:     return ints_.Bits();
         default: HaltUnsupportedAccess("AIU ReadHalf", addr, 0);
     }
 }
@@ -213,12 +191,9 @@ void Vr41xxAiu::WriteSeq(uint16_t value) {
 }
 
 void Vr41xxAiu::ClearInt(uint16_t value) {
-    const uint16_t cleared = static_cast<uint16_t>(int_ & value & kIntCauseMask);
-    if (cleared == 0u) return;
-    int_ = static_cast<uint16_t>(int_ & ~cleared);
+    const uint16_t cleared = ints_.Clear(static_cast<uint16_t>(value & kIntCauseMask));
     speaker_.ReleaseStops(cleared);
     mic_.ReleaseStops(cleared);
-    Publish();
 }
 
 void Vr41xxAiu::ResetUnit() {
@@ -226,18 +201,11 @@ void Vr41xxAiu::ResetUnit() {
     mic_.Reset();
     scnt_ = 0u;
     mcnt_ = 0u;
-    int_  = 0u;
-    Publish();
-}
-
-void Vr41xxAiu::RefreshClock() {
-    clock_supplied_ = cmu_->SuppliedClocks(kCmuMskAiu) != 0u;
-    suspended_      = channel_->Suspended();
-    ApplyClock();
+    ints_.Reset();
 }
 
 void Vr41xxAiu::ApplyClock() {
-    const bool running = clock_supplied_ && !suspended_;
+    const bool running = gate_.Running();
     speaker_.SetClockRunning(running);
     mic_.SetClockRunning(running);
 }
@@ -245,22 +213,17 @@ void Vr41xxAiu::ApplyClock() {
 void Vr41xxAiu::SaveState(StateWriter& w) {
     w.Write("scnt", scnt_);
     w.Write("mcnt", mcnt_);
-    w.Write("int", int_);
-    w.Write<uint8_t>("clock_supplied", clock_supplied_ ? 1u : 0u);
-    w.Write<uint8_t>("suspended", suspended_ ? 1u : 0u);
+    ints_.Save(w);
+    gate_.Save(w);
     speaker_.Save(w);
     mic_.Save(w);
 }
 
 void Vr41xxAiu::RestoreState(StateReader& r) {
-    uint8_t supplied = 0u, suspended = 0u;
     r.Read("scnt", scnt_);
     r.Read("mcnt", mcnt_);
-    r.Read("int", int_);
-    r.Read("clock_supplied", supplied);
-    r.Read("suspended", suspended);
-    clock_supplied_ = supplied != 0u;
-    suspended_      = suspended != 0u;
+    ints_.Restore(r);
+    gate_.Restore(r);
     speaker_.Restore(r);
     mic_.Restore(r);
 }
@@ -268,8 +231,8 @@ void Vr41xxAiu::RestoreState(StateReader& r) {
 void Vr41xxAiu::PostRestore() {
     speaker_.PostRestore();
     mic_.PostRestore();
-    RefreshClock();
-    Publish();
+    gate_.Refresh();
+    ints_.Publish();
 }
 
 }

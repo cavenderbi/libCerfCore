@@ -14,8 +14,9 @@ class CompactFlashMedia {
 public:
     CompactFlashMedia(CerfEmulator& emu, const std::string& image_path);
 
-    bool     IsOpen() const { return image_.IsOpen(); }
-    uint64_t TotalSectors() const { return image_.TotalSectors(); }
+    bool               IsOpen() const { return image_.IsOpen(); }
+    uint64_t           TotalSectors() const { return image_.TotalSectors(); }
+    const std::string& Serial() const { return serial_; }
 
     CompactFlashAddressFault Check(const CompactFlashTaskFile& tf) const;
     CompactFlashAddressFault Seek(const CompactFlashTaskFile& tf) const;
@@ -30,6 +31,7 @@ private:
 
     CerfEmulator&     emu_;
     CompactFlashImage image_;
+    std::string       serial_;
 };
 
 }

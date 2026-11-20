@@ -21,14 +21,19 @@ constexpr uint8_t kAdf          = 0x80u;
 constexpr uint8_t kAdie         = 0x40u;
 constexpr uint8_t kAdst         = 0x20u;
 constexpr uint8_t kMulti        = 0x10u;
+constexpr uint8_t kCks          = 0x08u;
 constexpr uint8_t kChannel      = 0x07u;
 constexpr uint8_t kGroup        = 0x04u;
 constexpr uint8_t kGroupChannel = 0x03u;
 constexpr uint8_t kStoredStatus = 0x5Fu;
+constexpr uint8_t kSelection    = kMulti | kCks | kChannel;
+
+constexpr uint8_t kSingleChannel0Selection = 0x00u;
+
+constexpr uint64_t kRepeatConversionStates     = 256u;
+constexpr uint64_t kRepeatConversionStatesFast = 128u;
 
 constexpr uint8_t kTriggerEnable = 0xC0u;
-
-constexpr uint8_t kStbcr2Mstp5 = 0x04u;
 
 constexpr const char* kDataNames[4] = {"addra", "addrb", "addrc", "addrd"};
 
@@ -39,6 +44,12 @@ void Sh77xxAdc::OnReady() {
     dmac_   = &emu_.Get<Sh77xxDmac>();
     stbcr2_ = &emu_.Get<Sh77xxStbcr2>();
     inputs_ = &emu_.Get<Sh77xxAnalogInputs>();
+    clock_  = &emu_.Get<GuestCycleClock>();
+    event_  = clock_->Add([this] {
+        Sync();
+        Drive();
+    });
+    pclk_.Attach([this] { Arm(); });
     emu_.Get<Sh77xxStandbyEntry>().RegisterListener([this] { Initialize(); });
     emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) { Initialize(); });
     Initialize();
@@ -61,6 +72,10 @@ void Sh77xxAdc::WriteByte(uint32_t addr, uint8_t value) {
     }
     if (off == kOffControl) {
         if ((value & Control().write_zero) != 0u) HaltUnsupportedAccess("WriteByte", addr, value);
+        if (scanning_ && ((value ^ adcr_) & Control().scan) != 0u) {
+            emu_.Get<Fatal>().Die("Sh77xxAdc: ADCR 0x%02X changes the scan selection during a scan with ADCR 0x%02X", value,
+                                  adcr_);
+        }
         adcr_ = static_cast<uint8_t>(value & Control().stored);
         return;
     }
@@ -68,6 +83,7 @@ void Sh77xxAdc::WriteByte(uint32_t addr, uint8_t value) {
 }
 
 uint8_t Sh77xxAdc::ReadData(uint32_t offset) {
+    Sync();
     const uint16_t data = data_[offset / kDataStride];
     uint8_t        value;
     if ((offset & kDataLowByte) == 0u) {
@@ -89,32 +105,42 @@ uint8_t Sh77xxAdc::ReadData(uint32_t offset) {
 }
 
 uint8_t Sh77xxAdc::ReadControlStatus() {
+    Sync();
     if (end_) end_read_ = true;
-    return static_cast<uint8_t>((end_ ? kAdf : 0u) | control_);
+    return static_cast<uint8_t>((end_ ? kAdf : 0u) | control_ | (scanning_ ? kAdst : 0u));
 }
 
 void Sh77xxAdc::WriteControlStatus(uint8_t value) {
+    Sync();
     if ((value & kAdf) == 0u && end_read_) ClearEndFlag();
-    control_ = static_cast<uint8_t>(value & kStoredStatus);
-    if ((value & kAdst) != 0u) Convert();
+    const uint8_t control = static_cast<uint8_t>(value & kStoredStatus);
+    const bool    adst    = (value & kAdst) != 0u;
+    if (scanning_ && adst && ((control ^ control_) & kSelection) != 0u &&
+        (control & kSelection) != kSingleChannel0Selection) {
+        emu_.Get<Fatal>().Die("Sh77xxAdc: ADCSR 0x%02X changes the conversion selection during a scan with ADCSR 0x%02X",
+                              value, control_ | kAdst);
+    }
+    if (scanning_ && (!adst || ((control ^ control_) & kSelection) != 0u)) StopScan();
+    control_ = control;
+    if (adst && !scanning_) Start();
     Drive();
 }
 
 void Sh77xxAdc::ExternalTrigger() {
-    if ((adcr_ & kTriggerEnable) != kTriggerEnable) return;
-    Convert();
+    if ((adcr_ & kTriggerEnable) != kTriggerEnable || scanning_) return;
+    Start();
     Drive();
 }
 
+void Sh77xxAdc::Start() {
+    RequireClock();
+    Convert();
+    if (!Scans()) return;
+    scanning_  = true;
+    next_pass_ = pclk_.DividedTicks(0u) + PassTicks();
+}
+
 void Sh77xxAdc::Convert() {
-    if (stbcr2_->ModuleStopped(kStbcr2Mstp5)) {
-        emu_.Get<Fatal>().Die("Sh77xxAdc: conversion with ADCSR 0x%02X while STBCR2 MSTP5 stops the A/D clock",
-                              control_ | kAdst);
-    }
-    if ((control_ & kMulti) != 0u && (adcr_ & Control().scan) != 0u) {
-        emu_.Get<Fatal>().Die("Sh77xxAdc: scan-mode conversion with ADCSR 0x%02X and ADCR 0x%02X", control_ | kAdst,
-                              adcr_);
-    }
     const uint32_t channel = control_ & kChannel;
     if ((control_ & kMulti) != 0u) {
         const uint32_t first = channel & kGroup;
@@ -125,6 +151,43 @@ void Sh77xxAdc::Convert() {
     end_ = true;
 }
 
+void Sh77xxAdc::RequireClock() const {
+    if (stbcr2_->ModuleStopped(Stbcr2ModuleStop())) {
+        emu_.Get<Fatal>().Die("Sh77xxAdc: conversion with ADCSR 0x%02X while STBCR2 stops the A/D clock",
+                              control_ | kAdst);
+    }
+}
+
+bool Sh77xxAdc::Scans() const {
+    if ((control_ & kMulti) == 0u) return false;
+    return Control().multi_scans || (adcr_ & Control().scan) != 0u;
+}
+
+uint64_t Sh77xxAdc::PassTicks() const {
+    const uint64_t channels = (control_ & kGroupChannel) + 1u;
+    return channels * ((control_ & kCks) != 0u ? kRepeatConversionStatesFast : kRepeatConversionStates);
+}
+
+void Sh77xxAdc::Sync() {
+    if (!scanning_) return;
+    const uint64_t now = pclk_.DividedTicks(0u);
+    if (now < next_pass_) return;
+    RequireClock();
+    const uint64_t period = PassTicks();
+    next_pass_ += ((now - next_pass_) / period + 1u) * period;
+    Convert();
+}
+
+void Sh77xxAdc::Arm() {
+    if (!scanning_ || end_ || (control_ & kAdie) == 0u) {
+        clock_->Disarm(event_);
+        return;
+    }
+    clock_->Arm(event_, pclk_.CycleOfDividedTick(next_pass_, 0u));
+}
+
+void Sh77xxAdc::StopScan() { scanning_ = false; }
+
 void Sh77xxAdc::ClearEndFlag() {
     end_      = false;
     end_read_ = false;
@@ -133,6 +196,7 @@ void Sh77xxAdc::ClearEndFlag() {
 bool Sh77xxAdc::Interrupting() const { return end_ && (control_ & kAdie) != 0u; }
 
 void Sh77xxAdc::Drive() {
+    Arm();
     if (Interrupting()) {
         dmac_->Request(Sh77xxDmaRequest::kAd);
     } else if (!dmac_->Transferring(Sh77xxDmaRequest::kAd)) {
@@ -148,6 +212,7 @@ void Sh77xxAdc::Initialize() {
     adcr_        = 0u;
     temp_loaded_ = false;
     ClearEndFlag();
+    StopScan();
     Drive();
 }
 
@@ -159,6 +224,10 @@ void Sh77xxAdc::SaveState(StateWriter& w) {
     w.Write("end", end_);
     w.Write("end_read", end_read_);
     w.Write("temp_loaded", temp_loaded_);
+    const uint64_t now = scanning_ ? pclk_.DividedTicks(0u) : 0u;
+    w.Write("scanning", scanning_);
+    w.Write("ticks_to_pass", scanning_ && now < next_pass_ ? next_pass_ - now : uint64_t{0u});
+    pclk_.Save(w);
 }
 
 void Sh77xxAdc::RestoreState(StateReader& r) {
@@ -169,8 +238,15 @@ void Sh77xxAdc::RestoreState(StateReader& r) {
     r.Read("end", end_);
     r.Read("end_read", end_read_);
     r.Read("temp_loaded", temp_loaded_);
+    r.Read("scanning", scanning_);
+    r.Read("ticks_to_pass", restored_ticks_to_pass_);
+    pclk_.Restore(r);
 }
 
-void Sh77xxAdc::PostRestore() { Drive(); }
+void Sh77xxAdc::PostRestore() {
+    pclk_.PostRestore();
+    if (scanning_) next_pass_ = pclk_.DividedTicks(0u) + restored_ticks_to_pass_;
+    Drive();
+}
 
 }

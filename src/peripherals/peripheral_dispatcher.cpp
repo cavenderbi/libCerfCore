@@ -12,6 +12,12 @@
 
 namespace cerfcore {
 
+namespace {
+
+constexpr char kGatedBusTag[] = "PeripheralDispatcher bus gate";
+
+}
+
 REGISTER_SERVICE(PeripheralDispatcher);
 
 std::vector<Peripheral*> PeripheralDispatcher::RegisteredPeripherals() const {
@@ -60,125 +66,95 @@ void PeripheralDispatcher::Register(Peripheral* p) {
 
 PeripheralDispatcher::DataInversionId PeripheralDispatcher::InstallDataInversion(
     uint32_t base, uint32_t end) {
-    if (base >= end) {
-        emu_.Get<Fatal>().Die("PeripheralDispatcher::InstallDataInversion empty range "
-                              "[0x%08X..0x%08X)", base, end);
-    }
     if (emu_.Get<EmulatedMemory>().OverlapsRegion(base, end - base)) {
         emu_.Get<Fatal>().Die("PeripheralDispatcher::InstallDataInversion [0x%08X..0x%08X) "
                               "overlaps backed memory", base, end);
     }
-    std::lock_guard<std::mutex> lock(table_mutex_);
-    if (inversions_.size() >= kMaxDataInversions) {
-        emu_.Get<Fatal>().Die("PeripheralDispatcher::InstallDataInversion [0x%08X..0x%08X) "
-                              "past %u ranges", base, end, kMaxDataInversions);
-    }
-    if (OverlapsDataInversionLocked(base, end)) {
-        emu_.Get<Fatal>().Die("PeripheralDispatcher::InstallDataInversion [0x%08X..0x%08X) "
-                              "overlaps another inversion range", base, end);
-    }
-    inversions_.push_back({base, end});
-    table_by_active_.clear();
-    PublishLocked();
-
-    LOG(Periph, "InstallDataInversion 0x%08X..0x%08X\n", base, end);
-    return static_cast<DataInversionId>(inversions_.size() - 1u);
+    const DataInversionId id = InstallRange(inversions_, base, end, false);
+    LOG(Periph, "InstallDataInversion %u 0x%08X..0x%08X\n", id, base, end);
+    return id;
 }
 
 void PeripheralDispatcher::SetDataInversion(DataInversionId id, bool inverting) {
-    std::lock_guard<std::mutex> lock(table_mutex_);
-    if (id >= inversions_.size()) {
-        emu_.Get<Fatal>().Die("PeripheralDispatcher::SetDataInversion unknown range %u", id);
-    }
-    const uint32_t bit    = 1u << id;
-    const uint32_t active = inverting ? (active_inversions_ | bit) : (active_inversions_ & ~bit);
-    if (active == active_inversions_) return;
-    active_inversions_ = active;
-    PublishLocked();
-
+    if (!SwitchRange(inversions_, id, inverting)) return;
     const EntryTable* live = live_.load(std::memory_order_acquire);
     const auto wrapped = std::count_if(live->begin(), live->end(),
         [](const Entry& e) { return e.inverted != nullptr; });
-    LOG(Periph, "SetDataInversion range %u %s: active 0x%X, %d of %zu entries wrapped\n",
-        id, inverting ? "on" : "off", active, static_cast<int>(wrapped), live->size());
+    LOG(Periph, "SetDataInversion range %u %s: %d of %zu entries wrapped\n", id, inverting ? "on" : "off",
+        static_cast<int>(wrapped), live->size());
 }
 
 PeripheralDispatcher::HalfwordPortId PeripheralDispatcher::InstallHalfwordPort(
     uint32_t base, uint32_t end, bool active) {
-    std::lock_guard<std::mutex> lock(table_mutex_);
-    const auto id = static_cast<HalfwordPortId>(halfword_ports_.size());
-    halfword_ports_.push_back({base, end});
-    if (active) active_halfword_ports_ |= 1u << id;
-    table_by_active_.clear();
-    PublishLocked();
-
+    const HalfwordPortId id = InstallRange(halfword_ports_, base, end, active);
     LOG(Periph, "InstallHalfwordPort %u 0x%08X..0x%08X %s\n", id, base, end,
         active ? "on" : "off");
     return id;
 }
 
 void PeripheralDispatcher::SetHalfwordPort(HalfwordPortId id, bool active) {
-    std::lock_guard<std::mutex> lock(table_mutex_);
-    const uint32_t bit  = 1u << id;
-    const uint32_t next = active ? (active_halfword_ports_ | bit) : (active_halfword_ports_ & ~bit);
-    if (next == active_halfword_ports_) return;
-    active_halfword_ports_ = next;
-    PublishLocked();
+    if (SwitchRange(halfword_ports_, id, active)) LOG(Periph, "SetHalfwordPort %u %s\n", id, active ? "on" : "off");
+}
 
-    LOG(Periph, "SetHalfwordPort %u %s\n", id, active ? "on" : "off");
+PeripheralDispatcher::BusGateId PeripheralDispatcher::InstallBusGate(uint32_t base, uint32_t end) {
+    const BusGateId id = InstallRange(gates_, base, end, false);
+    LOG(Periph, "InstallBusGate %u 0x%08X..0x%08X\n", id, base, end);
+    return id;
+}
+
+void PeripheralDispatcher::SetBusGate(BusGateId id, bool closed) {
+    if (SwitchRange(gates_, id, closed)) LOG(Periph, "SetBusGate %u %s\n", id, closed ? "closed" : "open");
 }
 
 bool PeripheralDispatcher::OverlapsDataInversion(uint32_t base, uint32_t size) const {
     std::lock_guard<std::mutex> lock(table_mutex_);
-    return OverlapsDataInversionLocked(base, uint64_t{base} + size);
+    return inversions_.Overlapping(base, uint64_t{base} + size) != nullptr;
 }
 
-bool PeripheralDispatcher::OverlapsDataInversionLocked(uint32_t base, uint64_t end) const {
-    for (const BusRange& r : inversions_) {
-        if (base < r.end && r.base < end) return true;
+uint32_t PeripheralDispatcher::InstallRange(BusRangeSet& set, uint32_t base, uint32_t end, bool on) {
+    std::lock_guard<std::mutex> lock(table_mutex_);
+    const uint32_t id = set.Add(base, end, on);
+    table_by_active_.clear();
+    PublishLocked();
+    return id;
+}
+
+bool PeripheralDispatcher::SwitchRange(BusRangeSet& set, uint32_t id, bool on) {
+    std::lock_guard<std::mutex> lock(table_mutex_);
+    if (!set.Set(id, on)) return false;
+    PublishLocked();
+    return true;
+}
+
+const BusRangeSet::Range* PeripheralDispatcher::RangeOfLocked(const BusRangeSet& set, const char* kind,
+                                                              const Entry& entry) const {
+    const BusRangeSet::Range* r = set.Overlapping(entry.base, uint64_t{entry.last} + 1u);
+    if (r != nullptr && (entry.base < r->base || entry.last >= r->end)) {
+        emu_.Get<Fatal>().Die("PeripheralDispatcher: %s at [0x%08X..0x%08X] crosses the edge of %s [0x%08X..0x%08X)",
+                              typeid(*entry.p).name(), entry.base, entry.last, kind, r->base, r->end);
     }
-    return false;
+    return r;
 }
 
-const PeripheralDispatcher::BusRange* PeripheralDispatcher::InversionRangeOf(
-    const Entry& entry) const {
-    for (const BusRange& r : inversions_) {
-        if (entry.base < r.end && r.base <= entry.last) {
-            if (entry.base < r.base || entry.last >= r.end) {
-                emu_.Get<Fatal>().Die("PeripheralDispatcher: %s at [0x%08X..0x%08X] crosses the "
-                                      "edge of data inversion range [0x%08X..0x%08X)",
-                                      typeid(*entry.p).name(), entry.base, entry.last, r.base,
-                                      r.end);
-            }
-            return &r;
-        }
-    }
-    return nullptr;
-}
-
-bool PeripheralDispatcher::InHalfwordPortLocked(const Entry& entry) const {
-    for (size_t i = 0; i < halfword_ports_.size(); ++i) {
-        const BusRange& r = halfword_ports_[i];
-        if ((active_halfword_ports_ & (1u << i)) != 0u && entry.base >= r.base && entry.base < r.end)
-            return true;
-    }
-    return false;
-}
-
-uint64_t PeripheralDispatcher::ActiveRoutingLocked() const {
-    return (static_cast<uint64_t>(active_halfword_ports_) << 32) | active_inversions_;
+PeripheralDispatcher::RoutingKey PeripheralDispatcher::ActiveRoutingLocked() const {
+    RoutingKey key;
+    halfword_ports_.AppendStates(key);
+    inversions_.AppendStates(key);
+    gates_.AppendStates(key);
+    return key;
 }
 
 void PeripheralDispatcher::PublishLocked() {
     const EntryTable* published = nullptr;
-    const uint64_t routing = ActiveRoutingLocked();
+    const RoutingKey routing = ActiveRoutingLocked();
     const auto cached = table_by_active_.find(routing);
     if (cached != table_by_active_.end()) {
         published = cached->second;
     } else {
         auto next = std::make_unique<EntryTable>(entries_);
         for (Entry& e : *next) {
-            if (InHalfwordPortLocked(e)) {
+            const BusRangeSet::Range* port = RangeOfLocked(halfword_ports_, "halfword port", e);
+            if (port != nullptr && port->on) {
                 if (e.read != e.p->Peripheral::FastReader() || e.write != e.p->Peripheral::FastWriter()) {
                     emu_.Get<Fatal>().Die("PeripheralDispatcher: %s at [0x%08X..0x%08X] has its own MMIO "
                                           "thunks inside a halfword port", typeid(*e.p).name(), e.base,
@@ -187,10 +163,17 @@ void PeripheralDispatcher::PublishLocked() {
                 e.read  = &Peripheral::SplitWordRead;
                 e.write = &Peripheral::SplitWordWrite;
             }
-            const BusRange* r = InversionRangeOf(e);
-            if (!r) continue;
-            const uint32_t index = static_cast<uint32_t>(r - inversions_.data());
-            if ((active_inversions_ & (1u << index)) == 0u) continue;
+            const BusRangeSet::Range* gate = RangeOfLocked(gates_, "bus gate", e);
+            if (gate != nullptr && gate->on) {
+                gated_targets_.push_back(std::make_unique<GatedTarget>(GatedTarget{&gated_bus_, e.base}));
+                e.read     = &GatedRead;
+                e.write    = &GatedWrite;
+                e.context  = gated_targets_.back().get();
+                e.inverted = nullptr;
+                continue;
+            }
+            const BusRangeSet::Range* r = RangeOfLocked(inversions_, "data inversion range", e);
+            if (r == nullptr || !r->on) continue;
             inverted_targets_.push_back(std::make_unique<InvertedTarget>(
                 InvertedTarget{e.read, e.write, e.context}));
             InvertedTarget* t = inverted_targets_.back().get();
@@ -229,6 +212,19 @@ void PeripheralDispatcher::InvertedWrite(void* ctx, uint32_t off, uint32_t value
                                          uint32_t width_bytes) {
     const auto* t = static_cast<const InvertedTarget*>(ctx);
     t->write(t->ctx, off, ~value & cerf::ByteWidthMask(width_bytes), width_bytes);
+}
+
+uint32_t PeripheralDispatcher::GatedRead(void* ctx, uint32_t off, uint32_t width_bytes) {
+    const auto* t = static_cast<const GatedTarget*>(ctx);
+    if (width_bytes == 1u) return t->bus->Read8(kGatedBusTag, t->entry_base + off);
+    if (width_bytes == 2u) return t->bus->Read16(kGatedBusTag, t->entry_base + off);
+    return t->bus->Read32(kGatedBusTag, t->entry_base + off);
+}
+
+void PeripheralDispatcher::GatedWrite(void* ctx, uint32_t off, uint32_t value, uint32_t width_bytes) {
+    (void)value;
+    const auto* t = static_cast<const GatedTarget*>(ctx);
+    t->bus->Write(kGatedBusTag, width_bytes * 8u, t->entry_base + off);
 }
 
 bool PeripheralDispatcher::IsPeripheralAddress(uint32_t addr) const {

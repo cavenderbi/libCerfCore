@@ -25,21 +25,21 @@ constexpr uint32_t kPcmcia1Channel = 1u;
 constexpr uint8_t kFunctionOutputs[kPorts] = {0xCCu, 0xA8u, 0x1Fu, 0x0Cu};
 
 struct Pcmcia1InputPin {
-    bool Hd64461Pcc::SocketPins::*level;
-    uint32_t                     port;
-    uint8_t                      mask;
+    bool HitachiPccSocketPins::*level;
+    uint32_t                   port;
+    uint8_t                    mask;
 };
 
 constexpr Pcmcia1InputPin kPcmcia1InputPins[] = {
-    {&Hd64461Pcc::SocketPins::wait, Hd64461Gpio::kPortC, 0x20u},
-    {&Hd64461Pcc::SocketPins::cd1, Hd64461Gpio::kPortC, 0x40u},
-    {&Hd64461Pcc::SocketPins::cd2, Hd64461Gpio::kPortC, 0x80u},
-    {&Hd64461Pcc::SocketPins::vs1, Hd64461Gpio::kPortD, 0x01u},
-    {&Hd64461Pcc::SocketPins::vs2, Hd64461Gpio::kPortD, 0x02u},
-    {&Hd64461Pcc::SocketPins::write_protect, Hd64461Gpio::kPortD, 0x10u},
-    {&Hd64461Pcc::SocketPins::ready, Hd64461Gpio::kPortD, 0x20u},
-    {&Hd64461Pcc::SocketPins::bvd1, Hd64461Gpio::kPortD, 0x40u},
-    {&Hd64461Pcc::SocketPins::bvd2, Hd64461Gpio::kPortD, 0x80u},
+    {&HitachiPccSocketPins::wait, Hd64461Gpio::kPortC, 0x20u},
+    {&HitachiPccSocketPins::cd1, Hd64461Gpio::kPortC, 0x40u},
+    {&HitachiPccSocketPins::cd2, Hd64461Gpio::kPortC, 0x80u},
+    {&HitachiPccSocketPins::vs1, Hd64461Gpio::kPortD, 0x01u},
+    {&HitachiPccSocketPins::vs2, Hd64461Gpio::kPortD, 0x02u},
+    {&HitachiPccSocketPins::write_protect, Hd64461Gpio::kPortD, 0x10u},
+    {&HitachiPccSocketPins::ready, Hd64461Gpio::kPortD, 0x20u},
+    {&HitachiPccSocketPins::bvd1, Hd64461Gpio::kPortD, 0x40u},
+    {&HitachiPccSocketPins::bvd2, Hd64461Gpio::kPortD, 0x80u},
 };
 
 constexpr uint16_t kPortCPcmcia1Outputs = 0x03FFu;
@@ -120,7 +120,7 @@ uint8_t Hd64461Gpio::ModePins(uint16_t control, uint32_t mode) const {
     return pins;
 }
 
-void Hd64461Gpio::GateInputs(uint32_t gated_ports, const Hd64461Pcc::SocketPins& pcc1) {
+void Hd64461Gpio::GateInputs(uint32_t gated_ports, const HitachiPccSocketPins& pcc1) {
     const uint64_t old  = gate_.load(std::memory_order_acquire);
     uint64_t       next = gated_ports;
     for (uint32_t port = 0; port < kPorts; ++port) {
@@ -131,16 +131,16 @@ void Hd64461Gpio::GateInputs(uint32_t gated_ports, const Hd64461Pcc::SocketPins&
     gate_.store(next, std::memory_order_release);
 }
 
-Hd64461Pcc::SocketPins Hd64461Gpio::Pcmcia1Presented(const Hd64461Pcc::SocketPins& live) const {
-    const uint64_t         gate      = gate_.load(std::memory_order_acquire);
-    Hd64461Pcc::SocketPins presented = live;
+HitachiPccSocketPins Hd64461Gpio::Pcmcia1Presented(const HitachiPccSocketPins& live) const {
+    const uint64_t       gate      = gate_.load(std::memory_order_acquire);
+    HitachiPccSocketPins presented = live;
     for (const Pcmcia1InputPin& pin : kPcmcia1InputPins) {
         if (GateCovers(gate, pin.port)) presented.*pin.level = (HeldNets(gate, pin.port) & pin.mask) != 0u;
     }
     return presented;
 }
 
-uint8_t Hd64461Gpio::InputLevels(uint32_t port, const Hd64461Pcc::SocketPins& pcc1) const {
+uint8_t Hd64461Gpio::InputLevels(uint32_t port, const HitachiPccSocketPins& pcc1) const {
     const uint8_t socket = Pcmcia1Inputs(port);
     const uint8_t nets   = wiring_->NetLevels(port);
     if (socket == 0u) return nets;
@@ -162,7 +162,7 @@ uint8_t Hd64461Gpio::Pcmcia1Inputs(uint32_t port) const {
     return mask;
 }
 
-uint8_t Hd64461Gpio::Pcmcia1InputLevels(uint32_t port, const Hd64461Pcc::SocketPins& pcc1) const {
+uint8_t Hd64461Gpio::Pcmcia1InputLevels(uint32_t port, const HitachiPccSocketPins& pcc1) const {
     uint8_t levels = 0u;
     for (const Pcmcia1InputPin& pin : kPcmcia1InputPins) {
         if (pin.port == port && pcc1.*pin.level) levels = static_cast<uint8_t>(levels | pin.mask);

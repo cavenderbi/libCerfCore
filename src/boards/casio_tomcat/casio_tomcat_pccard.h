@@ -2,9 +2,9 @@
 
 #include <cerfcore/peripherals/peripheral_base.h>
 
+#include "../../peripherals/casio_pc_card_socket/casio_pc_card_status.h"
 #include "../../peripherals/pcmcia/pcmcia_slot.h"
 
-#include <atomic>
 #include <cstdint>
 
 namespace cerfcore {
@@ -50,6 +50,7 @@ public:
     void OnCardDetectChanged(PcmciaSlot& slot) override;
     void OnReadyIreqLow     (PcmciaSlot& slot) override;
     void OnReadyIreqHigh    (PcmciaSlot& slot) override;
+    void OnStatusChange     (PcmciaSlot&, bool) override {}
     uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
     void SaveState(StateWriter& w) override;
@@ -59,7 +60,7 @@ public:
 private:
     PcmciaSlot        slot0_;
     bool              reg_space_ = false;
-    std::atomic<bool> ready_ireq_low_{false};
+    CasioPcCardStatus status_;
 };
 
 }

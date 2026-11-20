@@ -63,8 +63,8 @@ void Pm8058Keypad::Reset() {
     std::lock_guard<std::mutex> lk(mtx_);
     ctrl_ = 0;
     scan_ = 0;
+    pressed_.ReleaseAll();
     for (uint32_t i = 0; i < kMaxDrive; ++i) {
-        state_[i]       = kNoKeysPressed;
         latched_new_[i] = kNoKeysPressed;
         latched_old_[i] = kNoKeysPressed;
     }
@@ -154,14 +154,7 @@ void Pm8058Keypad::SetKeyPressed(uint32_t drive, uint32_t sense, bool pressed) {
             drive, sense, DriveLines(), SenseLines());
     }
 
-    const uint8_t mask   = (uint8_t)(1u << sense);
-    const uint8_t before = state_[drive];
-    if (pressed) {
-        state_[drive] &= (uint8_t)~mask;
-    } else {
-        state_[drive] |= mask;
-    }
-    if (state_[drive] == before) return;
+    if (!pressed_.Set(drive * KeyMatrixCells<kMaxDrive>::kColumns + sense, pressed)) return;
 
     CaptureScan();
 }
@@ -171,7 +164,7 @@ void Pm8058Keypad::CaptureScan() {
 
     for (uint32_t i = 0; i < kMaxDrive; ++i) {
         latched_old_[i] = latched_new_[i];
-        latched_new_[i] = state_[i];
+        latched_new_[i] = static_cast<uint8_t>(~pressed_.Line(i));
     }
     if (events_ < kMaxEvents) ++events_;
     PublishIrq();
@@ -191,7 +184,7 @@ void Pm8058Keypad::SaveState(StateWriter& w) {
     w.Write<uint8_t>("ctrl", ctrl_);
     w.Write<uint8_t>("scan", scan_);
     for (uint32_t i = 0; i < kMaxDrive; ++i) {
-        w.Write<uint8_t>("state", state_[i]);
+        w.Write<uint8_t>("state", static_cast<uint8_t>(~pressed_.Line(i)));
         w.Write<uint8_t>("latched_new", latched_new_[i]);
         w.Write<uint8_t>("latched_old", latched_old_[i]);
     }
@@ -205,7 +198,9 @@ void Pm8058Keypad::RestoreState(StateReader& r) {
     r.Read("ctrl", ctrl_);
     r.Read("scan", scan_);
     for (uint32_t i = 0; i < kMaxDrive; ++i) {
-        r.Read("state", state_[i]);
+        uint8_t state = kNoKeysPressed;
+        r.Read("state", state);
+        pressed_.SetLine(i, static_cast<uint8_t>(~state));
         r.Read("latched_new", latched_new_[i]);
         r.Read("latched_old", latched_old_[i]);
     }

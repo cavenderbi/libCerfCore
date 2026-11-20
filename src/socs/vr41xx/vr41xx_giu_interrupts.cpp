@@ -36,14 +36,15 @@ void Vr41xxGiuInterrupts::ApplyCondition(int pin, bool met) {
     const uint16_t typ   = high ? inttyp_h_ : inttyp_l_;
     const uint16_t htsel = high ? inthtsel_h_ : inthtsel_l_;
     const uint16_t en    = high ? inten_h_ : inten_l_;
-    const bool     hold  = (htsel & bit) != 0u;
+    const bool     selected_hold = (htsel & bit) != 0u;
+    const bool     hold  = latches_every_level_ || selected_hold;
 
     if (met) {
         if (intstat_sets_while_disabled_) {
             stat |= bit;
         } else if (en & bit) {
             stat |= bit;
-        } else if (hold) {
+        } else if (selected_hold) {
             (high ? retained_h_ : retained_l_) |= bit;
         }
     } else if ((typ & bit) == 0u && !hold) {

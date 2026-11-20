@@ -9,6 +9,9 @@ namespace cerfcore {
 
 namespace {
 
+constexpr char kBackLabel[]      = "Back";
+constexpr char kPlayPauseLabel[] = "Play/Pause";
+
 /* device_code = i.MX31 KPP cell, col<<8 | row. pyxis_keybd.dll's cell->VK table
    is cell0..3 = LEFT/UP/DOWN/RIGHT, cell5 = VK_BACK, cell6 = VK_RETURN (OK),
    cell15 = VK_MEDIA_PLAY_PAUSE (cell = 5*col + row). guest_label set only where
@@ -19,9 +22,9 @@ const std::vector<KeyBinding> kBindings = {
     { 0x28, 0x0002, nullptr,        0, 0 },   /* Down  -> cell2  DOWN  */
     { 0x27, 0x0003, nullptr,        0, 0 },   /* Right -> cell3  RIGHT */
     { 0x0D, 0x0101, nullptr,        0, 0 },   /* Enter -> cell6  OK    */
-    { 0x1B, 0x0100, "Back",        0, 0 },
+    { 0x1B, 0x0100, kBackLabel,      0, 0 },
     { 0x08, 0x0100, nullptr,        0, 0 },   /* Bksp  -> cell5  Back  */
-    { 0x20, 0x0300, "Play/Pause",  0, 0 },
+    { 0x20, 0x0300, kPlayPauseLabel, 0, 0 },
     { 0xB3, 0x0300, nullptr,        0, 0 },   /* MediaPlayPause -> cell15 */
 };
 

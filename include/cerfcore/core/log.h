@@ -48,7 +48,8 @@ namespace Log {
         X(GuestAdditions, "GUEST_HOST", "CERF guest additions")                          \
         X(Discord,     "DISCORD",     "Discord Rich Presence")                      \
         X(Manager,     "MANAGER",     "virtual machine manager")                    \
-        X(Machine,     "MACHINE",     "machine objects")
+        X(Machine,     "MACHINE",     "machine objects")                            \
+        X(Automation,  "AUTOMATION",  "automation API endpoint")
 
     enum class Cat : uint8_t {
     #define X(name, slug, desc) name,
@@ -95,6 +96,7 @@ namespace Log {
         | CatBit(Cat::Discord)
         | CatBit(Cat::Manager)
         | CatBit(Cat::Machine)
+        | CatBit(Cat::Automation)
         | CatBit(Cat::GuestAdditions)
         | CatBit(Cat::Nkdbg);
 

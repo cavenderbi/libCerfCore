@@ -15,7 +15,11 @@ public:
     bool ShouldRegister() override { return emu_.Get<BoardContext>().GetSocId() == SocId::Sh7729; }
 
 protected:
-    ControlModel Control() const override { return ControlModel{0xE0u, 0x07u, 0x18u, 0x20u}; }
+    ControlModel Control() const override { return ControlModel{0xE0u, 0x07u, 0x18u, 0x20u, false}; }
+    uint8_t      Stbcr2ModuleStop() const override { return kStbcr2Mstp5; }
+
+private:
+    static constexpr uint8_t kStbcr2Mstp5 = 0x04u;
 };
 
 }

@@ -78,6 +78,7 @@ public:
         emu_.Get<Sa11xxGpio>().DriveInputPin(kGpioReady[SocketOf(slot)],
                                              true);
     }
+    void OnStatusChange(PcmciaSlot&, bool) override {}
     uint8_t UndrivenDataLane() const override { return kUnstatedUndrivenDataLane; }
 
 private:

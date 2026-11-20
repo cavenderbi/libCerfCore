@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../execution/guest_cycle_clock.h"
+#include "../../peripherals/serial/uart_frame.h"
 
 #include <cstdint>
 
@@ -65,9 +66,13 @@ inline uint64_t DataBits(uint32_t utcr0) {
     return (utcr0 & kUtcr0Dss) != 0u ? 8u : 7u;
 }
 
+inline uint64_t BitsBeforeStop(uint32_t utcr0) {
+    return UartBitsBeforeStop(static_cast<uint32_t>(DataBits(utcr0)), (utcr0 & kUtcr0Pe) != 0u);
+}
+
 inline uint64_t FrameBits(uint32_t utcr0) {
-    return 1u + DataBits(utcr0) + ((utcr0 & kUtcr0Pe) != 0u ? 1u : 0u) +
-           ((utcr0 & kUtcr0Sbs) != 0u ? 2u : 1u);
+    return UartFrameBits(static_cast<uint32_t>(DataBits(utcr0)), (utcr0 & kUtcr0Pe) != 0u,
+                         (utcr0 & kUtcr0Sbs) != 0u ? 2u : 1u);
 }
 
 /* §11.6.1.1 (printed 11-7): "DA 31:28 = Device port address 31:28", "DA 27:8 = Device port address

@@ -2,7 +2,6 @@
 #include "../../socs/vr41xx/vr41xx_piu_regs.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/boards/board_context.h>
 #include "casio_pocketpostpet_family_id.h"
@@ -17,7 +16,7 @@ namespace {
 
 using cerf_vr41xx_piu_detail::kAdcmdAdin0;
 using cerf_vr41xx_piu_detail::kAdcmdAdin1;
-using cerf_vr41xx_piu_detail::kAdcmdTpx0;
+using cerf_vr41xx_piu_detail::kUndrivenPortSample;
 
 /* gwes.exe sub_ABEEC (0xABEEC): the ADIN0 average selects the main-battery level - >= 0x3D5
    full, >= 0x3B9 mid, below low. */
@@ -40,24 +39,16 @@ public:
         return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CasioPocketpostpet;
     }
 
-    std::optional<uint16_t> ConvertCommandPort(uint16_t adcmd,
-                                               uint16_t /*pos_x*/,
-                                               uint16_t /*pos_y*/) override {
-        if (adcmd != kAdcmdTpx0) {
-            emu_.Get<Fatal>().Die("CasioPocketpostpetTouchPanel: PIUCMDREG ADCMD=0x%X selects an A/D "
-                                  "port this board's panel does not drive", adcmd);
-        }
-        return std::nullopt;
-    }
-
     /* PIUCNTREG D5 PADSCANTYPE is "touch pressure sampling enable - 0: Prohibit" (VR4121 UM
        20.3.1); touch.dll sub_13715A0 never sets it, and sub_1370AB0 reads only PIUPBn0-3. */
-    std::optional<uint16_t> PressureSample() override { return std::nullopt; }
+    std::optional<uint16_t> PressureSample(bool) override { return std::nullopt; }
+
+    uint16_t ReleasedPlateSample() override { return kUndrivenPortSample; }
 
     /* nk.exe sub_9F0B61DC scans ADIN0 (PIUAMSKREG 0xEF) as the main battery and sub_9F0B64C4
        scans ADIN1 (PIUAMSKREG 0xDF) as the second cell; gwes.exe sub_ABEEC / sub_AC38C consume
        them. rules.md forbids a backup-battery model, so ADIN1 reports a fixed healthy cell. */
-    std::optional<uint16_t> AdPortScanSample(uint16_t port) override {
+    std::optional<uint16_t> PortSample(uint16_t port) override {
         switch (port) {
             case kAdcmdAdin0: {
                 const int fill = emu_.Get<CasioPocketpostpetBattery>().FillPercent();
@@ -66,9 +57,7 @@ public:
                 return kMainLow;
             }
             case kAdcmdAdin1: return kSecondCellHealthy;
-            default:
-                emu_.Get<Fatal>().Die("CasioPocketpostpetTouchPanel: ADPortScan A/D port 0x%X this board "
-                                      "does not drive", port);
+            default:          return kUndrivenPortSample;
         }
     }
 
@@ -77,6 +66,6 @@ public:
 
 }  /* namespace */
 
-REGISTER_SERVICE_AS(CasioPocketpostpetTouchPanel, Vr41xxPiuPanel);
+REGISTER_SERVICE_AS_ALSO(CasioPocketpostpetTouchPanel, Vr41xxPiuScreen, Vr41xxPiuPanel);
 
 }

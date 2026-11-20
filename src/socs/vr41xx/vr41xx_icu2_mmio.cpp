@@ -15,7 +15,10 @@ class Vr41xxIcu2Mmio : public Peripheral {
 public:
     using Peripheral::Peripheral;
 
-    bool ShouldRegister() override { return emu_.TryGet<Vr41xxIcu>() != nullptr; }
+    bool ShouldRegister() override {
+        const Vr41xxIcu* icu = emu_.TryGet<Vr41xxIcu>();
+        return icu != nullptr && icu->Icu2Size() != 0u;
+    }
 
     void OnReady() override { emu_.Get<PeripheralDispatcher>().Register(this); }
 

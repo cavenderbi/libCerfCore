@@ -8,12 +8,13 @@ using namespace cerf_vr41xx_kiu_regs;
 
 void Vr41xxKiuSequencer::Configure(uint32_t stprep_zero_count, bool scanstart_auto_clear,
                                    bool keyen_scanline_interlock, bool keyen_stop_deferred,
-                                   bool scanstart_while_running_defined) {
+                                   bool scanstart_while_running_defined, bool scanstp_completes_when_idle) {
     stprep_zero_count_        = stprep_zero_count;
     scanstart_auto_clear_     = scanstart_auto_clear;
     keyen_scanline_interlock_ = keyen_scanline_interlock;
     keyen_stop_deferred_      = keyen_stop_deferred;
     scanstart_while_running_defined_ = scanstart_while_running_defined;
+    scanstp_completes_when_idle_     = scanstp_completes_when_idle;
 }
 
 void Vr41xxKiuSequencer::Reset() {
@@ -83,13 +84,20 @@ void Vr41xxKiuSequencer::CompleteScan(bool key_data) {
     sstat_ = kSStatInterval;
 }
 
-void Vr41xxKiuSequencer::WriteScanRep(uint16_t value) {
+void Vr41xxKiuSequencer::WriteScanRep(uint16_t value, uint16_t written) {
     const uint16_t previous = scanrep_;
-    scanrep_ = value & kScanRepMask;
-    const bool scanstart_set = (scanrep_ & kScanStart) != 0 && (previous & kScanStart) == 0;
-    scanstart_set_while_running_ = (scanrep_ & kScanStart) != 0 &&
-                                   (sstat_ == kSStatInterval || sstat_ == kSStatScanning);
-    scanstp_set_in_waitkeyin_ = (scanrep_ & kScanStp) != 0 && sstat_ <= kSStatWaitKeyIn;
+    scanrep_ = static_cast<uint16_t>(((previous & ~written) | (value & written)) & kScanRepMask);
+    const bool start_written = (written & kScanStart) != 0;
+    const bool stop_written  = (written & kScanStp) != 0;
+    const bool scanstart_set = start_written && (scanrep_ & kScanStart) != 0 && (previous & kScanStart) == 0;
+    if (start_written)
+        scanstart_set_while_running_ = (scanrep_ & kScanStart) != 0 &&
+                                       (sstat_ == kSStatInterval || sstat_ == kSStatScanning);
+    if (stop_written) {
+        const bool idle = sstat_ <= kSStatWaitKeyIn;
+        if (idle && scanstp_completes_when_idle_) scanrep_ &= static_cast<uint16_t>(~kScanStp);
+        scanstp_set_in_waitkeyin_ = (scanrep_ & kScanStp) != 0 && idle;
+    }
     const uint16_t state_at_write = sstat_;
     const bool     follows_keyen_rise_in_scan = keyen_reenabled_in_scan_;
     keyen_reenabled_in_scan_ = false;
@@ -115,17 +123,18 @@ void Vr41xxKiuSequencer::WriteScanRep(uint16_t value) {
         }
         return;
     }
-    if ((scanrep_ & kScanStp) && (scanrep_ & kScanStart) && (!scanstart_while_running_defined_ || scanstart_set))
+    if (start_written && stop_written && (scanrep_ & kScanStp) && (scanrep_ & kScanStart) &&
+        (!scanstart_while_running_defined_ || scanstart_set))
         host_.SequencerHalt("KIU SCANSTP and SCANSTART set together", scanrep_);
 
     stop_after_scan_ = false;
     ReevaluateWaitKeyIn();
     if ((previous & kKeyen) == 0 && sstat_ == kSStatScanning) keyen_reenabled_in_scan_ = true;
-    if ((scanrep_ & kScanStp) && sstat_ == kSStatInterval) {
+    if (stop_written && (scanrep_ & kScanStp) && sstat_ == kSStatInterval) {
         ClearScanStp();
         return;
     }
-    if ((scanrep_ & kScanStart) == 0 || (scanrep_ & kScanStp)) return;
+    if (!start_written || (scanrep_ & kScanStart) == 0 || (stop_written && (scanrep_ & kScanStp))) return;
     if (state_at_write == kSStatScanning &&
         !(scanstart_while_running_defined_ && scanstart_set && follows_keyen_rise_in_scan))
         host_.SequencerHalt("KIU SCANSTART during a scan", scanrep_);

@@ -5,7 +5,8 @@ namespace cerfcore {
 
 namespace {
 
-constexpr sh77xx_intc::Model kSh7709Intc{.irls = false};
+constexpr sh77xx_intc::Model kSh7709Intc{
+    .irls = false, .lcdc_pcc = false, .standby_wake_irq_pins = 5u, .standby_wake_pint = true};
 
 class Sh7709Intc : public sh77xx_intc::Sh77xxIntcBase<SocId::Sh7709, kSh7709Intc> {
 public:

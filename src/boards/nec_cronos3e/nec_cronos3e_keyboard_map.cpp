@@ -14,6 +14,22 @@ namespace {
 constexpr uint8_t kFnLayer  = 1;
 constexpr uint8_t kAltLayer = 2;
 
+constexpr char kFnLabel[]           = "Fn";
+constexpr char kAltLabel[]          = "Alt";
+constexpr char kPowerLabel[]        = "Power";
+constexpr char kRecordLabel[]       = "Record";
+constexpr char kNumLockLabel[]      = "Num Lock";
+constexpr char kBacklightLabel[]    = "Backlight";
+constexpr char kPoundLabel[]        = "£";
+constexpr char kEuroLabel[]         = "€";
+constexpr char kRotateLabel[]       = "Rotate";
+constexpr char kPageUpLabel[]       = "PgUp";
+constexpr char kHomeLabel[]         = "Home";
+constexpr char kPageDownLabel[]     = "PgDn";
+constexpr char kEndLabel[]          = "End";
+constexpr char kContrastDownLabel[] = "Contrast -";
+constexpr char kContrastUpLabel[]   = "Contrast +";
+
 const std::vector<KeyBinding> kBindings = {
     { 0x20,  0, nullptr, 0, 0 }, { 0xDD,  1, nullptr, 0, 0 }, { 0xDC,  2, nullptr, 0, 0 },
     { 0xBF,  3, nullptr, 0, 0 }, { 0x25,  4, nullptr, 0, 0 }, { 0x27,  5, nullptr, 0, 0 },
@@ -39,22 +55,22 @@ const std::vector<KeyBinding> kBindings = {
     { 0x75, 86, nullptr, 0, 0 }, { 0x74, 87, nullptr, 0, 0 }, { 0x10, 91, nullptr, 0, 0 },
     { 0x73, 92, nullptr, 0, 0 }, { 0x72, 93, nullptr, 0, 0 }, { 0x71, 94, nullptr, 0, 0 },
     { 0x70, 95, nullptr, 0, 0 }, { 0x11, 82, nullptr, 0, 0 },
-    { 0x7B, 71, "Fn",  0, kFnLayer },
-    { 0x12, 73, "Alt", 0, kAltLayer },
-    { 0xA5, 64, "Alt", 0, kAltLayer },
-    { 0xDF, kNecVr41xxPowerSwitchCode, "Power", 0, 0 },
-    { 0x7A, kNecVr41xxRecordButtonCode, "Record", 0, 0 },
-    { 0x10, 0, "Num Lock",  kFnLayer, 0 },
-    { 0x20, 0, "Backlight", kFnLayer, 0 },
-    { 0x34, 0, "£",         kFnLayer, 0 },
-    { 0x35, 0, "€",         kFnLayer, 0 },
-    { 0x78, 0, "Rotate",    kFnLayer, 0 },
-    { 0x26, 0, "PgUp", kAltLayer, 0 },
-    { 0x25, 0, "Home", kAltLayer, 0 },
-    { 0x28, 0, "PgDn", kAltLayer, 0 },
-    { 0x27, 0, "End",  kAltLayer, 0 },
-    { 0xBC, 0, "Contrast -", kAltLayer, 0 },
-    { 0xBE, 0, "Contrast +", kAltLayer, 0 },
+    { 0x7B, 71, kFnLabel,  0, kFnLayer },
+    { 0x12, 73, kAltLabel, 0, kAltLayer },
+    { 0xA5, 64, kAltLabel, 0, kAltLayer },
+    { 0xDF, kNecVr41xxPowerSwitchCode, kPowerLabel, 0, 0 },
+    { 0x7A, kNecVr41xxRecordButtonCode, kRecordLabel, 0, 0 },
+    { 0x10, 0, kNumLockLabel,   kFnLayer, 0 },
+    { 0x20, 0, kBacklightLabel, kFnLayer, 0 },
+    { 0x34, 0, kPoundLabel,     kFnLayer, 0 },
+    { 0x35, 0, kEuroLabel,      kFnLayer, 0 },
+    { 0x78, 0, kRotateLabel,    kFnLayer, 0 },
+    { 0x26, 0, kPageUpLabel,   kAltLayer, 0 },
+    { 0x25, 0, kHomeLabel,     kAltLayer, 0 },
+    { 0x28, 0, kPageDownLabel, kAltLayer, 0 },
+    { 0x27, 0, kEndLabel,      kAltLayer, 0 },
+    { 0xBC, 0, kContrastDownLabel, kAltLayer, 0 },
+    { 0xBE, 0, kContrastUpLabel,   kAltLayer, 0 },
 };
 
 class NecCronos3eKeyboardMap : public KeyboardMap {

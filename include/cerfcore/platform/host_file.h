@@ -16,6 +16,11 @@ enum class FileMode : uint8_t {
     kReadWriteExisting,
 };
 
+struct HostFileIdentity {
+    uint64_t volume = 0;
+    uint64_t file   = 0;
+};
+
 class HostFile {
 public:
     HostFile() = default;
@@ -28,6 +33,7 @@ public:
     bool IsOpen() const { return handle_ != nullptr; }
 
     bool Size(uint64_t& size) const;
+    bool Identity(HostFileIdentity& identity) const;
     bool SeekTo(uint64_t offset);
     bool SeekToEnd();
     bool Read(void* dst, uint32_t length, uint32_t& done);

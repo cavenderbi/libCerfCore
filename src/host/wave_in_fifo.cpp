@@ -2,6 +2,9 @@
 
 #include <cerfcore/core/instance_threads.h>
 
+#include <algorithm>
+#include <vector>
+
 namespace cerfcore {
 
 void WaveInFifo::Start(InstanceThreads& threads, AudioInputs* inputs, const char* log_tag, size_t cap_bytes) {
@@ -24,6 +27,16 @@ void WaveInFifo::Request(uint32_t sample_rate_hz, uint16_t channels, uint16_t bi
     if (!request_.Set(sample_rate_hz, channels, bits)) return;
     std::lock_guard<std::mutex> lk(mtx_);
     cv_.notify_all();
+}
+
+size_t WaveInFifo::TakeIntoSlots(uint8_t* dst, uint32_t slots, uint32_t sample_bytes, uint32_t slot_bytes) {
+    std::vector<uint8_t> samples(static_cast<size_t>(slots) * sample_bytes);
+    const size_t         taken = fifo_.Take(samples.data(), samples.size());
+    for (uint32_t i = 0; i < slots; ++i) {
+        std::copy_n(samples.data() + static_cast<size_t>(i) * sample_bytes, sample_bytes,
+                    dst + static_cast<size_t>(i) * slot_bytes);
+    }
+    return taken;
 }
 
 void WaveInFifo::Main() {

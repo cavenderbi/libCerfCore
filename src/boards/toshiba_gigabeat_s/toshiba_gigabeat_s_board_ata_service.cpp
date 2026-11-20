@@ -107,11 +107,7 @@ private:
         ext.fat_size32 = p.fat_size_sectors;
         ext.root_cluster = 2;
         ext.fsinfo_sector = 1;
-        ext.drive_number = 0x80;
-        ext.boot_signature = 0x29;
-        ext.volume_id = p.vol_id;
-        ext.volume_label = "           ";
-        ext.fs_type = "FAT32   ";
+        ext.volume = {.drive_number = 0x80, .volume_id = p.vol_id, .volume_label = "           ", .fs_type = "FAT32   "};
         fat_volume_layout::WriteFat32Extension(vbr, ext);
         fat_volume_layout::WriteBootSignature(vbr);
         img.WriteSectors(p.start_lba, 1, vbr);

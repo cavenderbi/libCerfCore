@@ -29,34 +29,25 @@ bool Pr31x00UartDma::ShouldRegister() {
 }
 
 void Pr31x00UartDma::OnReady() {
-    mem_           = &emu_.Get<EmulatedMemory>();
-    clock_         = &emu_.Get<GuestCycleClock>();
-    host_requests_ = &emu_.Get<EngineBridge>().Engine().Get<cerfengine::HostRequestChannel>();
-    host_requests_->RegisterListener([this] { OnHostRequest(); });
-    emu_.Get<Hibernation>().RegisterPreSaveListener([this] { OnHostRequest(); });
-    clock_->RegisterRateListener([this] {
-        const uint64_t now = clock_->Cycles();
-        for (uint32_t i = 0; i < count_; ++i) {
-            Channel& c = *ch_[i];
-            std::lock_guard<std::mutex> lk(c.mu);
-            if (!c.line.Rescale(clock_->ClockRate(), now)) {
-                emu_.Get<Fatal>().Die("PR31x00 UART %s RX: the core rate change overflows the bit "
-                                      "counter scale", c.source);
-            }
-            ArmLocked(c, now);
-        }
-    });
+    mem_   = &emu_.Get<EmulatedMemory>();
+    clock_ = &emu_.Get<GuestCycleClock>();
 }
 
 uint32_t Pr31x00UartDma::Attach(const char* source, RxIntFn raise_ints, LineIdleFn on_line_idle) {
     if (count_ >= kPorts) emu_.Get<Fatal>().Die("Pr31x00UartDma: a third UART attached");
     const uint32_t port = count_;
-    ch_[port] = std::make_unique<Channel>(source);
-    ch_[port]->raise_ints   = std::move(raise_ints);
-    ch_[port]->on_line_idle = std::move(on_line_idle);
-    ch_[port]->event        = clock_->Add([this, port] { OnCharEvent(*ch_[port]); });
+    ch_[port] = std::make_unique<Channel>(emu_, source);
+    Channel& c = *ch_[port];
+    c.raise_ints   = std::move(raise_ints);
+    c.on_line_idle = std::move(on_line_idle);
+    c.rx.Attach([this, &c] { OnCharEvent(c); }, [this, &c] { OnHostRequest(c); }, [this, &c] { OnRate(c); });
     ++count_;
     return port;
+}
+
+void Pr31x00UartDma::OnRate(Channel& c) {
+    std::lock_guard<std::mutex> lk(c.mu);
+    c.rx.Rescale(c.rx.Now(), ArmWantedLocked(c));
 }
 
 Pr31x00UartDma::Channel& Pr31x00UartDma::Ch(uint32_t port) { return *ch_[port]; }
@@ -91,8 +82,7 @@ void Pr31x00UartDma::SetControl(uint32_t port, bool receiver_on, bool armed) {
            and its read cursor at the buffer base, and sub_1474634 reads to base + DMACNT. */
         if (!receiver_on) {
             idle = idle || !IdleLocked(c);
-            c.line.Reset();
-            clock_->Disarm(c.event);
+            c.rx.Stop();
             c.count           = 0;
             c.rxhold_full     = false;
             c.prxhold_full    = false;
@@ -122,8 +112,7 @@ void Pr31x00UartDma::ResetLine(uint32_t port) {
         c.prxhold_full    = false;
         c.prxhold_overrun = false;
         dropped           = !IdleLocked(c);
-        c.line.Reset();
-        clock_->Disarm(c.event);
+        c.rx.Stop();
     }
     Notify(c, RxInts{}, dropped);
 }
@@ -147,20 +136,18 @@ void Pr31x00UartDma::SetLine(uint32_t port, const LineTiming& timing) {
    Figure 16.4.1: BAUDRATE[9:0] and the UART master clock feed the bit counter. §16.2.1 (page 16-2):
    "each UART must also have its clock enabled to operate". */
 bool Pr31x00UartDma::RetimeLocked(Channel& c, const LineTiming& old, uint64_t now) {
-    if (!c.line.Timed()) return false;
-    if (c.timing.uart_clock.num == 0u) {
-        const bool dropped = c.line.DropNoClock();
-        clock_->Disarm(c.event);
-        return dropped && IdleLocked(c);
-    }
-    c.line.Reframe(FrameOf(old), FrameOf(c.timing));
-    bool rerated = false;
-    if (!c.line.SetBitRate(clock_->ClockRate(), BitRateLocked(c), now, rerated)) {
-        emu_.Get<Fatal>().Die("PR31x00 UART %s RX: the bit rate change overflows the bit counter "
-                              "scale", c.source);
-    }
-    ArmLocked(c, now);
-    return false;
+    if (!c.rx.Line().Timed()) return false;
+    TimedUartRxLine::Timing before;
+    before.frame = FrameOf(old);
+    return c.rx.Retime(before, RxTimingLocked(c), now, ArmWantedLocked(c));
+}
+
+TimedUartRxLine::Timing Pr31x00UartDma::RxTimingLocked(Channel& c) {
+    TimedUartRxLine::Timing t;
+    t.clocked = c.timing.uart_clock.num != 0u;
+    t.bit     = t.clocked ? BitRateLocked(c) : GuestCycleClock::Rate{};
+    t.frame   = FrameOf(c.timing);
+    return t;
 }
 
 UartRxLine::Frame Pr31x00UartDma::FrameOf(const LineTiming& t) {
@@ -179,9 +166,7 @@ GuestCycleClock::Rate Pr31x00UartDma::BitRateLocked(const Channel& c) {
     return uart.Scaled(1u, c.timing.uart_clocks_per_bit);
 }
 
-bool Pr31x00UartDma::IdleLocked(const Channel& c) const {
-    return c.line.Pending() == 0u && c.line.WireEmpty();
-}
+bool Pr31x00UartDma::IdleLocked(const Channel& c) const { return c.rx.Line().Idle(); }
 
 uint32_t Pr31x00UartDma::Count(uint32_t port) const {
     const Channel& c = Ch(port);
@@ -208,9 +193,9 @@ void Pr31x00UartDma::ReadHolds(uint32_t port, bool& rxhold_full, bool& prxhold_f
     {
         std::lock_guard<std::mutex> lk(c.mu);
         const uint64_t now     = clock_->Cycles();
-        const size_t   pending = c.line.Pending();
+        const size_t   pending = c.rx.Line().Pending();
         idle = SettleLocked(c, now, ints);
-        if (c.line.Pending() != pending) ArmLocked(c, now);
+        if (c.rx.Line().Pending() != pending) ArmLocked(c, now);
         rxhold_full  = c.rxhold_full;
         prxhold_full = c.prxhold_full;
     }
@@ -219,11 +204,8 @@ void Pr31x00UartDma::ReadHolds(uint32_t port, bool& rxhold_full, bool& prxhold_f
 
 void Pr31x00UartDma::Receive(uint32_t port, const uint8_t* data, size_t n) {
     Channel& c = Ch(port);
-    {
-        std::lock_guard<std::mutex> lk(c.mu);
-        if (!c.receiver_on || !c.line.Push(data, n)) return;
-    }
-    host_requests_->Request();
+    std::lock_guard<std::mutex> lk(c.mu);
+    if (c.receiver_on) c.rx.Push(data, n);
 }
 
 /* TMPR3911 §16.2.4 (pages 16-5 / 16-6): "For the transmitter, this means that when the
@@ -237,49 +219,22 @@ void Pr31x00UartDma::TransmitBlock(uint32_t port, std::vector<uint8_t>& out) {
     c.count = c.length - 1u;
 }
 
-void Pr31x00UartDma::OnHostRequest() {
-    const uint64_t now = clock_->Cycles();
-    for (uint32_t i = 0; i < count_; ++i) {
-        Channel& c    = *ch_[i];
-        bool     idle = false;
-        {
-            std::lock_guard<std::mutex> lk(c.mu);
-            const std::vector<uint8_t> bytes = c.line.TakeWire();
-            if (!bytes.empty()) {
-                if (c.timing.uart_clock.num == 0u) {
-                    c.line.LogNoClock(bytes.size());
-                    idle = IdleLocked(c);
-                } else {
-                    if (!c.line.Receive(bytes.data(), bytes.size(), clock_->ClockRate(),
-                                        BitRateLocked(c), FrameOf(c.timing), now)) {
-                        emu_.Get<Fatal>().Die("PR31x00 UART %s RX: the bit rate overflows the bit "
-                                              "counter scale", c.source);
-                    }
-                    ArmLocked(c, now);
-                }
-            }
-        }
-        Notify(c, RxInts{}, idle);
+void Pr31x00UartDma::OnHostRequest(Channel& c) {
+    bool idle = false;
+    {
+        std::lock_guard<std::mutex> lk(c.mu);
+        if (!c.rx.Line().WireEmpty()) idle = c.rx.Intake(RxTimingLocked(c), c.rx.Now(), ArmWantedLocked(c));
     }
+    Notify(c, RxInts{}, idle);
 }
 
-void Pr31x00UartDma::ArmLocked(Channel& c, uint64_t now) {
-    if (c.line.Pending() == 0u || (!c.armed && c.rxhold_full)) {
-        clock_->Disarm(c.event);
-        return;
-    }
-    clock_->Arm(c.event, c.line.FrontLandCycle(now));
-}
+void Pr31x00UartDma::ArmLocked(Channel& c, uint64_t now) { c.rx.Arm(now, ArmWantedLocked(c)); }
 
 /* TMPR3911 §16.4 (page 16-9): "As the stop bit is clocked in and checked, the assembled character
    is transferred from the Receive Shift Register to the PRXHOLD Register". */
 bool Pr31x00UartDma::SettleLocked(Channel& c, uint64_t now, RxInts& ints) {
-    bool landed = false;
-    while (c.line.FrontDue(now)) {
-        ReceiveByteLocked(c, static_cast<uint8_t>(c.line.Front()), ints);
-        c.line.PopFront(now);
-        landed = true;
-    }
+    const bool landed =
+        c.rx.Line().LandDue(now, [&](uint16_t entry) { ReceiveByteLocked(c, static_cast<uint8_t>(entry), ints); });
     return landed && IdleLocked(c);
 }
 
@@ -366,7 +321,7 @@ void Pr31x00UartDma::SaveState(uint32_t port, StateWriter& w) {
     w.Write("prxhold", c.prxhold);
     w.Write<uint8_t>("prxhold_full", c.prxhold_full ? 1u : 0u);
     w.Write<uint8_t>("prxhold_overrun", c.prxhold_overrun ? 1u : 0u);
-    c.line.Save(w, clock_->Cycles());
+    c.rx.Save(w);
 }
 
 void Pr31x00UartDma::RestoreState(uint32_t port, StateReader& r, const LineTiming& framing) {
@@ -388,9 +343,8 @@ void Pr31x00UartDma::RestoreState(uint32_t port, StateReader& r, const LineTimin
     c.prxhold_full = flag != 0u;
     r.Read("prxhold_overrun", flag);
     c.prxhold_overrun = flag != 0u;
-    c.line.Restore(r, clock_->ClockRate(), clock_->Cycles());
+    c.rx.Restore(r);
     c.timing = framing;
-    clock_->Disarm(c.event);
 }
 
 REGISTER_SERVICE(Pr31x00UartDma);

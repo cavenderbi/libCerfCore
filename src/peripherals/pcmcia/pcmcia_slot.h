@@ -23,6 +23,7 @@ public:
     virtual void OnCardDetectChanged(PcmciaSlot& slot) = 0;
     virtual void OnReadyIreqLow     (PcmciaSlot& slot) = 0;
     virtual void OnReadyIreqHigh    (PcmciaSlot& slot) = 0;
+    virtual void OnStatusChange     (PcmciaSlot& slot, bool low) = 0;
     virtual void OnCardPowerChanged (PcmciaSlot&) {}
     virtual uint8_t UndrivenDataLane() const = 0;
 
@@ -68,6 +69,8 @@ public:
     /* Card-side IRQ line, callable from any card thread; no bus lock. */
     void RaiseIrq();
     void ClearIrq();
+    void DriveStatusChange(bool low);
+    bool StatusChangeLow() const { return status_change_.load(std::memory_order_acquire); }
 
     void ArmCardTimer(int64_t delay_ns);
     void DisarmCardTimer();
@@ -136,6 +139,7 @@ private:
     uint64_t                    generation_ = 0;
     std::atomic<uint8_t>        pins_{0};
     std::atomic<uint8_t>        line_{0};
+    std::atomic<bool>           status_change_{false};
 
     ExternalDeviceClock::Timer* card_timer_ = nullptr;
 

@@ -24,7 +24,7 @@ void CasioPocketpostpetBattery::OnReady() {
    bit10 = GPIO26, bit8 = GPIO24 (VR4121 UM 19.2.4). */
 void CasioPocketpostpetBattery::DrivePowerPins() {
     auto& giu = emu_.Get<Vr41xxGiu>();
-    const bool on_ac = !battery_.OnBattery();
+    const bool on_ac = battery_.OnExternalPower();
     giu.SetPinLevel(26, on_ac || battery_.ChargePercent() > 0);
     giu.SetPinLevel(24, on_ac);
 }

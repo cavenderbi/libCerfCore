@@ -2,7 +2,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../core/board_config.h"
 #include "../../socs/sa11xx/sa1110_sdram_geometry.h"
-#include "../ram_param_id.h"
+#include "../ram_param.h"
 #include "compaq_ipaq_h3000_family_id.h"
 
 namespace cerfcore {

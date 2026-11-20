@@ -58,6 +58,9 @@ protected:
     virtual uint32_t ReadWordAsHalves (uint32_t addr);
     virtual void     WriteWordAsHalves(uint32_t addr, uint32_t value);
 
+    uint64_t ReadDwordAsHalves (uint32_t addr);
+    void     WriteDwordAsHalves(uint32_t addr, uint64_t value);
+
 private:
     static uint32_t AutoFastRead (void* ctx, uint32_t off, uint32_t width_bytes);
     static void     AutoFastWrite(void* ctx, uint32_t off, uint32_t value, uint32_t width_bytes);

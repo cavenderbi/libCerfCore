@@ -15,11 +15,13 @@ public:
     void OnReady() override;
 
     void RegisterListener(std::function<void()> listener);
+    void RegisterWakeCheck(std::function<void()> check);
 
 private:
     void Enter();
 
     CallbackList<> listeners_;
+    CallbackList<> wake_checks_;
 };
 
 }

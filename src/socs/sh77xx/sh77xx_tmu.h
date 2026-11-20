@@ -5,10 +5,9 @@
 #include "../../execution/guest_cycle_clock.h"
 #include "../reload_down_counter.h"
 #include "sh77xx_intc.h"
-#include "sh77xx_peripheral_clock_ticks.h"
-#include "sh77xx_rtc.h"
 #include "sh77xx_standby_control.h"
 #include "sh77xx_standby_entry.h"
+#include "sh77xx_timer_clock.h"
 
 #include <cstdint>
 
@@ -34,6 +33,9 @@ public:
     void RestoreState(StateReader& r) override;
     void PostRestore() override;
 
+protected:
+    virtual bool StandbyInitializesFlags() const = 0;
+
 private:
     static constexpr uint32_t kChannels = 3u;
 
@@ -51,24 +53,26 @@ private:
     uint64_t Ticks(const Channel& ch);
     void     Arm(Channel& ch);
     void     Drive(Channel& ch);
+    void     PublishStandbyWake(const Channel& ch);
     void     Sync(Channel& ch);
     void     RequireClock(const char* access, uint32_t addr, uint32_t value) const;
     uint8_t  ReadTstr() const;
     void     WriteTstr(uint8_t value);
+    void     WriteTocr(uint8_t value) const;
     uint16_t ReadControl(Channel& ch);
     void     WriteControl(Channel& ch, uint16_t value);
     void     PowerOnReset();
     void     OnStandbyControlChange(uint8_t from, uint8_t to);
+    void     EnterStandby();
     void     StopPeripheralClockChannels();
     void     SyncRtcclkChannels();
     int64_t  ParkWakeDueNs();
 
-    GuestCycleClock*           clock_ = nullptr;
-    Sh77xxIntc*                intc_  = nullptr;
-    Sh77xxStbcr*               stbcr_ = nullptr;
-    Sh77xxRtc*                 rtc_   = nullptr;
-    Sh77xxPeripheralClockTicks pclk_{emu_};
-    Channel                    ch_[kChannels];
+    GuestCycleClock* clock_ = nullptr;
+    Sh77xxIntc*      intc_  = nullptr;
+    Sh77xxStbcr*     stbcr_ = nullptr;
+    Sh77xxTimerClock timer_clock_{emu_};
+    Channel          ch_[kChannels];
 };
 
 }

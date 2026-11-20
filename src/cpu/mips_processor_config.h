@@ -8,6 +8,13 @@
 
 namespace cerfcore {
 
+struct MipsFixedFields {
+    uint32_t mask  = 0;
+    uint32_t value = 0;
+
+    bool Accepts(uint32_t written) const { return (written & mask) == value; }
+};
+
 class MipsProcessorConfig : public Service {
 public:
     using Service::Service;
@@ -22,12 +29,12 @@ public:
     cerfengine::MipsIsaLevel IsaLevel() const { return isa_level_; }
     uint32_t     DeviceIpMask() const { return device_ip_mask_; }
 
-    uint32_t ConfigReset()    const { return config_reset_; }
-    uint32_t ConfigWritable() const { return config_writable_; }
-    uint32_t ConfigZeroOnly() const { return config_zero_only_; }
-    uint32_t StatusReset()    const { return status_reset_; }
-    uint32_t StatusWritable() const { return status_writable_; }
-    uint32_t StatusZeroOnly() const { return status_zero_only_; }
+    uint32_t        ConfigReset()    const { return config_reset_; }
+    uint32_t        ConfigWritable() const { return config_writable_; }
+    MipsFixedFields ConfigFixed()    const { return config_fixed_; }
+    uint32_t        StatusReset()    const { return status_reset_; }
+    uint32_t        StatusWritable() const { return status_writable_; }
+    MipsFixedFields StatusFixed()    const { return status_fixed_; }
 
     bool HasFpu()              const { return fpu_; }
     bool HasLlsc()             const { return llsc_; }
@@ -35,7 +42,10 @@ public:
     bool HasWatch()            const { return watch_; }
     bool HasVr41xxPowerModes() const { return vr41xx_power_modes_; }
     bool HasMips16()           const { return mips16_; }
+    bool HasMips16Syscall()    const { return mips16_syscall_; }
     bool HasTx39MultiplyAdd()  const { return tx39_multiply_add_; }
+    bool HasMaccDmacc()        const { return macc_dmacc_; }
+    bool HasMadd16Dmadd16()    const { return madd16_dmadd16_; }
     bool Cop1Cop2Unusable()    const { return cop1_cop2_unusable_; }
 
     bool HasCp0Reg(uint32_t rd) const {
@@ -50,12 +60,12 @@ private:
     uint32_t     min_page_shift_ = 0;
     uint32_t     phys_addr_mask_ = 0;
     uint32_t     device_ip_mask_ = 0;
-    uint32_t     config_reset_     = 0;
-    uint32_t     config_writable_  = 0;
-    uint32_t     config_zero_only_ = 0;
-    uint32_t     status_reset_     = 0;
-    uint32_t     status_writable_  = 0;
-    uint32_t     status_zero_only_ = 0;
+    uint32_t        config_reset_    = 0;
+    uint32_t        config_writable_ = 0;
+    MipsFixedFields config_fixed_;
+    uint32_t        status_reset_    = 0;
+    uint32_t        status_writable_ = 0;
+    MipsFixedFields status_fixed_;
     cerfengine::MipsIsaLevel isa_level_ = cerfengine::MipsIsaLevel::kMips1;
 
     bool fpu_                = false;
@@ -64,7 +74,10 @@ private:
     bool watch_              = false;
     bool vr41xx_power_modes_ = false;
     bool mips16_             = false;
+    bool mips16_syscall_     = false;
     bool tx39_multiply_add_  = false;
+    bool macc_dmacc_         = false;
+    bool madd16_dmadd16_     = false;
     bool cop1_cop2_unusable_ = false;
 };
 

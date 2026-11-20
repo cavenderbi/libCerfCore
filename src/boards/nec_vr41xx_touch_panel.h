@@ -11,9 +11,9 @@ class NecVr41xxTouchPanel : public Vr41xxPiuPanel {
 public:
     using Vr41xxPiuPanel::Vr41xxPiuPanel;
 
-    std::optional<uint16_t> ConvertCommandPort(uint16_t adcmd, uint16_t pos_x, uint16_t pos_y) override;
-    std::optional<uint16_t> PressureSample() override;
-    std::optional<uint16_t> AdPortScanSample(uint16_t port) override;
+    std::optional<uint16_t> PressureSample(bool contact) override;
+    uint16_t                ReleasedPlateSample() override;
+    std::optional<uint16_t> PortSample(uint16_t port) override;
 
 protected:
     virtual uint16_t MainBatteryWord() const = 0;

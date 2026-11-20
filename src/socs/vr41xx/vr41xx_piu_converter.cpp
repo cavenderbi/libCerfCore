@@ -3,10 +3,11 @@
 #include <optional>
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/fatal.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
 #include "vr41xx_cmu.h"
-#include "vr41xx_piu.h"
+#include "vr41xx_buffered_piu.h"
 #include "vr41xx_piu_panel.h"
 #include "vr41xx_piu_regs.h"
 
@@ -17,6 +18,50 @@ using namespace cerf_vr41xx_piu_detail;
 REGISTER_SERVICE(Vr41xxPiuConverter);
 
 namespace {
+
+constexpr uint16_t kLoadedFilmSample = 0u;
+
+struct FilmDrive {
+    bool     out0;
+    bool     out1;
+    uint16_t level0;
+    uint16_t level1;
+};
+
+FilmDrive XFilm(uint16_t cmd) {
+    return {(cmd & 0x0100u) != 0u, (cmd & 0x0200u) != 0u, (cmd & 0x0010u) ? kAdcMax : uint16_t{0},
+            (cmd & 0x0020u) ? kAdcMax : uint16_t{0}};
+}
+
+FilmDrive YFilm(uint16_t cmd) {
+    return {(cmd & 0x0400u) != 0u, (cmd & 0x0800u) != 0u, (cmd & 0x0040u) ? kAdcMax : uint16_t{0},
+            (cmd & 0x0080u) ? kAdcMax : uint16_t{0}};
+}
+
+std::optional<uint16_t> FilmLevelAt(const FilmDrive& film, uint16_t pos) {
+    if (film.out0 && film.out1) {
+        const int32_t span = static_cast<int32_t>(film.level1) - static_cast<int32_t>(film.level0);
+        return static_cast<uint16_t>(film.level0 + span * static_cast<int32_t>(pos & 0x3FFu) / kAdcMax);
+    }
+    if (film.out0) return film.level0;
+    if (film.out1) return film.level1;
+    return std::nullopt;
+}
+
+uint16_t FilmPortSample(uint16_t cmd, uint16_t adcmd, uint16_t pos_x, uint16_t pos_y, bool contact,
+                        bool film) {
+    const bool      x_film = adcmd < 2u;
+    const bool      end1   = (adcmd & 1u) != 0u;
+    const FilmDrive own    = x_film ? XFilm(cmd) : YFilm(cmd);
+    const FilmDrive other  = x_film ? YFilm(cmd) : XFilm(cmd);
+    if (end1 ? own.out1 : own.out0) return end1 ? own.level1 : own.level0;
+    if (!film) return kUndrivenPortSample;
+    const std::optional<uint16_t> other_level = FilmLevelAt(other, x_film ? pos_x : pos_y);
+    if (const std::optional<uint16_t> own_level = FilmLevelAt(own, x_film ? pos_y : pos_x)) {
+        return contact && other_level ? kLoadedFilmSample : *own_level;
+    }
+    return contact && other_level ? *other_level : kUndrivenPortSample;
+}
 
 /* Page-buffer slots, from PIUPB00REG at piu2_base (VR4121 UM Table 20-1 == VR4102 UM
    Table 19-1): PIUPBn0-3 at +0x00/02/04/06 (page 0) and +0x08/0A/0C/0E (page 1),
@@ -39,37 +84,46 @@ bool PageBufferSlot(uint32_t off, int* page, int* idx) {
 
 }
 
-bool Vr41xxPiuConverter::ShouldRegister() { return emu_.TryGet<Vr41xxPiu>() != nullptr; }
+bool Vr41xxPiuConverter::ShouldRegister() { return emu_.TryGet<Vr41xxBufferedPiu>() != nullptr; }
 
 void Vr41xxPiuConverter::OnReady() { emu_.Get<PeripheralDispatcher>().Register(this); }
 
-uint32_t Vr41xxPiuConverter::MmioBase() const { return emu_.Get<Vr41xxPiu>().Piu2Base(); }
-uint32_t Vr41xxPiuConverter::MmioSize() const { return emu_.Get<Vr41xxPiu>().Piu2Size(); }
+uint32_t Vr41xxPiuConverter::MmioBase() const { return emu_.Get<Vr41xxBufferedPiu>().Piu2Base(); }
+uint32_t Vr41xxPiuConverter::MmioSize() const { return emu_.Get<Vr41xxBufferedPiu>().Piu2Size(); }
 
-int Vr41xxPiuConverter::ConvertCoordinates(uint16_t pos_x, uint16_t pos_y) {
+int Vr41xxPiuConverter::ConvertCoordinates(uint16_t pos_x, uint16_t pos_y, bool contact) {
     emu_.Get<Vr41xxCmu>().RequireClock(kCmuMskPiu, "PIU coordinate sample");
+    Vr41xxPiuPanel& panel = emu_.Get<Vr41xxPiuPanel>();
     std::lock_guard<std::mutex> lk(mtx_);
     const int page = next_page_;
     uint16_t (&buf)[5] = page_buf_[page];
-    const uint16_t x_rise = static_cast<uint16_t>(pos_x & 0x3FFu);
-    const uint16_t x_fall = static_cast<uint16_t>((kAdcMax - pos_x) & 0x3FFu);
-    const uint16_t y_rise = static_cast<uint16_t>(pos_y & 0x3FFu);
-    const uint16_t y_fall = static_cast<uint16_t>((kAdcMax - pos_y) & 0x3FFu);
-    buf[0] = kValid | x_rise;
-    buf[1] = kValid | x_fall;
-    buf[2] = kValid | y_rise;
-    buf[3] = kValid | y_fall;
-    const std::optional<uint16_t> z = emu_.Get<Vr41xxPiuPanel>().PressureSample();
+    if (contact) {
+        buf[0] = kValid | static_cast<uint16_t>(pos_x & 0x3FFu);
+        buf[1] = kValid | static_cast<uint16_t>((kAdcMax - pos_x) & 0x3FFu);
+        buf[2] = kValid | static_cast<uint16_t>(pos_y & 0x3FFu);
+        buf[3] = kValid | static_cast<uint16_t>((kAdcMax - pos_y) & 0x3FFu);
+    } else {
+        const uint16_t plate = kValid | static_cast<uint16_t>(panel.ReleasedPlateSample() & 0x3FFu);
+        for (int i = 0; i < 4; ++i) buf[i] = plate;
+    }
+    const std::optional<uint16_t> z = panel.PressureSample(contact);
     buf[4] = z ? static_cast<uint16_t>(kValid | (*z & 0x3FFu)) : 0u;
     next_page_ ^= 1;
     return page;
 }
 
-bool Vr41xxPiuConverter::ConvertCommand(uint16_t cmd, uint16_t pos_x, uint16_t pos_y) {
+bool Vr41xxPiuConverter::ConvertCommand(uint16_t cmd, uint16_t pos_x, uint16_t pos_y, bool contact) {
     emu_.Get<Vr41xxCmu>().RequireClock(kCmuMskPiu, "PIU command scan");
+    const uint16_t adcmd = static_cast<uint16_t>(cmd & 0x000Fu);
+    if (adcmd == kAdcmdStandby) return false;
+    if (adcmd > kAdcmdAudioIn) {
+        emu_.Get<Fatal>().Die("VR41xx PIU: command scan with RFU ADCMD 0x%X (PIUCMDREG 0x%04X)", adcmd, cmd);
+    }
+    Vr41xxPiuPanel& panel = emu_.Get<Vr41xxPiuPanel>();
+    const std::optional<uint16_t> val = adcmd < kAdcmdAdin0
+        ? std::optional<uint16_t>(FilmPortSample(cmd, adcmd, pos_x, pos_y, contact, panel.HasTouchscreen()))
+        : panel.PortSample(adcmd);
     std::lock_guard<std::mutex> lk(mtx_);
-    const std::optional<uint16_t> val = emu_.Get<Vr41xxPiuPanel>().ConvertCommandPort(
-        static_cast<uint16_t>(cmd & 0x000Fu), pos_x, pos_y);
     adbuf_[0] = val ? static_cast<uint16_t>(kValid | (*val & 0x3FFu)) : 0u;
     return val.has_value();
 }
@@ -84,7 +138,9 @@ bool Vr41xxPiuConverter::ScanAdPorts(uint16_t ascn, uint16_t amsk) {
     for (uint16_t slot = 0; slot < 4u; ++slot) {
         const uint16_t port = port_base + slot;
         if (amsk & (1u << port)) { adbuf_[slot] = 0; continue; }
-        const std::optional<uint16_t> v = emu_.Get<Vr41xxPiuPanel>().AdPortScanSample(port);
+        const std::optional<uint16_t> v = port < kAdcmdAdin0
+            ? std::optional<uint16_t>(kUndrivenPortSample)
+            : emu_.Get<Vr41xxPiuPanel>().PortSample(port);
         if (v) { adbuf_[slot] = static_cast<uint16_t>(kValid | (*v & 0x3FFu)); any_valid = true; }
         else   { adbuf_[slot] = 0; }
     }

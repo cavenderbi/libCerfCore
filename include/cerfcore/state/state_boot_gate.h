@@ -4,6 +4,7 @@
 #include "../core/service.h"
 
 #include <functional>
+#include <string>
 
 namespace cerfcore {
 
@@ -15,7 +16,8 @@ public:
     void RegisterColdStartListener(std::function<void()> fn);
 
 private:
-    void Run();
+    std::string ImagePath() const;
+    void        Run();
 
     CallbackList<> cold_start_listeners_;
 };

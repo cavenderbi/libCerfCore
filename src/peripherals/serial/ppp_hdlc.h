@@ -23,6 +23,7 @@ public:
     /* Feed guest TX bytes; each complete, FCS-good frame is delivered to the
        sink. Frames failing the FCS check are silently discarded. */
     void Feed(const uint8_t* data, size_t n);
+    void LineError();
 
     /* Append one async-HDLC frame for (protocol, payload) to `out`: flag,
        Address/Control 0xFF 0x03, 2-byte protocol, payload, FCS-16 lo/hi, flag,

@@ -12,6 +12,7 @@ public:
     Vr41xxRtcLatch(uint32_t halves, uint64_t mask) : halves_(halves), mask_(mask) {}
 
     bool     Write(uint32_t half, uint16_t value);
+    void     WriteNow(uint32_t half, uint16_t value);
     bool     Written(uint32_t half) const { return (written_ & (1u << half)) != 0u; }
     bool     Open() const { return written_ != 0u; }
     uint64_t Value() const { return value_; }

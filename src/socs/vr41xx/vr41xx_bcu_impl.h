@@ -33,8 +33,66 @@ constexpr bool WritableAndWrite0Partition(const RegWindowModel& m, uint32_t off)
 }
 
 template <const std::string_view& Soc, const RegWindowModel& M>
-class Vr41xxBcuBase : public RegWindowBase<Soc, M> {
+class Vr41xxBcuWindow : public RegWindowBase<Soc, M> {
     using Base = RegWindowBase<Soc, M>;
+
+public:
+    using Base::Base;
+
+    void OnReady() override {
+        Base::OnReady();
+        dispatcher_   = &this->emu_.template Get<PeripheralDispatcher>();
+        lcd_space_id_ = dispatcher_->InstallDataInversion(vr41xx_bcu::kLcdSpaceBase, vr41xx_bcu::kLcdSpaceEnd);
+        lcd_port_     = dispatcher_->InstallHalfwordPort(vr41xx_bcu::kLcdSpaceBase, vr41xx_bcu::kLcdSpaceEnd,
+                                                         LcdSpaceSixteenBit());
+        UpdateLcdSpace();
+    }
+
+    void WriteHalf(uint32_t addr, uint16_t value) override {
+        const uint32_t off = addr - M.base;
+        if (const char* why = EncodingRejected(off, value)) {
+            this->HaltUnsupportedAccess(why, addr, value);
+        }
+        Base::WriteHalf(addr, value);
+        UpdateLcdSpace();
+    }
+
+    void RestoreState(StateReader& r) override {
+        Base::RestoreState(r);
+        UpdateLcdSpace();
+    }
+
+protected:
+    const char* RegStateName(uint32_t i) const override {
+        (void)i;
+        return "bcu_reg";
+    }
+
+    virtual const char* EncodingRejected(uint32_t off, uint16_t value) const {
+        (void)off;
+        (void)value;
+        return nullptr;
+    }
+
+    virtual bool LcdSpaceInverted() const = 0;
+    virtual bool LcdSpaceSixteenBit() const { return true; }
+
+    void AfterReset() override { UpdateLcdSpace(); }
+
+    void UpdateLcdSpace() {
+        dispatcher_->SetDataInversion(lcd_space_id_, LcdSpaceInverted());
+        dispatcher_->SetHalfwordPort(lcd_port_, LcdSpaceSixteenBit());
+    }
+
+private:
+    PeripheralDispatcher*                 dispatcher_   = nullptr;
+    PeripheralDispatcher::DataInversionId lcd_space_id_ = 0u;
+    PeripheralDispatcher::HalfwordPortId  lcd_port_     = 0u;
+};
+
+template <const std::string_view& Soc, const RegWindowModel& M>
+class Vr41xxBcuBase : public Vr41xxBcuWindow<Soc, M> {
+    using Base = Vr41xxBcuWindow<Soc, M>;
 
     static constexpr uint32_t kCnt1Slot = vr41xx_bcu::kOffCnt1 / 2u;
     static constexpr uint32_t kCnt2Slot = vr41xx_bcu::kOffCnt2 / 2u;
@@ -55,51 +113,21 @@ public:
     void OnReady() override {
         Base::OnReady();
         ApplyEntryWrites();
-        dispatcher_   = &this->emu_.template Get<PeripheralDispatcher>();
-        lcd_space_id_ = dispatcher_->InstallDataInversion(vr41xx_bcu::kLcdSpaceBase,
-                                                          vr41xx_bcu::kLcdSpaceEnd);
-        UpdateLcdInversion();
-        lcd_port_ = dispatcher_->InstallHalfwordPort(vr41xx_bcu::kLcdSpaceBase,
-                                                     vr41xx_bcu::kLcdSpaceEnd, LcdSpaceSixteenBit());
-    }
-
-    void WriteHalf(uint32_t addr, uint16_t value) override {
-        const uint32_t off = addr - M.base;
-        if (const char* why = EncodingRejected(off, value)) {
-            this->HaltUnsupportedAccess(why, addr, value);
-        }
-        Base::WriteHalf(addr, value);
-        if (off == vr41xx_bcu::kOffCnt1 || off == vr41xx_bcu::kOffCnt2) UpdateLcdInversion();
-        UpdateLcdPort();
-    }
-
-    void RestoreState(StateReader& r) override {
-        Base::RestoreState(r);
-        UpdateLcdInversion();
-        UpdateLcdPort();
+        this->UpdateLcdSpace();
     }
 
 protected:
-    const char* RegStateName(uint32_t i) const override {
-        (void)i;
-        return "bcu_reg";
-    }
-
     virtual std::vector<Vr41xxBcuBootWrite> KernelEntryWrites() const { return {}; }
 
-    virtual const char* EncodingRejected(uint32_t off, uint16_t value) const {
-        (void)off;
-        (void)value;
-        return nullptr;
+    bool LcdSpaceInverted() const override {
+        return (this->StoredReg(kCnt1Slot) & vr41xx_bcu::kCnt1IsamLcd) == 0u &&
+               (this->StoredReg(kCnt2Slot) & vr41xx_bcu::kCnt2Gmode) == 0u;
     }
 
     void AfterReset() override {
         ApplyEntryWrites();
-        UpdateLcdInversion();
-        UpdateLcdPort();
+        this->UpdateLcdSpace();
     }
-
-    virtual bool LcdSpaceSixteenBit() const { return true; }
 
 private:
     void ApplyEntryWrites() {
@@ -109,7 +137,7 @@ private:
                 M.reg[i].write == WriteKind::kFatal) {
                 continue;
             }
-            if (const char* why = EncodingRejected(w.offset, w.value)) {
+            if (const char* why = this->EncodingRejected(w.offset, w.value)) {
                 this->emu_.template Get<Fatal>().Die(
                     "%s: kernel-entry %s (0x%04X at 0x%02X)", typeid(*this).name(), why,
                     w.value, w.offset);
@@ -118,17 +146,6 @@ private:
         }
     }
 
-    void UpdateLcdInversion() {
-        dispatcher_->SetDataInversion(
-            lcd_space_id_, (this->StoredReg(kCnt1Slot) & vr41xx_bcu::kCnt1IsamLcd) == 0u &&
-                               (this->StoredReg(kCnt2Slot) & vr41xx_bcu::kCnt2Gmode) == 0u);
-    }
-
-    void UpdateLcdPort() { dispatcher_->SetHalfwordPort(lcd_port_, LcdSpaceSixteenBit()); }
-
-    PeripheralDispatcher*                  dispatcher_   = nullptr;
-    PeripheralDispatcher::DataInversionId lcd_space_id_ = 0u;
-    PeripheralDispatcher::HalfwordPortId  lcd_port_     = 0u;
 };
 
 }

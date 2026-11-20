@@ -13,6 +13,7 @@ public:
 
     int  FillPercent() const { return battery_.ChargePercent(); }
     bool IsOnBattery() const { return battery_.OnBattery(); }
+    bool Charging() const { return battery_.Charging(); }
 
 private:
     Battery       battery_{emu_};

@@ -12,13 +12,10 @@ namespace cerfcore {
 
 namespace {
 
-constexpr uint32_t kDramVaBase = 0x80000000u;
-
 /* TX39 BIU System Address Map: DRAMBANK0CS1 0x00000000, DRAMBANK1CS1 0x02000000,
    DRAMBANK_LEN 0x02000000 (ENCS1DRAM clear). */
 constexpr uint32_t kBank0PaBase     = 0x00000000u;
 constexpr uint32_t kBank0DecodeSpan = 0x02000000u;
-constexpr uint32_t kBank1VaBase     = 0x82000000u;
 constexpr uint32_t kBank1PaBase     = 0x02000000u;
 constexpr uint32_t kBank1DecodeSpan = 0x02000000u;
 
@@ -37,41 +34,39 @@ public:
 
     void OnReady() override {
         const auto& memory = emu_.Get<SharpMobilonHcMemory>();
-        bank0_size_ = memory.Bank0Bytes();
-        bank1_size_ = memory.Bank1Bytes();
-        rom_ = PlaceEntryXipRom(kDramVaBase, bank0_size_);
+        bank0_ = CachedWindowDram(kBank0PaBase, memory.Bank0Bytes(), kBank0DecodeSpan, kBank0DecodeSpan);
+        bank1_ = CachedWindowDram(kBank1PaBase, memory.Bank1Bytes(), kBank1DecodeSpan, kBank1DecodeSpan);
+        rom_   = PlaceEntryXipRom(bank0_.region.va_base, bank0_.region.size);
     }
 
     std::vector<DramRegion> CachedDramRegions() const override {
-        std::vector<DramRegion> regions = { { kDramVaBase, kBank0PaBase, bank0_size_ } };
-        if (bank1_size_ != 0u) regions.push_back({ kBank1VaBase, kBank1PaBase, bank1_size_ });
+        std::vector<DramRegion> regions;
+        bank0_.AddCachedTo(regions);
+        bank1_.AddCachedTo(regions);
         return regions;
     }
 
     std::vector<BackedRegion> BackedMemoryRegions() const override {
-        std::vector<BackedRegion> regions = {
-            { kDramVaBase, kBank0PaBase, bank0_size_, MemoryKind::kRam, kBank0DecodeSpan },
-        };
-        if (bank1_size_ != 0u) {
-            regions.push_back({ kBank1VaBase, kBank1PaBase, bank1_size_, MemoryKind::kRam,
-                                kBank1DecodeSpan });
-        }
+        std::vector<BackedRegion> regions;
+        bank0_.AddBackedTo(regions);
+        bank1_.AddBackedTo(regions);
         regions.push_back({ rom_.va_base, rom_.pa_base, rom_.size, MemoryKind::kRom });
         return regions;
     }
 
     std::vector<DramRegion> MappedVaSpans() const override {
-        std::vector<DramRegion> spans = { { kDramVaBase, kBank0PaBase, kBank0DecodeSpan } };
-        if (bank1_size_ != 0u) spans.push_back({ kBank1VaBase, kBank1PaBase, kBank1DecodeSpan });
+        std::vector<DramRegion> spans;
+        bank0_.AddMappedTo(spans);
+        bank1_.AddMappedTo(spans);
         spans.push_back(rom_);
         spans.push_back({ kRegsVaBase, kRegsPaBase, kRegsSize });
         return spans;
     }
 
 private:
-    uint32_t   bank0_size_ = 0;
-    uint32_t   bank1_size_ = 0;
-    DramRegion rom_{};
+    UnmappedWindowDram bank0_{};
+    UnmappedWindowDram bank1_{};
+    DramRegion         rom_{};
 };
 
 }  /* namespace */

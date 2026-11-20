@@ -13,13 +13,16 @@ class RicohRf5c396 : public IsaExcaSocketPair {
 public:
     explicit RicohRf5c396(CerfEmulator& emu);
 
+    static constexpr const char* kName                 = "RF5C396";
+    static constexpr bool        kPortOverlayUndefined = false;
+
     static bool FittedOnFamily(std::string_view family);
 
     bool ShouldRegister() override;
     void OnReady() override;
 
 protected:
-    const char* ChipName() const override { return "RF5C396"; }
+    const char* ChipName() const override { return kName; }
     uint8_t     UnbankedIndexReadLocked(uint32_t port) override;
     uint8_t     UnbankedDataReadLocked(uint32_t port) override;
     void        UnbankedDataWriteLocked(uint8_t) override {}

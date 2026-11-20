@@ -1,6 +1,7 @@
 #include <cerfcore/peripherals/peripheral_base.h>
 
 #include <cerfcore/boards/board_context.h>
+#include "../../boards/casio_cassiopeia_a10/casio_cassiopeia_a10_family_id.h"
 #include "../../boards/casio_pocketpostpet/casio_pocketpostpet_family_id.h"
 #include "../../boards/casio_tomcat/casio_tomcat_family_id.h"
 #include <cerfcore/core/cerf_emulator.h>
@@ -9,26 +10,25 @@
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
 
+#include <algorithm>
 #include <cstdint>
 
 namespace cerfcore {
 
 namespace {
 
-/* ISA-MEM system bus: VR4121 UM Table 6-6 p173 and VR4111 UM Table 6-6 p166 both give
-   0x1000 0000-0x13FF FFFF as "System bus memory space (ISA-MEM)". */
 constexpr uint32_t kBase = 0x10000120u;
 constexpr uint32_t kSize = 0x08u;
 
-/* casio_toricomail_ce212 nk.exe sub_9F0B955C (send) / sub_9F0B94DC (get);
-   casio_cassiopeia_e55 nk.exe 0x9E8170C0 (send) / 0x9E817040 (get). */
-constexpr uint32_t kOffData  = 0x00u;   /* data out sh 0($a2); RX = lhu 0($a2) high byte */
-constexpr uint32_t kOffCtrl  = 0x02u;   /* command/status 0x1100/0x9100/0x9900, 0x3330 init */
-constexpr uint32_t kOffProbe = 0x04u;   /* loopback probe, writes 0x80/0 and reads bit 7 */
+constexpr uint32_t kOffData  = 0x00u;
+constexpr uint32_t kOffCtrl  = 0x02u;
+constexpr uint32_t kOffProbe = 0x04u;
 
-/* Init requires (status & 0x2320) == 0x2320; D1 (0x2) TX-ACK and D12 (0x1000) RX-ready
-   are the peer-handshake bits both drivers poll. */
 constexpr uint16_t kCtrlPresent = 0x2320u;
+
+constexpr uint16_t kDataBits      = 0x00FFu;
+constexpr uint16_t kCtrlValues[]  = {0x1100u, 0x3330u, 0x9100u, 0x9900u};
+constexpr uint16_t kProbeValues[] = {0x0000u, 0x0080u};
 
 class CasioHostLink : public Peripheral {
 public:
@@ -38,7 +38,8 @@ public:
         auto* bd = emu_.TryGet<BoardContext>();
         if (!bd) return false;
         const auto b = bd->GetBoardFamilyId();
-        return b == BoardFamilyId::CasioPocketpostpet || b == BoardFamilyId::CasioTomcat;
+        return b == BoardFamilyId::CasioPocketpostpet || b == BoardFamilyId::CasioTomcat ||
+               b == BoardFamilyId::CasioCassiopeiaA10;
     }
     void OnReady() override {
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) { probe_ = 0u; });
@@ -58,12 +59,20 @@ public:
     void WriteHalf(uint32_t addr, uint16_t value) override {
         switch (addr - kBase) {
             case kOffData:
-                LOG(Board, "Casio host-link TX 0x%02X (no docked peer)\n", value & 0xFFu);
+                if ((value & ~kDataBits) != 0u) break;
+                LOG(Board, "Casio host-link TX 0x%02X (no docked peer)\n", value);
                 return;
-            case kOffCtrl:  return;
-            case kOffProbe: probe_ = static_cast<uint16_t>(value & 0x80u); return;
-            default: HaltUnsupportedAccess("CasioHostLink WriteHalf", addr, value);
+            case kOffCtrl:
+                if (std::ranges::find(kCtrlValues, value) == std::ranges::end(kCtrlValues)) break;
+                return;
+            case kOffProbe:
+                if (std::ranges::find(kProbeValues, value) == std::ranges::end(kProbeValues)) break;
+                probe_ = value;
+                return;
+            default:
+                break;
         }
+        HaltUnsupportedAccess("CasioHostLink WriteHalf", addr, value);
     }
 
     uint8_t  ReadByte (uint32_t addr) override { HaltUnsupportedAccess("CasioHostLink ReadByte", addr, 0); }
