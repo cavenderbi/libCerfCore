@@ -1070,7 +1070,12 @@
       }
     }
   ],
-  "device_features": [
+  "device_generic_parts": [
+    {
+      "id": "display",
+      "name": "Display",
+      "icon": "display"
+    },
     {
       "id": "touch",
       "name": "Touch Panel",
@@ -1087,8 +1092,33 @@
       "icon": "keyboard"
     },
     {
+      "id": "ram",
+      "name": "RAM",
+      "icon": "ram"
+    },
+    {
+      "id": "dram_card",
+      "name": "DRAM card",
+      "icon": "pcmcia_enabled_ram"
+    },
+    {
+      "id": "nand",
+      "name": "NAND flash",
+      "icon": "storage"
+    },
+    {
+      "id": "hdd",
+      "name": "Hard disk",
+      "icon": "storage"
+    },
+    {
+      "id": "emmc",
+      "name": "eMMC",
+      "icon": "storage"
+    },
+    {
       "id": "suspend",
-      "name": "CPU Supend/Resume",
+      "name": "CPU Suspend/Resume",
       "icon": "suspend"
     },
     {
@@ -1115,6 +1145,36 @@
       "id": "network",
       "name": "Built-in Network Adapter",
       "icon": "internet"
+    },
+    {
+      "id": "wifi",
+      "name": "Wi-Fi",
+      "icon": "wireless"
+    },
+    {
+      "id": "cellular",
+      "name": "Cellular",
+      "icon": "wireless"
+    },
+    {
+      "id": "irda",
+      "name": "IrDA",
+      "icon": "wireless"
+    },
+    {
+      "id": "dect",
+      "name": "DECT",
+      "icon": "wireless"
+    },
+    {
+      "id": "fm_tuner",
+      "name": "FM tuner",
+      "icon": "wireless"
+    },
+    {
+      "id": "tv_tuner",
+      "name": "TV tuner",
+      "icon": "wireless"
     },
     {
       "id": "battery",
@@ -1181,7 +1241,8 @@
           "id": "32mb",
           "name": "32 MB"
         }
-      ]
+      ],
+      "generic_part_id": "dram_card"
     },
     {
       "id": "ram",
@@ -1230,8 +1291,17 @@
         {
           "id": "64mb",
           "name": "64 MB"
+        },
+        {
+          "id": "128mb",
+          "name": "128 MB"
+        },
+        {
+          "id": "256mb",
+          "name": "256 MB"
         }
-      ]
+      ],
+      "generic_part_id": "ram"
     },
     {
       "id": "lcd_panel",
@@ -1249,7 +1319,8 @@
           "id": "monochrome_stn",
           "name": "Monochrome STN"
         }
-      ]
+      ],
+      "generic_part_id": "display"
     },
     {
       "id": "backlight",
@@ -1277,7 +1348,8 @@
           "id": "nicd_nimh",
           "name": "NiCd / NiMH"
         }
-      ]
+      ],
+      "generic_part_id": "battery"
     },
     {
       "id": "mips16en",
@@ -1299,38 +1371,30 @@
       "id": "samsung_smdk2410",
       "name": "Samsung SMDK2410",
       "soc_id": "s3c2410",
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "sound",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "touch",
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "battery",
-          "supported": true
-        },
-        {
-          "feature_id": "suspend",
-          "supported": true
-        },
-        {
-          "feature_id": "guest_additions",
-          "supported": true
+          "generic_part_id": "serial",
+          "supported": false
         }
       ],
       "notes": [
@@ -1338,10 +1402,6 @@
         "Stock video: don't exceed 800x600 on any OS - CERF crash imminent."
       ],
       "configurable_screen": true,
-      "lcd_panel_size": {
-        "width": 240,
-        "height": 320
-      },
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     },
@@ -1349,47 +1409,58 @@
       "id": "askey_pc3xx",
       "name": "Askey PC3xx",
       "soc_id": "pxa255",
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "sound",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        },
+        {
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "touch",
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": false
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "network",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
+        },
+        {
+          "generic_part_id": "nand",
+          "supported": false,
+          "displayed_name": "DiskOnChip G3"
+        },
+        {
+          "generic_part_id": "irda",
+          "supported": false
         }
       ],
       "notes": [
         "Stock video: visual artifacts present"
       ],
-      "lcd_panel_size": {
-        "width": 240,
-        "height": 320
-      },
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     },
@@ -1415,49 +1486,55 @@
           ]
         }
       },
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "sound",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        },
+        {
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "touch",
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "network",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "mic",
+          "generic_part_id": "mic",
           "supported": true
+        },
+        {
+          "generic_part_id": "irda",
+          "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 240,
-        "height": 320
-      },
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     },
@@ -1466,51 +1543,53 @@
       "name": "Compaq Aero 1500",
       "soc_id": "vr4111",
       "device_year": 1999,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        },
+        {
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "mic",
           "supported": true
         },
         {
-          "feature_id": "mic",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "serial",
           "supported": true
         },
         {
-          "feature_id": "serial",
-          "supported": true
+          "generic_part_id": "irda",
+          "supported": false
         }
       ],
       "notes": [
         "The guest OS driver doesn't accept keypad input for 7 seconds after boot (OEM's intention, not CERF's bug)"
       ],
-      "lcd_panel_size": {
-        "width": 240,
-        "height": 320
-      },
       "ga_window_size": 50331648,
       "rom_placing_mode": "flat_container",
       "board_config": {
@@ -1528,57 +1607,59 @@
       "name": "HP Jornada 820",
       "soc_id": "sa1100",
       "device_year": 1998,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "sound",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 640,
+          "display_height": 480
+        },
+        {
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "mouse",
+          "generic_part_id": "mouse",
           "supported": true
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "network",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "mic",
+          "generic_part_id": "mic",
           "supported": false
         },
         {
-          "feature_id": "serial",
+          "generic_part_id": "serial",
           "supported": false
         },
         {
-          "feature_id": "phone_line",
+          "generic_part_id": "irda",
           "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 480
-      },
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     },
@@ -1596,53 +1677,41 @@
           ]
         }
       },
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "sound",
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "touch",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "mic",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "serial",
           "supported": true
         },
         {
-          "feature_id": "mic",
-          "supported": true
-        },
-        {
-          "feature_id": "serial",
-          "supported": true
-        },
-        {
-          "feature_id": "phone_line",
+          "generic_part_id": "irda",
           "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
       "ga_window_size": 50331648,
       "rom_placing_mode": "flat_container"
     },
@@ -1667,47 +1736,54 @@
             "alkaline",
             "nicd_nimh"
           ]
+        },
+        "backlight": {
+          "default": "installed",
+          "values": [
+            "none",
+            "installed"
+          ]
         }
       },
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "sound",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "touch",
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "serial",
+          "generic_part_id": "serial",
           "supported": true
+        },
+        {
+          "generic_part_id": "irda",
+          "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
       "ga_color_depth": 8,
       "ga_window_size": 50331648,
       "rom_placing_mode": "flat_container"
@@ -1717,91 +1793,103 @@
       "name": "HP Jornada 700 series",
       "soc_id": "sa1110",
       "device_year": 2000,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "sound",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "touch",
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "network",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "mic",
+          "generic_part_id": "mic",
           "supported": false
         },
         {
-          "feature_id": "serial",
+          "generic_part_id": "serial",
           "supported": false
         },
         {
-          "feature_id": "phone_line",
+          "generic_part_id": "irda",
           "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
       "ga_color_depth": 24,
-      "rom_placing_mode": "flat_container"
+      "rom_placing_mode": "flat_container",
+      "board_config": {
+        "ram": {
+          "default": "32mb",
+          "values": [
+            "32mb"
+          ]
+        }
+      }
     },
     {
       "id": "odo",
       "name": "Microsoft Hardware Reference Platform",
       "soc_id": "arm720t",
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "sound",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "touch",
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": false
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 480,
-        "height": 240
-      },
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     },
@@ -1809,59 +1897,59 @@
       "id": "ti_omap35x_evm",
       "name": "TI OMAP35x EVM",
       "soc_id": "omap3530",
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "sound",
+          "generic_part_id": "display",
           "supported": true
         },
         {
-          "feature_id": "touch",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "touch",
+          "supported": true
+        },
+        {
+          "generic_part_id": "suspend",
           "supported": false
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
-        },
-        {
-          "feature_id": "network",
-          "supported": false
         }
       ],
       "ga_color_depth": 24,
-      "rom_placing_mode": "flat_container"
+      "rom_placing_mode": "flat_container",
+      "board_config": {
+        "ram": {
+          "default": "256mb",
+          "values": [
+            "256mb"
+          ]
+        }
+      }
     },
     {
       "id": "toshiba_gigabeat_s",
       "name": "Toshiba Gigabeat S",
       "soc_id": "imx31",
       "device_year": 2006,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "sound",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
-          "supported": true
-        },
-        {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 240,
-        "height": 320
-      },
       "ga_color_depth": 16,
       "rom_placing_mode": "flat_container"
     },
@@ -1870,104 +1958,116 @@
       "name": "Siemens SIMpad",
       "soc_id": "sa1110",
       "device_year": 2001,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "sound",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 800,
+          "display_height": 600
+        },
+        {
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "touch",
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "network",
           "supported": true
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "mic",
+          "generic_part_id": "serial",
           "supported": false
         },
         {
-          "feature_id": "keyboard",
-          "supported": true
-        },
-        {
-          "feature_id": "serial",
+          "generic_part_id": "irda",
           "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 800,
-        "height": 600
-      },
       "ga_color_depth": 24,
-      "rom_placing_mode": "flat_container"
+      "rom_placing_mode": "flat_container",
+      "board_config": {
+        "ram": {
+          "default": "64mb",
+          "values": [
+            "64mb"
+          ]
+        }
+      }
     },
     {
       "id": "nec_mobilepro_900_series",
       "name": "NEC MobilePro 900 Series",
       "soc_id": "pxa255",
       "device_year": 2003,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "sound",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "touch",
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "network",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": false
         },
         {
-          "feature_id": "mic",
+          "generic_part_id": "mic",
           "supported": false
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "phone_line",
+          "generic_part_id": "phone_line",
+          "supported": false
+        },
+        {
+          "generic_part_id": "irda",
           "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     },
@@ -1976,53 +2076,59 @@
       "name": "NEC MobilePro 700",
       "soc_id": "vr4102",
       "device_year": 1997,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "sound",
           "supported": false
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "network",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "serial",
+          "generic_part_id": "serial",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": false
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "phone_line",
+          "generic_part_id": "phone_line",
+          "supported": false
+        },
+        {
+          "generic_part_id": "irda",
           "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
       "ga_color_depth": 8,
       "ga_window_size": 100663296,
       "rom_placing_mode": "flat_container"
@@ -2039,43 +2145,56 @@
             "2mb",
             "4mb"
           ]
+        },
+        "backlight": {
+          "default": "none",
+          "values": [
+            "none",
+            "installed"
+          ]
         }
       },
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "serial",
+          "generic_part_id": "serial",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
           "supported": true
+        },
+        {
+          "generic_part_id": "irda",
+          "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 480,
-        "height": 240
-      },
       "rom_placing_mode": "flat_container"
     },
     {
@@ -2083,53 +2202,51 @@
       "name": "NEC CRONOS3E",
       "soc_id": "vr4121",
       "device_year": 2001,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "mic",
           "supported": true
         },
         {
-          "feature_id": "mic",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "serial",
           "supported": true
         },
         {
-          "feature_id": "serial",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "phone_line",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
-          "supported": true
-        },
-        {
-          "feature_id": "suspend",
-          "supported": true
+          "generic_part_id": "irda",
+          "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
       "ga_window_size": 50331648,
       "rom_placing_mode": "flat_container",
       "board_config": {
@@ -2147,53 +2264,59 @@
       "name": "Casio Tomcat",
       "soc_id": "vr4111",
       "device_year": 1998,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        },
+        {
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "serial",
+          "generic_part_id": "serial",
           "supported": true
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "network",
           "supported": true
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "mic",
+          "generic_part_id": "mic",
           "supported": false
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": false
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
+          "supported": false
+        },
+        {
+          "generic_part_id": "irda",
           "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 240,
-        "height": 320
-      },
       "ga_color_depth": 8,
       "ga_window_size": 50331648,
       "rom_placing_mode": "flat_container",
@@ -2204,6 +2327,12 @@
             "low",
             "high"
           ]
+        },
+        "ram": {
+          "default": "16mb",
+          "values": [
+            "16mb"
+          ]
         }
       }
     },
@@ -2212,41 +2341,39 @@
       "name": "Casio JX670",
       "soc_id": "vr4122",
       "device_year": 2000,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        },
+        {
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "mic",
+          "generic_part_id": "mic",
           "supported": true
-        },
-        {
-          "feature_id": "battery",
-          "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 240,
-        "height": 320
-      },
       "ga_color_depth": 24,
       "ga_window_size": 100663296,
       "rom_placing_mode": "flat_container",
@@ -2257,6 +2384,12 @@
             "low",
             "high"
           ]
+        },
+        "ram": {
+          "default": "16mb",
+          "values": [
+            "16mb"
+          ]
         }
       }
     },
@@ -2265,33 +2398,29 @@
       "name": "Casio PocketPostPet",
       "soc_id": "vr4121",
       "device_year": 2000,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "sound",
-          "supported": true
-        },
-        {
-          "feature_id": "network",
+          "generic_part_id": "network",
           "supported": false
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": false
         },
         {
-          "feature_id": "mic",
+          "generic_part_id": "mic",
           "supported": true
         }
       ],
@@ -2299,10 +2428,6 @@
         "Stock camera: access causes imminent crash",
         "Stock microphone: access causes imminent crash"
       ],
-      "lcd_panel_size": {
-        "width": 320,
-        "height": 240
-      },
       "ga_color_depth": 24,
       "ga_window_size": 100663296,
       "rom_placing_mode": "flat_container",
@@ -2331,51 +2456,54 @@
             "5mb",
             "6mb"
           ]
+        },
+        "backlight": {
+          "default": "installed",
+          "values": [
+            "none",
+            "installed"
+          ]
         }
       },
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "mic",
           "supported": true
         },
         {
-          "feature_id": "mic",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "serial",
           "supported": true
         },
         {
-          "feature_id": "serial",
-          "supported": true
+          "generic_part_id": "irda",
+          "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 480,
-        "height": 240
-      },
       "ga_color_depth": 8,
       "ga_window_size": 67108864,
       "rom_placing_mode": "flat_container"
@@ -2401,55 +2529,53 @@
           ]
         }
       },
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "mouse",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 640,
+          "display_height": 480
+        },
+        {
+          "generic_part_id": "mouse",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "mic",
           "supported": true
         },
         {
-          "feature_id": "mic",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "serial",
           "supported": true
         },
         {
-          "feature_id": "serial",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "phone_line",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "battery",
-          "supported": true
-        },
-        {
-          "feature_id": "suspend",
-          "supported": true
+          "generic_part_id": "irda",
+          "supported": false
         }
       ],
       "notes": [
         "Slow emulation"
       ],
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 480
-      },
       "ga_window_size": 100663296,
       "rom_placing_mode": "flat_container"
     },
@@ -2457,43 +2583,45 @@
       "id": "nec_sg2_vr5500",
       "name": "NEC Solution Gear 2-Vr5500",
       "soc_id": "vr5500",
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "mouse",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 640,
+          "display_height": 480
+        },
+        {
+          "generic_part_id": "mouse",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
           "supported": false
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "sound",
           "supported": false
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "network",
           "supported": true
         }
       ],
       "notes": [
         "MIPS IV ROM is incompatible with MIPS II apps. Prefer using MIPS II ROM."
       ],
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 480
-      },
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     },
@@ -2502,55 +2630,63 @@
       "name": "Philips Nino",
       "soc_id": "pr31700",
       "device_year": 1998,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "serial",
+          "generic_part_id": "serial",
           "supported": true
         },
         {
-          "feature_id": "microphone",
+          "generic_part_id": "mic",
           "supported": true
         },
         {
-          "feature_id": "phone_line",
+          "generic_part_id": "phone_line",
+          "supported": false
+        },
+        {
+          "generic_part_id": "irda",
           "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 240,
-        "height": 320
-      },
       "ga_color_depth": 8,
-      "rom_placing_mode": "flat_container"
+      "rom_placing_mode": "flat_container",
+      "board_config": {
+        "ram": {
+          "default": "4mb",
+          "values": [
+            "4mb"
+          ]
+        }
+      }
     },
     {
       "id": "philips_velo_1",
@@ -2570,53 +2706,59 @@
           ]
         }
       },
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": false
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "network",
           "supported": true
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "serial",
+          "generic_part_id": "serial",
           "supported": true
         },
         {
-          "feature_id": "phone_line",
+          "generic_part_id": "phone_line",
+          "supported": false
+        },
+        {
+          "generic_part_id": "irda",
           "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 480,
-        "height": 240
-      },
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     },
@@ -2650,53 +2792,55 @@
           ]
         }
       },
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "network",
           "supported": true
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "serial",
           "supported": true
         },
         {
-          "feature_id": "serial",
-          "supported": true
+          "generic_part_id": "phone_line",
+          "supported": false
         },
         {
-          "feature_id": "phone_line",
+          "generic_part_id": "irda",
           "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
       "ga_color_depth": 8,
       "rom_placing_mode": "flat_container"
     },
@@ -2705,29 +2849,25 @@
       "name": "Siemens SIMATIC MP 377",
       "soc_id": "iop13xx",
       "device_year": 2007,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "network",
           "supported": true
         },
         {
-          "feature_id": "network",
-          "supported": true
-        },
-        {
-          "feature_id": "mic",
+          "generic_part_id": "mic",
           "supported": false
         },
         {
-          "feature_id": "serial",
+          "generic_part_id": "serial",
           "supported": false
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         }
       ],
@@ -2739,25 +2879,27 @@
       "id": "siemens_simatic_tp177b_4",
       "name": "Siemens SIMATIC TP 177B 4\"",
       "soc_id": "s3c2410",
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 480,
+          "display_height": 272
+        },
+        {
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "network",
           "supported": false
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 480,
-        "height": 272
-      },
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     },
@@ -2766,49 +2908,55 @@
       "name": "Pangolin",
       "soc_id": "sa1110",
       "device_year": 2003,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 800,
+          "display_height": 480
+        },
+        {
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": true
         },
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "pcmcia",
           "supported": true
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "network",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "battery",
+          "generic_part_id": "battery",
           "supported": false
         },
         {
-          "feature_id": "mic",
+          "generic_part_id": "mic",
           "supported": false
         },
         {
-          "feature_id": "suspend",
+          "generic_part_id": "suspend",
           "supported": true
         },
         {
-          "feature_id": "phone_line",
+          "generic_part_id": "phone_line",
+          "supported": false
+        },
+        {
+          "generic_part_id": "cellular",
           "supported": false
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 800,
-        "height": 480
-      },
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     },
@@ -2817,18 +2965,28 @@
       "name": "Ford SYNC Gen 2",
       "soc_id": "imx51",
       "device_year": 2010,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 800,
+          "display_height": 480
+        },
+        {
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "sound",
           "supported": false
+        },
+        {
+          "generic_part_id": "nand",
+          "supported": true
         }
       ],
       "notes": [
@@ -2836,10 +2994,6 @@
         "Guest Additions: do not use this mode when booting without NAND. Flash your device first.",
         "Guest Additions: driver will OVERWRITE your registry and permanently force WinCE Shell even for stock device runs."
       ],
-      "lcd_panel_size": {
-        "width": 800,
-        "height": 480
-      },
       "ga_color_depth": 24,
       "rom_placing_mode": "imx51_nand"
     },
@@ -2848,33 +3002,29 @@
       "name": "Symbol Hamptons",
       "soc_id": "pxa270",
       "device_year": 2009,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "touch",
+          "generic_part_id": "touch",
           "supported": true
         },
         {
-          "feature_id": "keyboard",
+          "generic_part_id": "keyboard",
           "supported": false
         },
         {
-          "feature_id": "sound",
+          "generic_part_id": "sound",
           "supported": true
         },
         {
-          "feature_id": "network",
+          "generic_part_id": "network",
           "supported": false
         },
         {
-          "feature_id": "guest_additions",
+          "generic_part_id": "guest_additions",
           "supported": true
         }
       ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 320,
-        "height": 240
-      },
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     },
@@ -2883,12 +3033,15 @@
       "name": "Nokia Sea Ray",
       "soc_id": "msm8255",
       "device_year": 2011,
-      "device_features": [],
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": false,
+          "display_width": 480,
+          "display_height": 800
+        }
+      ],
       "notes": [],
-      "lcd_panel_size": {
-        "width": 480,
-        "height": 800
-      },
       "ga_color_depth": 24,
       "rom_placing_mode": "flat_container"
     }
@@ -2899,7 +3052,27 @@
       "name": "Device Emulator 2008 (QVGA)",
       "short_name": "Device Emulator",
       "board_family_id": "samsung_smdk2410",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        },
+        {
+          "generic_part_id": "network",
+          "supported": true
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        },
+        {
+          "generic_part_id": "guest_additions",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "devemu_vga",
@@ -2907,10 +3080,26 @@
       "short_name": "Device Emulator",
       "board_family_id": "samsung_smdk2410",
       "support_level": "bootable_full",
-      "lcd_panel_size": {
-        "width": 480,
-        "height": 640
-      },
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 480,
+          "display_height": 640
+        },
+        {
+          "generic_part_id": "network",
+          "supported": true
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        },
+        {
+          "generic_part_id": "guest_additions",
+          "supported": true
+        }
+      ],
       "dynamic_scale_factor": -1
     },
     {
@@ -2919,10 +3108,26 @@
       "short_name": "Device Emulator",
       "board_family_id": "samsung_smdk2410",
       "support_level": "bootable_full",
-      "lcd_panel_size": {
-        "width": 240,
-        "height": 400
-      }
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 400
+        },
+        {
+          "generic_part_id": "network",
+          "supported": true
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        },
+        {
+          "generic_part_id": "guest_additions",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "devemu_wvga",
@@ -2930,10 +3135,26 @@
       "short_name": "Device Emulator",
       "board_family_id": "samsung_smdk2410",
       "support_level": "bootable_full",
-      "lcd_panel_size": {
-        "width": 480,
-        "height": 800
-      }
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 480,
+          "display_height": 800
+        },
+        {
+          "generic_part_id": "network",
+          "supported": true
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        },
+        {
+          "generic_part_id": "guest_additions",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "devemu_sp",
@@ -2941,10 +3162,26 @@
       "short_name": "Device Emulator",
       "board_family_id": "samsung_smdk2410",
       "support_level": "bootable_full",
-      "lcd_panel_size": {
-        "width": 176,
-        "height": 220
-      },
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 176,
+          "display_height": 220
+        },
+        {
+          "generic_part_id": "network",
+          "supported": true
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        },
+        {
+          "generic_part_id": "guest_additions",
+          "supported": true
+        }
+      ],
       "dynamic_scale_factor": 1
     },
     {
@@ -2952,14 +3189,54 @@
       "name": "Device Emulator 2008 Smartphone (QVGA)",
       "short_name": "Device Emulator",
       "board_family_id": "samsung_smdk2410",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        },
+        {
+          "generic_part_id": "network",
+          "supported": true
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        },
+        {
+          "generic_part_id": "guest_additions",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "devemu_gen1",
       "name": "Device Emulator 2003 (QVGA)",
       "short_name": "Device Emulator",
       "board_family_id": "samsung_smdk2410",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        },
+        {
+          "generic_part_id": "network",
+          "supported": true
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        },
+        {
+          "generic_part_id": "guest_additions",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "devemu_gen1_vga",
@@ -2967,10 +3244,26 @@
       "short_name": "Device Emulator",
       "board_family_id": "samsung_smdk2410",
       "support_level": "bootable_full",
-      "lcd_panel_size": {
-        "width": 480,
-        "height": 640
-      },
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 480,
+          "display_height": 640
+        },
+        {
+          "generic_part_id": "network",
+          "supported": true
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        },
+        {
+          "generic_part_id": "guest_additions",
+          "supported": true
+        }
+      ],
       "dynamic_scale_factor": -1
     },
     {
@@ -2979,10 +3272,26 @@
       "short_name": "Device Emulator",
       "board_family_id": "samsung_smdk2410",
       "support_level": "bootable_full",
-      "lcd_panel_size": {
-        "width": 176,
-        "height": 220
-      },
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 176,
+          "display_height": 220
+        },
+        {
+          "generic_part_id": "network",
+          "supported": true
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        },
+        {
+          "generic_part_id": "guest_additions",
+          "supported": true
+        }
+      ],
       "dynamic_scale_factor": 1
     },
     {
@@ -2990,7 +3299,27 @@
       "name": "Device Emulator 2003 Smartphone (QVGA)",
       "short_name": "Device Emulator",
       "board_family_id": "samsung_smdk2410",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        },
+        {
+          "generic_part_id": "network",
+          "supported": true
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        },
+        {
+          "generic_part_id": "guest_additions",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "devemu_wince_svga",
@@ -2998,10 +3327,26 @@
       "short_name": "Device Emulator",
       "board_family_id": "samsung_smdk2410",
       "support_level": "bootable_full",
-      "lcd_panel_size": {
-        "width": 800,
-        "height": 600
-      }
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 800,
+          "display_height": 600
+        },
+        {
+          "generic_part_id": "network",
+          "supported": true
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        },
+        {
+          "generic_part_id": "guest_additions",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "devemu_gen1_wince_svga",
@@ -3009,10 +3354,26 @@
       "short_name": "Device Emulator",
       "board_family_id": "samsung_smdk2410",
       "support_level": "bootable_full",
-      "lcd_panel_size": {
-        "width": 800,
-        "height": 600
-      }
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 800,
+          "display_height": 600
+        },
+        {
+          "generic_part_id": "network",
+          "supported": true
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        },
+        {
+          "generic_part_id": "guest_additions",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "samsung_smdk2410",
@@ -3020,6 +3381,27 @@
       "short_name": "SMDK2410",
       "board_family_id": "samsung_smdk2410",
       "support_level": "no_support",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        },
+        {
+          "generic_part_id": "mic",
+          "supported": false
+        },
+        {
+          "generic_part_id": "network",
+          "supported": false,
+          "displayed_name": "CS8900A"
+        },
+        {
+          "generic_part_id": "irda",
+          "supported": false
+        }
+      ],
       "internal__spec_divergences": "physical board, no Device Emulator virtual devices"
     },
     {
@@ -3042,7 +3424,6 @@
       "short_name": "iPAQ H3100",
       "board_family_id": "compaq_ipaq_h3000",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "16 MB RAM, 15-level grayscale STN panel",
       "device_year": 2001,
       "board_config": {
         "ram": {
@@ -3059,7 +3440,6 @@
       "short_name": "iPAQ H3660/H3670",
       "board_family_id": "compaq_ipaq_h3000",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "64 MB RAM",
       "device_year": 2001,
       "board_config": {
         "ram": {
@@ -3073,7 +3453,7 @@
       "short_name": "iPAQ H37xx",
       "board_family_id": "compaq_ipaq_h3000",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "64 MB RAM, 32 MB flash",
+      "internal__spec_divergences": "32 MB flash",
       "device_year": 2001,
       "board_config": {
         "ram": {
@@ -3086,7 +3466,14 @@
       "name": "Compaq Aero 1520",
       "short_name": "Aero 1520",
       "board_family_id": "compaq_aero_1500",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "Keypad with exit button"
+        }
+      ]
     },
     {
       "id": "compaq_aero_1530",
@@ -3094,7 +3481,13 @@
       "short_name": "Aero 1530",
       "board_family_id": "compaq_aero_1500",
       "support_level": "bootable_partial",
-      "internal__spec_divergences": "identical hardware"
+      "device_specs": [
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "Keypad with exit button"
+        }
+      ]
     },
     {
       "id": "compaq_aero_1550",
@@ -3102,7 +3495,13 @@
       "short_name": "Aero 1550",
       "board_family_id": "compaq_aero_1500",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Pocket PC mask ROM, QLaunch side button in place of the exit button",
+      "device_specs": [
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "Keypad with QLaunch button"
+        }
+      ],
       "device_year": 2000
     },
     {
@@ -3111,29 +3510,62 @@
       "short_name": "Presario 150",
       "board_family_id": "compaq_aero_1500",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Japanese mask ROM"
+      "device_specs": [
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "Keypad with exit button"
+        }
+      ]
     },
     {
       "id": "jornada_820",
       "name": "HP Jornada 820",
       "short_name": "Jornada 820",
       "board_family_id": "hp_jornada_820",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "jornada_820e",
       "name": "HP Jornada 820e",
       "short_name": "Jornada 820e",
       "board_family_id": "hp_jornada_820",
-      "support_level": "unknown_partial",
-      "internal__spec_divergences": "no modem connector"
+      "support_level": "unknown_partial"
     },
     {
       "id": "jornada_680",
       "name": "HP Jornada 680",
       "short_name": "Jornada 680",
       "board_family_id": "hp_600",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "jornada_680e",
@@ -3141,7 +3573,24 @@
       "short_name": "Jornada 680e",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "no modem"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "jornada_690",
@@ -3149,7 +3598,28 @@
       "short_name": "Jornada 690",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "32 MB RAM",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ],
       "device_year": 1999,
       "board_config": {
         "ram": {
@@ -3163,7 +3633,24 @@
       "short_name": "Jornada 690e",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "32 MB RAM, no modem",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "device_year": 1999,
       "board_config": {
         "ram": {
@@ -3177,7 +3664,28 @@
       "short_name": "Jornada 688",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Chinese ROM",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ],
       "device_year": 1999
     },
     {
@@ -3186,7 +3694,29 @@
       "short_name": "Jornada 680",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Japanese keyboard"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "Japanese keyboard"
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "jornada_680_europe",
@@ -3194,7 +3724,29 @@
       "short_name": "Jornada 680",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "European keyboard"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "European keyboard"
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "jornada_680_germany",
@@ -3202,7 +3754,29 @@
       "short_name": "Jornada 680",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "German keyboard"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "German keyboard"
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "jornada_680_france",
@@ -3210,7 +3784,29 @@
       "short_name": "Jornada 680",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "French keyboard"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "French keyboard"
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "jornada_680_scandinavia",
@@ -3218,7 +3814,29 @@
       "short_name": "Jornada 680",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Scandinavian keyboard"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "Scandinavian keyboard"
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "jornada_680_spain",
@@ -3226,7 +3844,29 @@
       "short_name": "Jornada 680",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Spanish keyboard"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "Spanish keyboard"
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "jornada_690_japan",
@@ -3234,7 +3874,29 @@
       "short_name": "Jornada 690",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "32 MB RAM, Japanese keyboard",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "Japanese keyboard"
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ],
       "device_year": 1999,
       "board_config": {
         "ram": {
@@ -3248,7 +3910,29 @@
       "short_name": "Jornada 690",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "32 MB RAM, European keyboard",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "European keyboard"
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ],
       "device_year": 1999,
       "board_config": {
         "ram": {
@@ -3262,7 +3946,29 @@
       "short_name": "Jornada 690",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "32 MB RAM, German keyboard",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "German keyboard"
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ],
       "device_year": 1999,
       "board_config": {
         "ram": {
@@ -3276,7 +3982,29 @@
       "short_name": "Jornada 690",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "32 MB RAM, French keyboard",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "French keyboard"
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ],
       "device_year": 1999,
       "board_config": {
         "ram": {
@@ -3290,7 +4018,29 @@
       "short_name": "Jornada 690",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "32 MB RAM, Scandinavian keyboard",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "Scandinavian keyboard"
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ],
       "device_year": 1999,
       "board_config": {
         "ram": {
@@ -3304,7 +4054,29 @@
       "short_name": "Jornada 690",
       "board_family_id": "hp_600",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "32 MB RAM, Spanish keyboard",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers A"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "Spanish keyboard"
+        },
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ],
       "device_year": 1999,
       "board_config": {
         "ram": {
@@ -3319,7 +4091,24 @@
       "board_family_id": "hp_600",
       "soc_id": "sh7709",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "10 MB ROM, no modem, other speaker and LCD contrast pins",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers B"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "16mb",
@@ -3341,7 +4130,24 @@
       "board_family_id": "hp_600",
       "soc_id": "sh7709",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "10 MB ROM, no modem, other speaker and LCD contrast pins, Japanese market",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers B"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "16mb",
@@ -3363,7 +4169,24 @@
       "board_family_id": "hp_600",
       "soc_id": "sh7709",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "32 MB RAM, 10 MB ROM, no modem, other speaker and LCD contrast pins",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "sound",
+          "supported": true,
+          "displayed_name": "Speakers B"
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "32mb",
@@ -3383,7 +4206,15 @@
       "name": "HP 320LX",
       "short_name": "320LX",
       "board_family_id": "hp_300",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 640,
+          "display_height": 240
+        }
+      ]
     },
     {
       "id": "hp_300lx",
@@ -3391,10 +4222,21 @@
       "short_name": "300LX",
       "board_family_id": "hp_300",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "2 MB RAM, no backlight, no CompactFlash slot",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 640,
+          "display_height": 240
+        }
+      ],
+      "internal__spec_divergences": "no CompactFlash slot",
       "board_config": {
         "ram": {
           "default": "2mb"
+        },
+        "backlight": {
+          "default": "none"
         }
       }
     },
@@ -3404,7 +4246,14 @@
       "short_name": "340LX",
       "board_family_id": "hp_300",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Asia-Pacific market"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 640,
+          "display_height": 240
+        }
+      ]
     },
     {
       "id": "hp_360lx",
@@ -3412,7 +4261,16 @@
       "short_name": "360LX",
       "board_family_id": "hp_300",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "8 MB RAM, 60 MHz clock, 16-grey panel, white backlight",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "16-grey panel",
+          "display_width": 640,
+          "display_height": 240
+        }
+      ],
+      "internal__spec_divergences": "white backlight",
       "board_config": {
         "ram": {
           "default": "8mb",
@@ -3432,7 +4290,14 @@
       "short_name": "MC12",
       "board_family_id": "hp_300",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Ericsson brand"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 640,
+          "display_height": 240
+        }
+      ]
     },
     {
       "id": "ericsson_mc16",
@@ -3440,7 +4305,16 @@
       "short_name": "MC16",
       "board_family_id": "hp_300",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Ericsson brand, 8 MB RAM, 60 MHz clock, 16-grey panel, white backlight",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "16-grey panel",
+          "display_width": 640,
+          "display_height": 240
+        }
+      ],
+      "internal__spec_divergences": "white backlight",
       "board_config": {
         "ram": {
           "default": "8mb",
@@ -3459,7 +4333,13 @@
       "name": "HP Jornada 720",
       "short_name": "Jornada 720",
       "board_family_id": "hp_jornada_700",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "jornada_710",
@@ -3467,7 +4347,6 @@
       "short_name": "Jornada 710",
       "board_family_id": "hp_jornada_700",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "no modem",
       "device_year": 2001
     },
     {
@@ -3476,8 +4355,18 @@
       "short_name": "Jornada 728",
       "board_family_id": "hp_jornada_700",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "64 MB RAM",
-      "device_year": 2002
+      "device_specs": [
+        {
+          "generic_part_id": "phone_line",
+          "supported": false
+        }
+      ],
+      "device_year": 2002,
+      "board_config": {
+        "ram": {
+          "default": "64mb"
+        }
+      }
     },
     {
       "id": "odo",
@@ -3491,7 +4380,14 @@
       "name": "TI OMAP35x EVM Gen1",
       "short_name": "OMAP35x EVM",
       "board_family_id": "ti_omap35x_evm",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "network",
+          "supported": false,
+          "displayed_name": "LAN9115"
+        }
+      ]
     },
     {
       "id": "omap_3530_evm_gen2",
@@ -3499,7 +4395,13 @@
       "short_name": "OMAP35x EVM",
       "board_family_id": "ti_omap35x_evm",
       "support_level": "bootable_partial",
-      "internal__spec_divergences": "LAN9220 Ethernet"
+      "device_specs": [
+        {
+          "generic_part_id": "network",
+          "supported": false,
+          "displayed_name": "LAN9220"
+        }
+      ]
     },
     {
       "id": "omap_3530_evm_onenand",
@@ -3507,14 +4409,55 @@
       "short_name": "OMAP35x EVM",
       "board_family_id": "ti_omap35x_evm",
       "support_level": "no_support",
-      "internal__spec_divergences": "128 MB RAM, 128 MB OneNAND"
+      "device_specs": [
+        {
+          "generic_part_id": "network",
+          "supported": false,
+          "displayed_name": "LAN9115"
+        },
+        {
+          "generic_part_id": "nand",
+          "supported": false,
+          "displayed_name": "128 MB OneNAND"
+        }
+      ],
+      "board_config": {
+        "ram": {
+          "default": "128mb"
+        }
+      }
     },
     {
       "id": "zune_30",
       "name": "Microsoft Zune 30",
       "short_name": "Zune 30",
       "board_family_id": "toshiba_gigabeat_s",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        },
+        {
+          "generic_part_id": "hdd",
+          "supported": true
+        },
+        {
+          "generic_part_id": "wifi",
+          "supported": false
+        },
+        {
+          "generic_part_id": "fm_tuner",
+          "supported": false,
+          "displayed_name": "Si4701"
+        }
+      ]
     },
     {
       "id": "toshiba_gigabeat_s30",
@@ -3522,7 +4465,29 @@
       "short_name": "Gigabeat S30",
       "board_family_id": "toshiba_gigabeat_s",
       "support_level": "no_support",
-      "internal__spec_divergences": "2.4\" panel, matrix keypad, no WiFi, Si4700 FM tuner"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "2.4\"",
+          "display_width": 240,
+          "display_height": 320
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": false,
+          "displayed_name": "Matrix keypad"
+        },
+        {
+          "generic_part_id": "hdd",
+          "supported": true
+        },
+        {
+          "generic_part_id": "fm_tuner",
+          "supported": false,
+          "displayed_name": "Si4700"
+        }
+      ]
     },
     {
       "id": "toshiba_gigabeat_s60v",
@@ -3530,7 +4495,30 @@
       "short_name": "Gigabeat S60V",
       "board_family_id": "toshiba_gigabeat_s",
       "support_level": "no_support",
-      "internal__spec_divergences": "2.4\" panel, matrix keypad, no WiFi, Si4700 FM tuner, 60 GB HDD"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "2.4\"",
+          "display_width": 240,
+          "display_height": 320
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": false,
+          "displayed_name": "Matrix keypad"
+        },
+        {
+          "generic_part_id": "hdd",
+          "supported": false,
+          "displayed_name": "60 GB"
+        },
+        {
+          "generic_part_id": "fm_tuner",
+          "supported": false,
+          "displayed_name": "Si4700"
+        }
+      ]
     },
     {
       "id": "toshiba_gigabeat_v30t",
@@ -3538,14 +4526,46 @@
       "short_name": "Gigabeat V30T",
       "board_family_id": "toshiba_gigabeat_s",
       "support_level": "no_support",
-      "internal__spec_divergences": "3.5\" 320x240 panel, 1seg TV tuner"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": false,
+          "displayed_name": "3.5\"",
+          "display_width": 320,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": false,
+          "displayed_name": "Navigation stick"
+        },
+        {
+          "generic_part_id": "hdd",
+          "supported": true
+        },
+        {
+          "generic_part_id": "tv_tuner",
+          "supported": false,
+          "displayed_name": "1seg"
+        }
+      ]
     },
     {
       "id": "simpad_sl4",
       "name": "Siemens SIMpad SL4",
       "short_name": "SIMpad SL4",
       "board_family_id": "siemens_simpad",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "pcmcia",
+          "supported": true
+        },
+        {
+          "generic_part_id": "mic",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "simpad_slc",
@@ -3553,7 +4573,21 @@
       "short_name": "SIMpad SLC",
       "board_family_id": "siemens_simpad",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "MD34 DECT module"
+      "device_specs": [
+        {
+          "generic_part_id": "pcmcia",
+          "supported": true
+        },
+        {
+          "generic_part_id": "mic",
+          "supported": false
+        },
+        {
+          "generic_part_id": "dect",
+          "supported": false,
+          "displayed_name": "MD34"
+        }
+      ]
     },
     {
       "id": "simpad_cl4",
@@ -3561,13 +4595,22 @@
       "short_name": "SIMpad CL4",
       "board_family_id": "siemens_simpad",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "32 MB RAM, 16 MB flash, MD34 DECT module, no PC Card slot, no microphone",
-      "device_features": [
+      "internal__spec_divergences": "16 MB flash",
+      "device_specs": [
         {
-          "feature_id": "pcmcia",
-          "supported": false
+          "generic_part_id": "dect",
+          "supported": false,
+          "displayed_name": "MD34"
         }
-      ]
+      ],
+      "board_config": {
+        "ram": {
+          "default": "32mb",
+          "values": [
+            "32mb"
+          ]
+        }
+      }
     },
     {
       "id": "t_sinus_pad",
@@ -3575,7 +4618,30 @@
       "short_name": "T-Sinus Pad",
       "board_family_id": "siemens_simpad",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "32 MB RAM, 16 MB flash, MD34 DECT module"
+      "device_specs": [
+        {
+          "generic_part_id": "pcmcia",
+          "supported": true
+        },
+        {
+          "generic_part_id": "mic",
+          "supported": false
+        },
+        {
+          "generic_part_id": "dect",
+          "supported": false,
+          "displayed_name": "MD34"
+        }
+      ],
+      "internal__spec_divergences": "16 MB flash",
+      "board_config": {
+        "ram": {
+          "default": "32mb",
+          "values": [
+            "32mb"
+          ]
+        }
+      }
     },
     {
       "id": "swisscom_wp50",
@@ -3583,13 +4649,26 @@
       "short_name": "WP50",
       "board_family_id": "siemens_simpad",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "32 MB RAM, 16 MB flash, MD34 DECT module, no PC Card slot",
-      "device_features": [
+      "internal__spec_divergences": "16 MB flash",
+      "device_specs": [
         {
-          "feature_id": "pcmcia",
+          "generic_part_id": "mic",
           "supported": false
+        },
+        {
+          "generic_part_id": "dect",
+          "supported": false,
+          "displayed_name": "MD34"
         }
-      ]
+      ],
+      "board_config": {
+        "ram": {
+          "default": "32mb",
+          "values": [
+            "32mb"
+          ]
+        }
+      }
     },
     {
       "id": "nec_mobilepro_900",
@@ -3618,7 +4697,6 @@
       "short_name": "MobilePro 400",
       "board_family_id": "nec_mobilepro_200",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "4 MB RAM",
       "board_config": {
         "ram": {
           "default": "4mb"
@@ -3631,11 +4709,13 @@
       "short_name": "MobilePro 450",
       "board_family_id": "nec_mobilepro_200",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "4 MB RAM, backlight",
       "device_year": 1997,
       "board_config": {
         "ram": {
           "default": "4mb"
+        },
+        "backlight": {
+          "default": "installed"
         }
       }
     },
@@ -3644,7 +4724,21 @@
       "name": "NEC MobilePro 790",
       "short_name": "MobilePro 790",
       "board_family_id": "nec_cronos3e",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "phone_line",
+          "supported": true
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        },
+        {
+          "generic_part_id": "nand",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "nec_mobilegear2_r550",
@@ -3652,12 +4746,21 @@
       "short_name": "MobileGear II R550",
       "board_family_id": "nec_cronos3e",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Japanese keyboard, phone interface (PDC, cdmaOne, PHS), earphone-mic jack",
+      "internal__spec_divergences": "phone interface (PDC, cdmaOne, PHS), earphone-mic jack",
       "device_year": 2000,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "keyboard",
-          "supported": false
+          "generic_part_id": "phone_line",
+          "supported": true
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": false,
+          "displayed_name": "Japanese keyboard"
+        },
+        {
+          "generic_part_id": "nand",
+          "supported": true
         }
       ]
     },
@@ -3667,12 +4770,21 @@
       "short_name": "MobileGear II R450",
       "board_family_id": "nec_cronos3e",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Japanese keyboard, phone interface (PDC, cdmaOne, PHS), earphone-mic jack",
+      "internal__spec_divergences": "phone interface (PDC, cdmaOne, PHS), earphone-mic jack",
       "device_year": 2000,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "keyboard",
-          "supported": false
+          "generic_part_id": "phone_line",
+          "supported": true
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": false,
+          "displayed_name": "Japanese keyboard"
+        },
+        {
+          "generic_part_id": "nand",
+          "supported": true
         }
       ]
     },
@@ -3682,7 +4794,16 @@
       "short_name": "MobilePro 780",
       "board_family_id": "nec_cronos3e",
       "support_level": "bootable_partial",
-      "internal__spec_divergences": "no flash",
+      "device_specs": [
+        {
+          "generic_part_id": "phone_line",
+          "supported": true
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "device_year": 2000
     },
     {
@@ -3691,12 +4812,16 @@
       "short_name": "MobileGear II R530",
       "board_family_id": "nec_cronos3e",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "no flash, Japanese keyboard",
       "device_year": 1999,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "keyboard",
-          "supported": false
+          "generic_part_id": "phone_line",
+          "supported": true
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": false,
+          "displayed_name": "Japanese keyboard"
         }
       ]
     },
@@ -3706,12 +4831,13 @@
       "short_name": "MobileGear II R430",
       "board_family_id": "nec_cronos3e",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "no flash, Japanese keyboard, no modem, no VGA out, no scroll dial",
+      "internal__spec_divergences": "no VGA out",
       "device_year": 1999,
-      "device_features": [
+      "device_specs": [
         {
-          "feature_id": "keyboard",
-          "supported": false
+          "generic_part_id": "keyboard",
+          "supported": false,
+          "displayed_name": "Japanese keyboard without scroll dial"
         }
       ]
     },
@@ -3728,7 +4854,11 @@
       "short_name": "E-10",
       "board_family_id": "casio_tomcat",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "4 MB RAM, 8 MB ROM"
+      "board_config": {
+        "ram": {
+          "default": "4mb"
+        }
+      }
     },
     {
       "id": "casio_cassiopeia_e11",
@@ -3736,7 +4866,11 @@
       "short_name": "E-11",
       "board_family_id": "casio_tomcat",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "8 MB RAM, 8 MB ROM"
+      "board_config": {
+        "ram": {
+          "default": "8mb"
+        }
+      }
     },
     {
       "id": "casio_cassiopeia_e65",
@@ -3744,7 +4878,6 @@
       "short_name": "E-65",
       "board_family_id": "casio_tomcat",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "identical hardware",
       "device_year": 1999
     },
     {
@@ -3753,7 +4886,6 @@
       "short_name": "E-15",
       "board_family_id": "casio_tomcat",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "16 MB ROM",
       "device_year": 1999
     },
     {
@@ -3762,14 +4894,28 @@
       "short_name": "CASSIOPEIA for DoCoMo",
       "board_family_id": "casio_tomcat",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "8 MB RAM"
+      "board_config": {
+        "ram": {
+          "default": "8mb"
+        }
+      }
     },
     {
       "id": "casio_cassiopeia_em500",
       "name": "Casio Cassiopeia EM-500",
       "short_name": "EM-500",
       "board_family_id": "casio_jx670",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "irda",
+          "supported": false
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": false
+        }
+      ]
     },
     {
       "id": "casio_cassiopeia_e700",
@@ -3777,7 +4923,21 @@
       "short_name": "E-700",
       "board_family_id": "casio_jx670",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "32 MB RAM, 32 MB ROM"
+      "device_specs": [
+        {
+          "generic_part_id": "irda",
+          "supported": false
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": false
+        }
+      ],
+      "board_config": {
+        "ram": {
+          "default": "32mb"
+        }
+      }
     },
     {
       "id": "casio_cassiopeia_em505",
@@ -3785,7 +4945,17 @@
       "short_name": "EM-505",
       "board_family_id": "casio_jx670",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "32 MB RAM"
+      "device_specs": [
+        {
+          "generic_part_id": "battery",
+          "supported": false
+        }
+      ],
+      "board_config": {
+        "ram": {
+          "default": "32mb"
+        }
+      }
     },
     {
       "id": "casio_cassiopeia_e707",
@@ -3793,7 +4963,22 @@
       "short_name": "E-707",
       "board_family_id": "casio_jx670",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "CF slot, DoPa module"
+      "device_specs": [
+        {
+          "generic_part_id": "irda",
+          "supported": false
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": false
+        },
+        {
+          "generic_part_id": "cellular",
+          "supported": false,
+          "displayed_name": "DoPa"
+        }
+      ],
+      "internal__spec_divergences": "CF slot"
     },
     {
       "id": "casio_cassiopeia_e800",
@@ -3801,6 +4986,16 @@
       "short_name": "E-800",
       "board_family_id": "casio_jx670",
       "support_level": "unknown_partial",
+      "device_specs": [
+        {
+          "generic_part_id": "irda",
+          "supported": false
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": false
+        }
+      ],
       "internal__spec_divergences": "CF slot instead of SD"
     },
     {
@@ -3809,14 +5004,37 @@
       "short_name": "GFORT",
       "board_family_id": "casio_jx670",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "CF slot instead of SD, Li-polymer battery"
+      "device_specs": [
+        {
+          "generic_part_id": "irda",
+          "supported": false
+        },
+        {
+          "generic_part_id": "battery",
+          "supported": false,
+          "displayed_name": "Li-polymer battery"
+        }
+      ],
+      "internal__spec_divergences": "CF slot instead of SD"
     },
     {
       "id": "casio_toricomail",
       "name": "Casio Toricomail",
       "short_name": "Toricomail",
       "board_family_id": "casio_pocketpostpet",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 320,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "casio_message_cam",
@@ -3824,6 +5042,18 @@
       "short_name": "Message-Cam",
       "board_family_id": "casio_pocketpostpet",
       "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 320,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "internal__spec_divergences": "GSM phone interface",
       "device_year": 2001
     },
@@ -3833,7 +5063,25 @@
       "short_name": "PocketPostPet",
       "board_family_id": "casio_pocketpostpet",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "no camera, keyboard, IrDA, 4096-colour panel, PDC phone interface"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "4096-colour panel",
+          "display_width": 320,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": false,
+          "displayed_name": "Japanese keyboard"
+        },
+        {
+          "generic_part_id": "irda",
+          "supported": false
+        }
+      ],
+      "internal__spec_divergences": "no camera, PDC phone interface"
     },
     {
       "id": "casio_cassiopeia_a11",
@@ -3841,6 +5089,19 @@
       "short_name": "A-11",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "dram_card": {
           "default": "none",
@@ -3864,7 +5125,19 @@
       "short_name": "A-10",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "2 MB RAM",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "2mb"
@@ -3891,7 +5164,19 @@
       "short_name": "A-11A",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "other bundled software",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "dram_card": {
           "default": "none",
@@ -3915,7 +5200,19 @@
       "short_name": "A-11+",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "6 MB RAM",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "device_year": 1997,
       "board_config": {
         "ram": {
@@ -3943,7 +5240,19 @@
       "short_name": "A-11J",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Japanese market",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "dram_card": {
           "default": "none",
@@ -3967,7 +5276,19 @@
       "short_name": "PC Companion C120",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Compaq brand, 2 MB RAM",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "2mb"
@@ -3994,7 +5315,19 @@
       "short_name": "PC Companion C120+2",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Compaq brand, 2 MB RAM, 2 MB RAM expansion module",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "4mb"
@@ -4021,7 +5354,19 @@
       "short_name": "PC Companion C120+4",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Compaq brand, 6 MB RAM",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "device_year": 1997,
       "board_config": {
         "ram": {
@@ -4049,7 +5394,19 @@
       "short_name": "PC Companion C140",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Compaq brand",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display A",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "dram_card": {
           "default": "none",
@@ -4073,7 +5430,21 @@
       "short_name": "A-51",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, 8 MB RAM, JIS keyboard, CompactFlash slot",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "JIS keyboard"
+        }
+      ],
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1997,
       "board_config": {
         "ram": {
@@ -4094,7 +5465,21 @@
       "short_name": "A-50",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, JIS keyboard, CompactFlash slot",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "JIS keyboard"
+        }
+      ],
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1997,
       "board_config": {
         "ram": {
@@ -4115,7 +5500,21 @@
       "short_name": "PA-2000",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, 8 MB RAM, JIS keyboard, CompactFlash slot, corporate market",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "JIS keyboard"
+        }
+      ],
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1997,
       "board_config": {
         "ram": {
@@ -4136,7 +5535,16 @@
       "short_name": "PA-2100",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, 8 MB RAM, no keyboard, CompactFlash slot, corporate market",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 480,
+          "display_height": 240
+        }
+      ],
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1997,
       "board_config": {
         "ram": {
@@ -4157,7 +5565,21 @@
       "short_name": "A-51V",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, 8 MB RAM, JIS keyboard, CompactFlash slot, 80 MHz CPU",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "JIS keyboard"
+        }
+      ],
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1997,
       "board_config": {
         "ram": {
@@ -4178,7 +5600,21 @@
       "short_name": "PA-2000V",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, 8 MB RAM, JIS keyboard, CompactFlash slot, 80 MHz CPU, corporate market",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "JIS keyboard"
+        }
+      ],
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1997,
       "board_config": {
         "ram": {
@@ -4199,7 +5635,16 @@
       "short_name": "PA-2300V",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Japanese ROM, 24 MB ROM, dictionary ROM, separate video RAM, 8 MB RAM, no keyboard, CompactFlash slot, 80 MHz CPU, corporate market",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 480,
+          "display_height": 240
+        }
+      ],
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1997,
       "board_config": {
         "ram": {
@@ -4220,7 +5665,21 @@
       "short_name": "A-55V",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Japanese Windows CE 2.0 ROM, 24 MB ROM, separate video RAM, 8 MB RAM, JIS keyboard, CompactFlash slot, 80 MHz CPU",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 480,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "JIS keyboard"
+        }
+      ],
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1998,
       "board_config": {
         "ram": {
@@ -4241,12 +5700,22 @@
       "short_name": "A-60",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Japanese Windows CE 2.0 ROM, 24 MB ROM, separate video RAM, 8 MB RAM, 640x240 panel, JIS keyboard, CompactFlash slot, 80 MHz CPU",
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1998,
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "JIS keyboard"
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "8mb",
@@ -4266,12 +5735,21 @@
       "short_name": "A-20",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Windows CE 2.0 ROM, 8 MB ROM, separate video RAM, 8 MB RAM, 640x240 panel, CompactFlash slot, 80 MHz CPU",
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1997,
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "8mb",
@@ -4291,12 +5769,21 @@
       "short_name": "A-20J",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Windows CE 2.0 ROM, 8 MB ROM, separate video RAM, 8 MB RAM, 640x240 panel, CompactFlash slot, 80 MHz CPU, Japanese market",
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1997,
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "8mb",
@@ -4316,12 +5803,22 @@
       "short_name": "A-20F",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Windows CE 2.0 ROM, 8 MB ROM, separate video RAM, 8 MB RAM, 640x240 panel, AZERTY keyboard, CompactFlash slot, 80 MHz CPU",
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1998,
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "AZERTY keyboard"
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "8mb",
@@ -4341,12 +5838,21 @@
       "short_name": "A-21S",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Windows CE 2.0 ROM, 8 MB ROM, separate video RAM, 16 MB RAM, 640x240 panel, no backlight, CompactFlash slot, 80 MHz CPU, education market",
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1998,
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "16mb",
@@ -4354,6 +5860,9 @@
             "8mb",
             "16mb"
           ]
+        },
+        "backlight": {
+          "default": "none"
         }
       }
     },
@@ -4363,12 +5872,21 @@
       "short_name": "A-22T",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Windows CE 2.0 ROM, 8 MB ROM, separate video RAM, 16 MB RAM, 640x240 panel, no backlight, CompactFlash slot, 80 MHz CPU, education market",
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1998,
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "16mb",
@@ -4376,6 +5894,9 @@
             "8mb",
             "16mb"
           ]
+        },
+        "backlight": {
+          "default": "none"
         }
       }
     },
@@ -4385,12 +5906,22 @@
       "short_name": "A-23G",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Windows CE 2.0 ROM, 8 MB ROM, separate video RAM, 16 MB RAM, 640x240 panel, QWERTZ keyboard, CompactFlash slot, 80 MHz CPU",
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1999,
-      "lcd_panel_size": {
-        "width": 640,
-        "height": 240
-      },
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 640,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "QWERTZ keyboard"
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "16mb",
@@ -4407,7 +5938,16 @@
       "short_name": "PA-2400U",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "Windows CE 2.0 ROM, 16 MB ROM, separate video RAM, 8 MB RAM, no keyboard, CompactFlash slot, 80 MHz CPU, corporate market",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 480,
+          "display_height": 240
+        }
+      ],
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1998,
       "board_config": {
         "ram": {
@@ -4428,7 +5968,16 @@
       "short_name": "PA-2400W",
       "board_family_id": "casio_cassiopeia_a10",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "Windows CE 2.11 ROM, 16 MB ROM, separate video RAM, 8 MB RAM, no keyboard, CompactFlash slot, 80 MHz CPU, corporate market",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "Display B",
+          "display_width": 480,
+          "display_height": 240
+        }
+      ],
+      "internal__spec_divergences": "CompactFlash slot",
       "device_year": 1999,
       "board_config": {
         "ram": {
@@ -4448,7 +5997,17 @@
       "name": "IBM WorkPad z50",
       "short_name": "WorkPad z50",
       "board_family_id": "ibm_workpad_z50",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "phone_line",
+          "supported": true
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "ibm_workpad_z50_canada",
@@ -4456,7 +6015,17 @@
       "short_name": "WorkPad z50",
       "board_family_id": "ibm_workpad_z50",
       "support_level": "bootable_partial",
-      "internal__spec_divergences": "Canadian French keyboard"
+      "device_specs": [
+        {
+          "generic_part_id": "phone_line",
+          "supported": true
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "Canadian French keyboard"
+        }
+      ]
     },
     {
       "id": "ibm_workpad_z50_uk",
@@ -4464,7 +6033,14 @@
       "short_name": "WorkPad z50",
       "board_family_id": "ibm_workpad_z50",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "EMEA main board, no modem, UK keyboard"
+      "device_specs": [
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "UK keyboard"
+        }
+      ],
+      "internal__spec_divergences": "EMEA main board"
     },
     {
       "id": "ibm_workpad_z50_france",
@@ -4472,7 +6048,14 @@
       "short_name": "WorkPad z50",
       "board_family_id": "ibm_workpad_z50",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "EMEA main board, no modem, French keyboard, French ROM"
+      "device_specs": [
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "French keyboard"
+        }
+      ],
+      "internal__spec_divergences": "EMEA main board"
     },
     {
       "id": "ibm_workpad_z50_germany",
@@ -4480,7 +6063,14 @@
       "short_name": "WorkPad z50",
       "board_family_id": "ibm_workpad_z50",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "EMEA main board, no modem, German keyboard, German ROM"
+      "device_specs": [
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "German keyboard"
+        }
+      ],
+      "internal__spec_divergences": "EMEA main board"
     },
     {
       "id": "ibm_workpad_z50_japan",
@@ -4488,7 +6078,17 @@
       "short_name": "WorkPad z50",
       "board_family_id": "ibm_workpad_z50",
       "support_level": "bootable_partial",
-      "internal__spec_divergences": "32 MB ROM, Japanese keyboard, Japanese ROM"
+      "device_specs": [
+        {
+          "generic_part_id": "phone_line",
+          "supported": true
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": true,
+          "displayed_name": "Japanese keyboard"
+        }
+      ]
     },
     {
       "id": "nec_rockhopper",
@@ -4510,7 +6110,15 @@
       "name": "Philips Nino 300",
       "short_name": "Nino 300",
       "board_family_id": "philips_nino",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        }
+      ]
     },
     {
       "id": "philips_nino_312",
@@ -4518,7 +6126,19 @@
       "short_name": "Nino 312",
       "board_family_id": "philips_nino",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "8 MB RAM"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        }
+      ],
+      "board_config": {
+        "ram": {
+          "default": "8mb"
+        }
+      }
     },
     {
       "id": "philips_nino_200",
@@ -4526,8 +6146,20 @@
       "short_name": "Nino 200",
       "board_family_id": "philips_nino",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "8 MB RAM",
-      "device_year": 1999
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "display_width": 240,
+          "display_height": 320
+        }
+      ],
+      "device_year": 1999,
+      "board_config": {
+        "ram": {
+          "default": "8mb"
+        }
+      }
     },
     {
       "id": "philips_nino_500",
@@ -4535,8 +6167,21 @@
       "short_name": "Nino 500",
       "board_family_id": "philips_nino",
       "support_level": "no_support",
-      "internal__spec_divergences": "16 MB RAM, 16 MB ROM, 256-colour DSTN panel",
-      "device_year": 1999
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "256-colour DSTN panel",
+          "display_width": 240,
+          "display_height": 320
+        }
+      ],
+      "device_year": 1999,
+      "board_config": {
+        "ram": {
+          "default": "16mb"
+        }
+      }
     },
     {
       "id": "philips_velo_1",
@@ -4550,7 +6195,13 @@
       "name": "Sharp Mobilon HC-4100",
       "short_name": "Mobilon HC-4100",
       "board_family_id": "sharp_mobilon_hc",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "sharp_mobilon_hc4100_8mb",
@@ -4558,7 +6209,12 @@
       "short_name": "Mobilon HC-4100",
       "board_family_id": "sharp_mobilon_hc",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "8 MB RAM",
+      "device_specs": [
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "8mb"
@@ -4571,7 +6227,12 @@
       "short_name": "Mobilon HC-4000",
       "board_family_id": "sharp_mobilon_hc",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "4 MB RAM",
+      "device_specs": [
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "4mb"
@@ -4584,7 +6245,13 @@
       "short_name": "Mobilon HC-4500",
       "board_family_id": "sharp_mobilon_hc",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "256-colour STN panel, NiMH battery, 16 MB RAM",
+      "device_specs": [
+        {
+          "generic_part_id": "battery",
+          "supported": true,
+          "displayed_name": "NiMH battery"
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "16mb"
@@ -4603,7 +6270,13 @@
       "short_name": "Mobilon HC-4500",
       "board_family_id": "sharp_mobilon_hc",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "256-colour STN panel, NiMH battery, 8 MB RAM",
+      "device_specs": [
+        {
+          "generic_part_id": "battery",
+          "supported": true,
+          "displayed_name": "NiMH battery"
+        }
+      ],
       "board_config": {
         "ram": {
           "default": "8mb"
@@ -4622,7 +6295,12 @@
       "short_name": "Mobilon HC-4600",
       "board_family_id": "sharp_mobilon_hc",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "256-colour panel, 16 MB RAM",
+      "device_specs": [
+        {
+          "generic_part_id": "battery",
+          "supported": true
+        }
+      ],
       "device_year": 1998,
       "board_config": {
         "ram": {
@@ -4641,7 +6319,20 @@
       "name": "Siemens SIMATIC MP 377 12\" Touch",
       "short_name": "SIMATIC MP 377",
       "board_family_id": "siemens_simatic_mp377",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "12\"",
+          "display_width": 800,
+          "display_height": 600
+        },
+        {
+          "generic_part_id": "touch",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "siemens_mp377_12_key",
@@ -4649,7 +6340,20 @@
       "short_name": "SIMATIC MP 377",
       "board_family_id": "siemens_simatic_mp377",
       "support_level": "bootable_partial",
-      "internal__spec_divergences": "membrane keypad"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "12\"",
+          "display_width": 800,
+          "display_height": 600
+        },
+        {
+          "generic_part_id": "keyboard",
+          "supported": false,
+          "displayed_name": "Membrane keypad"
+        }
+      ]
     },
     {
       "id": "siemens_mp377_15_touch",
@@ -4657,7 +6361,19 @@
       "short_name": "SIMATIC MP 377",
       "board_family_id": "siemens_simatic_mp377",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "15\" 1024x768 panel"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "15\"",
+          "display_width": 1024,
+          "display_height": 768
+        },
+        {
+          "generic_part_id": "touch",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "siemens_mp377_19_touch",
@@ -4665,7 +6381,19 @@
       "short_name": "SIMATIC MP 377",
       "board_family_id": "siemens_simatic_mp377",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "19\" 1280x1024 panel"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "19\"",
+          "display_width": 1280,
+          "display_height": 1024
+        },
+        {
+          "generic_part_id": "touch",
+          "supported": true
+        }
+      ]
     },
     {
       "id": "siemens_mp377_15_daylight",
@@ -4673,7 +6401,21 @@
       "short_name": "SIMATIC MP 377",
       "board_family_id": "siemens_simatic_mp377",
       "support_level": "no_support",
-      "internal__spec_divergences": "15\" 1024x768 panel, projected-capacitive touch, LED backlight",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "15\"",
+          "display_width": 1024,
+          "display_height": 768
+        },
+        {
+          "generic_part_id": "touch",
+          "supported": false,
+          "displayed_name": "Projected-capacitive touch"
+        }
+      ],
+      "internal__spec_divergences": "LED backlight",
       "device_year": 2009
     },
     {
@@ -4682,7 +6424,20 @@
       "short_name": "SIMATIC MP 377",
       "board_family_id": "siemens_simatic_mp377",
       "support_level": "unknown_partial",
-      "internal__spec_divergences": "15\" 1024x768 panel, LED backlight",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "15\"",
+          "display_width": 1024,
+          "display_height": 768
+        },
+        {
+          "generic_part_id": "touch",
+          "supported": true
+        }
+      ],
+      "internal__spec_divergences": "LED backlight",
       "device_year": 2009
     },
     {
@@ -4712,8 +6467,7 @@
       "name": "Coxion WebBook",
       "short_name": "WebBook",
       "board_family_id": "pangolin",
-      "support_level": "unknown_partial",
-      "internal__spec_divergences": "identical hardware"
+      "support_level": "unknown_partial"
     },
     {
       "id": "ford_sync_2",
@@ -4727,23 +6481,30 @@
       "name": "Lincoln MyLincoln Touch",
       "short_name": "MyLincoln Touch",
       "board_family_id": "ford_sync_gen2",
-      "support_level": "unknown_partial",
-      "internal__spec_divergences": "identical hardware"
+      "support_level": "unknown_partial"
     },
     {
       "id": "ford_sync_2_intl",
       "name": "Ford SYNC 2 (Europe, Asia-Pacific)",
       "short_name": "SYNC 2",
       "board_family_id": "ford_sync_gen2",
-      "support_level": "unknown_partial",
-      "internal__spec_divergences": "unknown"
+      "support_level": "unknown_partial"
     },
     {
       "id": "symbol_mk500",
       "name": "Symbol MK500 (T35QM7117 panel)",
       "short_name": "MK500",
       "board_family_id": "symbol_hamptons",
-      "support_level": "bootable_full"
+      "support_level": "bootable_full",
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "T35QM7117",
+          "display_width": 320,
+          "display_height": 240
+        }
+      ]
     },
     {
       "id": "symbol_mk500_a035qn02",
@@ -4751,7 +6512,15 @@
       "short_name": "MK500",
       "board_family_id": "symbol_hamptons",
       "support_level": "bootable_full",
-      "internal__spec_divergences": "A035QN02 panel"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "A035QN02",
+          "display_width": 320,
+          "display_height": 240
+        }
+      ]
     },
     {
       "id": "symbol_mk590",
@@ -4759,7 +6528,20 @@
       "short_name": "MK590",
       "board_family_id": "symbol_hamptons",
       "support_level": "bootable_partial",
-      "internal__spec_divergences": "802.11a/b/g radio"
+      "device_specs": [
+        {
+          "generic_part_id": "display",
+          "supported": true,
+          "displayed_name": "T35QM7117",
+          "display_width": 320,
+          "display_height": 240
+        },
+        {
+          "generic_part_id": "wifi",
+          "supported": false,
+          "displayed_name": "802.11a/b/g"
+        }
+      ]
     },
     {
       "id": "nokia_lumia_800",

@@ -25,7 +25,8 @@ constexpr char kGaVideoDriverNames[]       = "ga_video_driver_names";
 constexpr char kValues[]                   = "values";
 constexpr char kSocFamilies[]              = "soc_families";
 constexpr char kSocs[]                     = "socs";
-constexpr char kDeviceFeatures[]           = "device_features";
+constexpr char kDeviceGenericParts[]       = "device_generic_parts";
+constexpr char kDeviceSpecs[]              = "device_specs";
 constexpr char kBoardFamilies[]            = "board_families";
 constexpr char kBoards[]                   = "boards";
 constexpr char kId[]                       = "id";
@@ -37,9 +38,6 @@ constexpr char kShortName[]                = "short_name";
 constexpr char kBoardFamilyId[]            = "board_family_id";
 constexpr char kSupportLevel[]             = "support_level";
 constexpr char kSocId[]                    = "soc_id";
-constexpr char kLcdPanelSize[]             = "lcd_panel_size";
-constexpr char kWidth[]                    = "width";
-constexpr char kHeight[]                   = "height";
 constexpr char kGaColorDepth[]             = "ga_color_depth";
 constexpr char kGaWindowSize[]             = "ga_window_size";
 constexpr char kDynamicScaleFactor[]       = "dynamic_scale_factor";
@@ -47,8 +45,12 @@ constexpr char kRomPlacingMode[]           = "rom_placing_mode";
 constexpr char kConfigurableScreen[]       = "configurable_screen";
 constexpr char kDeviceYear[]               = "device_year";
 constexpr char kNotes[]                    = "notes";
-constexpr char kFeatureId[]                = "feature_id";
+constexpr char kGenericPartId[]            = "generic_part_id";
 constexpr char kSupported[]                = "supported";
+constexpr char kDisplayedName[]            = "displayed_name";
+constexpr char kDisplayWidth[]             = "display_width";
+constexpr char kDisplayHeight[]            = "display_height";
+constexpr char kDisplayPart[]              = "display";
 constexpr char kBoardConfigParams[]        = "board_config_params";
 constexpr char kBoardConfig[]              = "board_config";
 constexpr char kDefault[]                  = "default";
@@ -98,16 +100,24 @@ struct BoardValues {
     }
 };
 
-void MergeFeatures(const json& row, std::vector<DbFeatureSupport>& out) {
-    const json list = row.value(kDeviceFeatures, json::array());
-    for (const auto& f : list) {
-        std::string id        = f.at(kFeatureId).get<std::string>();
-        const bool  supported = f.at(kSupported).get<bool>();
-        const auto  existing  = std::find_if(out.begin(), out.end(),
-                                             [&id](const DbFeatureSupport& s) { return s.feature_id == id; });
-        if (existing != out.end()) existing->supported = supported;
-        else                       out.push_back(DbFeatureSupport{std::move(id), supported});
-    }
+std::optional<uint32_t> OptionalSize(const json& item, const char* key) {
+    if (!item.contains(key)) return std::nullopt;
+    return item.at(key).get<uint32_t>();
+}
+
+void AppendSpecs(const json& row, std::vector<DbDeviceSpec>& out) {
+    const json list = row.value(kDeviceSpecs, json::array());
+    for (const auto& s : list)
+        out.push_back(DbDeviceSpec{s.at(kGenericPartId).get<std::string>(), s.at(kSupported).get<bool>(),
+                                   s.value(kDisplayedName, std::string()), OptionalSize(s, kDisplayWidth),
+                                   OptionalSize(s, kDisplayHeight)});
+}
+
+std::optional<DbLcdPanelSize> PanelSize(std::span<const DbDeviceSpec> specs) {
+    for (const DbDeviceSpec& s : specs)
+        if (s.generic_part_id == kDisplayPart && s.display_width && s.display_height)
+            return DbLcdPanelSize{*s.display_width, *s.display_height};
+    return std::nullopt;
 }
 
 void MergeBoardConfig(const json& row, std::vector<DbBoardConfigSetting>& out) {
@@ -149,16 +159,13 @@ void BoardDatabase::OnReady() {
         socs_.push_back(DbSoc{s.at(kId).get<std::string>(), s.at(kName).get<std::string>(),
                               s.at(kFamilyId).get<std::string>()});
 
-    for (const auto& f : root.at(kDeviceFeatures)) {
-        DbDeviceFeature row;
-        row.id   = f.at(kId).get<std::string>();
-        row.name = f.at(kName).get<std::string>();
-        row.icon = f.value(kIcon, row.id);
-        device_features_.push_back(std::move(row));
-    }
+    for (const auto& p : root.at(kDeviceGenericParts))
+        generic_parts_.push_back(DbGenericPart{p.at(kId).get<std::string>(), p.at(kName).get<std::string>(),
+                                               p.at(kIcon).get<std::string>()});
 
     for (const auto& p : root.at(kBoardConfigParams))
         board_config_params_.push_back(DbBoardConfigParam{p.at(kId).get<std::string>(), p.at(kName).get<std::string>(),
+                                                          p.value(kGenericPartId, std::string()),
                                                           ParseConfigEnumValues(p.at(kEnumValues))});
 
     const json& families = root.at(kBoardFamilies);
@@ -178,11 +185,9 @@ void BoardDatabase::OnReady() {
         row.support_level = ValueByName(kSupportLevels, support);
         row.runs          = InWordList(CERF_RUNNING_SUPPORT_LEVELS, support);
         row.soc_id        = v.Value<std::string>(kSocId);
-        const json& panel_owner = v.Owner(kLcdPanelSize);
-        if (panel_owner.contains(kLcdPanelSize)) {
-            const json& p = panel_owner.at(kLcdPanelSize);
-            row.lcd_panel_size = DbLcdPanelSize{p.at(kWidth).get<uint32_t>(), p.at(kHeight).get<uint32_t>()};
-        }
+        AppendSpecs(family, row.specs);
+        AppendSpecs(b, row.specs);
+        row.lcd_panel_size      = PanelSize(row.specs);
         row.ga_color_depth      = v.ValueOr(kGaColorDepth, kDefaultGaColorDepth);
         row.ga_window_size      = v.ValueOr(kGaWindowSize, kDefaultGaWindowSize);
         row.dynamic_scale_factor = v.ValueOr(kDynamicScaleFactor, 0);
@@ -191,8 +196,6 @@ void BoardDatabase::OnReady() {
         row.device_year         = v.ValueOr(kDeviceYear, 0u);
         row.notes = family.value(kNotes, std::vector<std::string>());
         for (std::string& note : b.value(kNotes, std::vector<std::string>())) row.notes.push_back(std::move(note));
-        MergeFeatures(family, row.features);
-        MergeFeatures(b, row.features);
         MergeBoardConfig(family, row.config);
         MergeBoardConfig(b, row.config);
         std::ranges::sort(row.config, {}, [this](const DbBoardConfigSetting& s) { return FindBoardConfigParam(s.param_id); });

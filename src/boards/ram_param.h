@@ -24,6 +24,8 @@ inline constexpr std::pair<std::string_view, uint32_t> kRamBytes[] = {
     {"16mb", 16u << 20},
     {"32mb", 32u << 20},
     {"64mb", 64u << 20},
+    {"128mb", 128u << 20},
+    {"256mb", 256u << 20},
 };
 
 }

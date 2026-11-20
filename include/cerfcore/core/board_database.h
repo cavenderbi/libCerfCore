@@ -46,20 +46,24 @@ struct DbBoardFamily {
     std::string name;
 };
 
-struct DbDeviceFeature {
+struct DbGenericPart {
     std::string id;
     std::string name;
     std::string icon;
 };
 
-struct DbFeatureSupport {
-    std::string feature_id;
-    bool        supported;
+struct DbDeviceSpec {
+    std::string             generic_part_id;
+    bool                    supported;
+    std::string             displayed_name;
+    std::optional<uint32_t> display_width;
+    std::optional<uint32_t> display_height;
 };
 
 struct DbBoardConfigParam {
     std::string                  id;
     std::string                  name;
+    std::string                  generic_part_id;
     std::vector<ConfigEnumValue> enum_values;
 };
 
@@ -89,8 +93,8 @@ struct DbBoard {
     RomPlacingMode                rom_placing_mode;
     bool                          configurable_screen;
     uint32_t                      device_year;
-    std::vector<std::string>      notes;
-    std::vector<DbFeatureSupport> features;
+    std::vector<std::string>          notes;
+    std::vector<DbDeviceSpec>         specs;
     std::vector<DbBoardConfigSetting> config;
 };
 
@@ -102,7 +106,7 @@ public:
 
     std::span<const DbBoard>         Boards() const { return boards_; }
     std::span<const DbBoardFamily>   Families() const { return board_families_; }
-    std::span<const DbDeviceFeature> DeviceFeatures() const { return device_features_; }
+    std::span<const DbGenericPart>   GenericParts() const { return generic_parts_; }
 
     const std::string& GaSharedFolderMountPoint() const {
         return ga_shared_folder_mount_point_;
@@ -124,7 +128,7 @@ private:
     std::vector<DbSocFamily>     soc_families_;
     std::vector<DbSoc>           socs_;
     std::vector<DbBoardFamily>   board_families_;
-    std::vector<DbDeviceFeature> device_features_;
+    std::vector<DbGenericPart>   generic_parts_;
     std::vector<DbBoard>         boards_;
     std::string              ga_shared_folder_mount_point_;
     std::vector<std::string> ga_video_driver_names_;
