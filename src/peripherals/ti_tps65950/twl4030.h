@@ -32,7 +32,7 @@ public:
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
-    void PostRestore();
+    void PostRestore() override;
 
 private:
     int AddrIndex(uint8_t slave_addr) const;
