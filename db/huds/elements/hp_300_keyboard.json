@@ -1,6 +1,9 @@
 {
   "column": [
-    "hp_300_upper_rows",
+    "escape_number_row",
+    "hp_620lx_q_row",
+    "hp_300_home_row",
+    "hp_300_shift_row",
     {
       "row": [
         { "grow": 1.25, "button": { "keys": ["VK_CONTROL"] } },
