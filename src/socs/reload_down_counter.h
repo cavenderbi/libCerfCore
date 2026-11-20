@@ -19,7 +19,9 @@ public:
     bool     Flagged() const { return flag_; }
     uint32_t Constant() const { return constant_; }
     uint64_t NextFlag() const;
+    uint64_t FlagAfter(uint64_t tick) const;
     uint64_t FlagsThrough(uint64_t tick) const;
+    uint64_t FlagTotalThrough(uint64_t tick) const { return total_ + FlagsThrough(tick); }
     uint64_t NextReload() const { return reload_; }
 
     void     ClearFlag() { flag_ = false; }
@@ -44,6 +46,7 @@ private:
     uint64_t   anchor_   = 0u;
     uint64_t   reload_   = 0u;
     uint64_t   consumed_ = 0u;
+    uint64_t   total_    = 0u;
     uint32_t   value_    = 0u;
     uint32_t   constant_ = 0u;
     uint32_t   stopped_  = 0u;

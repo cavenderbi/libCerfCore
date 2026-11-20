@@ -5,7 +5,7 @@
 #include "pr31x00_intc.h"
 #include "pr31x00_sib_address_counter.h"
 #include "pr31x00_sib_capture.h"
-#include "pr31x00_sib_count_int.h"
+#include "pr31x00_counter_int.h"
 #include "pr31x00_sib_speaker.h"
 
 #include <cerfcore/boards/board_context.h>
@@ -49,7 +49,7 @@ public:
         mem_     = &emu_.Get<EmulatedMemory>();
         capture_ = &emu_.Get<Pr31x00SibCapture>();
         speaker_ = &emu_.Get<Pr31x00SibSpeaker>();
-        count_   = &emu_.Get<Pr31x00SibCountInt>();
+        count_   = &emu_.Get<Pr31x00CounterInt>();
         sound_.Attach();
         telecom_.Attach();
         clock_->RegisterRateListener([this] {
@@ -99,7 +99,7 @@ public:
 private:
     /* TMPR3911 §13.4 (printed p.13-15): "Two identical circuits (one for sound DMA and one for
        telecom DMA)". */
-    class Circuit final : public Pr31x00SibDmaTimeline {
+    class Circuit final : public Pr31x00CounterTimeline {
     public:
         Circuit(Pr31x00SibAudioPlayer& owner, uint32_t half_int, uint32_t end_int, uint32_t cnt_int,
                 bool host_audio)
@@ -108,30 +108,24 @@ private:
 
         void Attach() {
             event_    = p_.clock_->Add([this] { OnMatch(); });
-            cnt_port_ = p_.count_->Attach(cnt_int_, *this);
+            cnt_port_ = p_.count_->Attach(kStatus1, cnt_int_, *this);
         }
 
-        bool Live() const override { return active_ && !ended_; }
-        bool Moving() const override { return active_ && !ended_ && running_; }
-        uint64_t PointerTicks(uint64_t cycle) const override { return WordPosition(cycle).ticks; }
-        uint64_t CycleOfTick(uint64_t tick) const override { return words_.CycleOfTick(tick); }
+        uint64_t CountAt(uint64_t cycle) override { return base_ + EpochCount(cycle); }
 
-        /* "For the one-time mode, the DMA logic will stop executing whenever the end-of-buffer is
-           reached." (TMPR3911 §13.4, printed p.13-15) */
-        uint64_t LastIncrement(uint64_t cycle) const override {
-            const uint64_t t = words_.TicksAt(cycle);
-            if (!dma_.one_time) return t;
-            uint64_t end = next_tick_;
-            uint32_t c   = CntAfter(cnt_, end - cnt_tick_);
-            while (c != Size()) {
-                const uint64_t k = NextMatch(c);
-                c = CntAfter(c, k);
-                end += k;
-            }
-            return std::min(t, end);
+        bool NextCountCycle(uint64_t cycle, uint64_t& at) override {
+            if (!active_ || ended_ || !running_) return false;
+            const uint64_t next = EpochCount(cycle) + 1u;
+            if (dma_.one_time && next > EndTick()) return false;
+            at = words_.CycleOfTick(next);
+            return true;
         }
+
+        void Settle() override { FlushReceived(); }
 
         void Start(const Pr31x00SibDmaSetup& dma) {
+            base_       += EpochCount(p_.clock_->Cycles());
+            held_        = 0;
             dma_         = dma;
             active_      = true;
             ended_       = false;
@@ -148,13 +142,12 @@ private:
             if (Records()) OpenMic();
             QueueThrough(1u);
             OnMatch();
-            p_.count_->Restart(cnt_port_);
+            p_.count_->Rearm(cnt_port_);
         }
 
         void Update(const Pr31x00SibDmaSetup& dma) {
             const uint64_t now = p_.clock_->Cycles();
             DeliverDueMatches(now);
-            p_.count_->Latch(cnt_port_);
             const RatedTickCount::Position at = WordPosition(now);
             if (!ended_) {
                 WriteReceived(at.ticks);
@@ -195,7 +188,7 @@ private:
         void Stop() {
             const uint64_t now = p_.clock_->Cycles();
             DeliverDueMatches(now);
-            p_.count_->Latch(cnt_port_);
+            held_ = EpochCount(now);
             if (!ended_) {
                 const uint64_t t = WordPosition(now).ticks;
                 WriteReceived(t);
@@ -207,7 +200,7 @@ private:
             p_.count_->Rearm(cnt_port_);
         }
 
-        void FlushReceived() override {
+        void FlushReceived() {
             DeliverDueMatches(p_.clock_->Cycles());
             if (active_ && !ended_) WriteReceived(WordPosition(p_.clock_->Cycles()).ticks);
         }
@@ -248,6 +241,8 @@ private:
             w.Write("cnt_tick", cnt_tick_);
             w.Write("next_tick", next_tick_);
             w.Write("rx_tick", rx_tick_);
+            w.Write("cnt_base", base_);
+            w.Write("cnt_held", held_);
             p_.count_->SaveState(cnt_port_, w);
         }
 
@@ -276,6 +271,8 @@ private:
             r.Read("cnt_tick", cnt_tick_);
             r.Read("next_tick", next_tick_);
             r.Read("rx_tick", rx_tick_);
+            r.Read("cnt_base", base_);
+            r.Read("cnt_held", held_);
             p_.count_->RestoreState(cnt_port_, r);
             dma_.tx          = tx != 0u;
             dma_.rx          = rx != 0u;
@@ -334,6 +331,24 @@ private:
 
         uint64_t NextMatch(uint32_t c) const { return Counter().NextMatch(c); }
 
+        uint64_t EpochCount(uint64_t cycle) const {
+            if (!active_) return held_;
+            if (ended_) return cnt_tick_;
+            const uint64_t t = WordPosition(cycle).ticks;
+            return dma_.one_time ? std::min(t, EndTick()) : t;
+        }
+
+        uint64_t EndTick() const {
+            uint64_t end = next_tick_;
+            uint32_t c   = CntAfter(cnt_, end - cnt_tick_);
+            while (c != Size()) {
+                const uint64_t k = NextMatch(c);
+                c = CntAfter(c, k);
+                end += k;
+            }
+            return end;
+        }
+
         /* Figure 13.4.1 (printed p.13-16): CMP of ADDR CNT against BUFFER SIZE and BUFFER SIZE / 2. */
         uint32_t CompareBits(uint32_t c) const {
             return (c == Size() / 2u ? half_int_ : 0u) | (c == Size() ? end_int_ : 0u);
@@ -380,7 +395,6 @@ private:
             cnt_tick_ = next_tick_;
             Raise(CompareBits(cnt_));
             if (dma_.one_time && cnt_ == Size()) {
-                p_.count_->Latch(cnt_port_);
                 ended_ = true;
                 if (Plays()) p_.speaker_->Finish();
                 p_.count_->Rearm(cnt_port_);
@@ -455,6 +469,8 @@ private:
         uint64_t                 next_tick_   = 0;
         uint64_t                 queued_tick_ = 0;
         uint64_t                 rx_tick_     = 0;
+        uint64_t                 base_        = 0;
+        uint64_t                 held_        = 0;
         bool                     active_      = false;
         bool                     ended_       = false;
         bool                     running_     = false;
@@ -468,7 +484,7 @@ private:
     EmulatedMemory*      mem_     = nullptr;
     Pr31x00SibCapture*   capture_ = nullptr;
     Pr31x00SibSpeaker*   speaker_ = nullptr;
-    Pr31x00SibCountInt*  count_   = nullptr;
+    Pr31x00CounterInt*   count_   = nullptr;
     Circuit              sound_{*this, kSnd0_5Int, kSnd1_0Int, kSndDmaCntInt, true};
     Circuit              telecom_{*this, kTel0_5Int, kTel1_0Int, kTelDmaCntInt, false};
 };

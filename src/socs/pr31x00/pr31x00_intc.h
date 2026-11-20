@@ -87,7 +87,7 @@ private:
     struct EnableListener { uint32_t set; uint32_t bits; std::function<void()> cb; };
     std::vector<EnableListener> enable_listeners_;
 
-    static constexpr size_t kMaxTimedSources = 2;
+    static constexpr size_t kMaxTimedSources = 3;
 
     struct TimedSource { uint32_t set; uint32_t bit; Pr31x00IntcTimedSource* src; bool open; };
     std::vector<TimedSource> timed_sources_;

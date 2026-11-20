@@ -35,6 +35,7 @@ protected:
     void     UnpauseScanLocked(uint64_t now);
     bool     GateScanLocked(bool running, uint64_t now);
     bool     CatchUpLocked(uint64_t now);
+    void     RescaleScanLocked(uint64_t cycle);
     void     RearmScanLocked();
 
     void SaveScanLocked(StateWriter& w);

@@ -1,6 +1,9 @@
 #pragma once
 
 #include "../raster_scan_peripheral.h"
+#include "pr31x00_counter_int.h"
+#include "pr31x00_lcd_df_signal.h"
+#include "pr31x00_lcd_loads.h"
 
 #include <cstdint>
 
@@ -10,9 +13,13 @@ class Pr31x00Clock;
 class Pr31x00Intc;
 
 /* TMPR3911 §17.4.1-§17.4.4: Video Control 1-4 ($028-$034). */
-class Pr31x00Lcd : public RasterScanPeripheral {
+class Pr31x00Lcd : public RasterScanPeripheral, public Pr31x00CounterTimeline {
 public:
     using RasterScanPeripheral::RasterScanPeripheral;
+
+    uint64_t CountAt(uint64_t cycle) override;
+    bool     NextCountCycle(uint64_t cycle, uint64_t& at) override;
+    void     Settle() override {}
 
     bool ShouldRegister() override;
     void OnReady() override;
@@ -66,11 +73,16 @@ private:
     void     ScheduleFreezeLocked(uint64_t now);
     void     OnLoadEvent();
     void     RearmLoad();
+    uint64_t DfTickLocked(uint64_t now) const { return ScanLiveLocked() ? ScanTicksLocked(now) : 0u; }
 
     static constexpr uint32_t kRegs = 4;
 
     uint32_t reg_[kRegs] = {};
 
+    Pr31x00LcdDfSignal      df_;
+    Pr31x00LcdLoads         loads_;
+    Pr31x00CounterInt*      counter_    = nullptr;
+    uint32_t                df_port_    = 0;
     Pr31x00Intc*            intc_       = nullptr;
     Pr31x00Clock*           clock_      = nullptr;
     GuestCycleClock*        cycles_     = nullptr;
@@ -82,11 +94,6 @@ private:
     bool     cp_rate_changed_    = false;
     uint32_t vidrate_            = 0;
     uint32_t lineval_            = 0;
-    bool     lineval_due_        = false;
-    uint64_t lineval_tick_       = 0;
-    bool     freeze_due_         = false;
-    bool     freeze_stopped_     = false;
-    uint64_t freeze_tick_        = 0;
 };
 
 }

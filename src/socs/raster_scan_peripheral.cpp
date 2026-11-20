@@ -137,17 +137,20 @@ void RasterScanPeripheral::OnScanEvent() {
     ScanEdgesRan();
 }
 
+void RasterScanPeripheral::RescaleScanLocked(uint64_t cycle) {
+    if (state_ != State::Live) return;
+    const ScanShape s = ScanShapeLocked();
+    if (!scan_.Rescale(cycle, clock_->ClockRate(), s.tick)) DieUnschedulable("rescale", s);
+    ArmLocked();
+}
+
 void RasterScanPeripheral::OnScanSourceClockChange() {
     {
         std::lock_guard<std::mutex> lk(state_mtx_);
         if (state_ != State::Live) return;
         const uint64_t now = clock_->Cycles();
         CatchUpLocked(now);
-        if (state_ == State::Live) {
-            const ScanShape s = ScanShapeLocked();
-            if (!scan_.Rescale(now, clock_->ClockRate(), s.tick)) DieUnschedulable("rescale", s);
-            ArmLocked();
-        }
+        RescaleScanLocked(now);
     }
     ScanEdgesRan();
 }

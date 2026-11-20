@@ -16,6 +16,7 @@ void ReloadDownCounter::PowerOnReset(uint32_t value) {
     anchor_   = 0u;
     reload_   = 0u;
     consumed_ = 0u;
+    total_    = 0u;
     value_    = value;
     constant_ = value;
     stopped_  = value;
@@ -36,6 +37,12 @@ uint64_t ReloadDownCounter::NextFlag() const {
     return first + ((consumed_ - first) / Period() + 1u) * Period();
 }
 
+uint64_t ReloadDownCounter::FlagAfter(uint64_t tick) const {
+    const uint64_t next = NextFlag();
+    if (tick < next) return next;
+    return next + ((tick - next) / Period() + 1u) * Period();
+}
+
 uint64_t ReloadDownCounter::FlagsThrough(uint64_t tick) const {
     if (!running_ || tick <= consumed_) return 0u;
     const uint64_t next = NextFlag();
@@ -45,7 +52,9 @@ uint64_t ReloadDownCounter::FlagsThrough(uint64_t tick) const {
 
 void ReloadDownCounter::Advance(uint64_t tick) {
     if (!running_ || tick <= consumed_) return;
-    if (FlagsThrough(tick) != 0u) flag_ = true;
+    const uint64_t flags = FlagsThrough(tick);
+    if (flags != 0u) flag_ = true;
+    total_ += flags;
     const uint64_t period = Period();
     if (tick >= reload_) {
         anchor_ = reload_ + (tick - reload_) / period * period;

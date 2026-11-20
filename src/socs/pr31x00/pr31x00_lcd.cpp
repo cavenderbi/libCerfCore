@@ -36,6 +36,7 @@ constexpr uint32_t kCtl1ResetKept = 0x001FFE00u;
 constexpr uint32_t kCtl1Timing    = 0x001F0000u;
 constexpr uint32_t kEnVid        = 1u << 0;
 constexpr uint32_t kInvVid       = 1u << 2;
+constexpr uint32_t kDfMode       = 1u << 3;
 constexpr uint32_t kEnFreezeFrame = 1u << 8;
 constexpr uint32_t kDisp8        = 1u << 4;
 constexpr uint32_t kDispSplit    = 1u << 5;
@@ -61,8 +62,9 @@ constexpr uint32_t kBaudValMask  = 0x1Fu;
 
 /* LCDINT, Interrupt Status 1 bit 31: "Issues an interrupt at the end of each
    video frame" (§8.3.1). Status set 0 == Interrupt Status 1. */
-constexpr uint32_t kLcdIntSet = 0;
-constexpr uint32_t kLcdInt    = 1u << 31;
+constexpr uint32_t kStatus1 = 0;
+constexpr uint32_t kLcdInt  = 1u << 31;
+constexpr uint32_t kDfInt   = 1u << 30;
 
 /* Video Control 3 (§17.4.3): VIDBANK[31:20] concatenated with VIDBASEHI[19:4] form the
    address video data is fetched from; bits 3-0 reserved. */
@@ -73,6 +75,8 @@ constexpr uint32_t kFbAddrMask = 0xFFFFFFF0u;
    which feeds FIFOLO - unused on a non-split display (§17.3.6). DFVAL scales the DF
    toggle rate and only reaches the DF pin while DFMODE is set (§17.4.1). */
 constexpr uint32_t kCtl4FrameMaskVal = 0x00F00000u;
+constexpr uint32_t kDfValShift       = 24;
+constexpr uint32_t kDfValMask        = 0xFFu;
 
 /* Reserved bits: §17.4.2 CTL2 <21> and <11:10>; §17.4.3 CTL3 <3:0>; §17.4.4 CTL4 <3:0>. */
 constexpr uint32_t kCtl2Reserved  = 0x00200C00u;
@@ -98,6 +102,8 @@ void Pr31x00Lcd::OnReady() {
     intc_       = &emu_.Get<Pr31x00Intc>();
     clock_      = &emu_.Get<Pr31x00Clock>();
     cycles_     = &emu_.Get<GuestCycleClock>();
+    counter_    = &emu_.Get<Pr31x00CounterInt>();
+    df_port_    = counter_->Attach(kStatus1, kDfInt, *this);
     load_event_ = cycles_->Add([this] { OnLoadEvent(); });
     emu_.Get<PeripheralDispatcher>().Register(this);
     AttachScanClock();
@@ -115,14 +121,15 @@ void Pr31x00Lcd::OnReady() {
     });
     emu_.Get<Pr31x00ResetLine>().RegisterResetListener([this] {
         std::lock_guard<std::mutex> lk(state_mtx_);
+        df_.Stop(DfTickLocked(ScanNow()));
         StopScanLocked();
+        df_.Reset((reg_[kCtl4] >> kDfValShift) & kDfValMask);
         reg_[kCtl1]         &= kCtl1ResetKept;
         held_linecnt_        = 0;
         frame_edge_pending_  = false;
         enabled_edge_        = false;
         cp_rate_changed_     = false;
-        freeze_due_          = false;
-        freeze_stopped_      = false;
+        loads_.Reset();
         LoadTimingLocked();
     });
 }
@@ -160,13 +167,27 @@ void Pr31x00Lcd::ScanEdgesRan() {
         pending             = frame_edge_pending_;
         frame_edge_pending_ = false;
     }
-    if (pending) intc_->SetPending(kLcdIntSet, kLcdInt);
+    if (pending) intc_->SetPending(kStatus1, kLcdInt);
+    counter_->Rearm(df_port_);
+}
+
+uint64_t Pr31x00Lcd::CountAt(uint64_t cycle) {
+    std::lock_guard<std::mutex> lk(state_mtx_);
+    return df_.TogglesThrough(DfTickLocked(cycle));
+}
+
+bool Pr31x00Lcd::NextCountCycle(uint64_t cycle, uint64_t& at) {
+    std::lock_guard<std::mutex> lk(state_mtx_);
+    uint64_t tick = 0;
+    if (!ScanLiveLocked() || !df_.NextToggle(ScanTicksLocked(cycle), tick)) return false;
+    at = ScanCycleOfTickLocked(tick);
+    return true;
 }
 
 /* ENVID "will enable the video logic" (§17.4.1 p17-20); ENVIDCLK gates VIDCLK (§6.3.1
    p6-6). */
 bool Pr31x00Lcd::ScanWantedLocked() const {
-    return (reg_[kCtl1] & kEnVid) != 0u && clock_->VideoClockRate().num != 0u && !freeze_stopped_;
+    return (reg_[kCtl1] & kEnVid) != 0u && clock_->VideoClockRate().num != 0u && !loads_.Frozen();
 }
 
 void Pr31x00Lcd::SyncScanLocked(uint64_t now) {
@@ -175,22 +196,24 @@ void Pr31x00Lcd::SyncScanLocked(uint64_t now) {
     if (wanted) {
         LoadTimingLocked();
         StartScanLocked(now);
+        df_.Start((reg_[kCtl1] & kDfMode) == 0u, uint64_t{lineval_} + 1u);
         ScheduleFreezeLocked(now);
         return;
     }
     held_linecnt_ = LineCntLocked(now);
+    df_.Stop(ScanTicksLocked(now));
     StopScanLocked();
     LoadTimingLocked();
-    freeze_due_ = false;
+    loads_.CancelFreeze();
 }
 
 /* §17.3.2 (p17-9): ENFREEZEFRAME "causes the video baud clock to stop and the video to stop
    shifting cleanly at the end of the current frame". */
 void Pr31x00Lcd::ScheduleFreezeLocked(uint64_t now) {
-    if ((reg_[kCtl1] & kEnFreezeFrame) == 0u || !ScanLiveLocked() || freeze_due_) return;
+    if ((reg_[kCtl1] & kEnFreezeFrame) == 0u || !ScanLiveLocked() || loads_.FreezeDue()) return;
     const uint64_t frame = uint64_t{lineval_} + 1u;
-    freeze_due_  = true;
-    freeze_tick_ = (ScanTicksLocked(now) / frame + 1u) * frame;
+    loads_.DueFreeze((ScanTicksLocked(now) / frame + 1u) * frame);
+    df_.SetFrameEnd(loads_.FrameEnd());
     ArmLoadLocked();
 }
 
@@ -204,7 +227,7 @@ uint32_t Pr31x00Lcd::LineCntLocked(uint64_t now) const {
 void Pr31x00Lcd::LoadTimingLocked() {
     vidrate_     = (reg_[kCtl2] >> kVidRateShift) & kVidRateMask;
     lineval_     = reg_[kCtl2] & kLineValMask;
-    lineval_due_ = false;
+    loads_.ClearTiming();
     cycles_->Disarm(load_event_);
 }
 
@@ -212,10 +235,6 @@ void Pr31x00Lcd::LoadTimingLocked() {
    setting" and generates the LOAD pulse; §17.3.4 (p17-11): "For each new frame, the Line Counter
    is preloaded with the LINEVAL(9:0)". */
 void Pr31x00Lcd::WriteTimingLocked(uint32_t value, uint64_t now) {
-    if (ScanLiveLocked() && ((value >> kVidRateShift) & kVidRateMask) != vidrate_) {
-        emu_.Get<Fatal>().Die("Pr31x00Lcd: VIDEO_CTL2 0x%08X changes VIDRATE of 0x%08X while the "
-                              "video logic scans", value, reg_[kCtl2]);
-    }
     reg_[kCtl2] = value;
     if (!ScanLiveLocked()) {
         LoadTimingLocked();
@@ -223,45 +242,46 @@ void Pr31x00Lcd::WriteTimingLocked(uint32_t value, uint64_t now) {
     }
     const uint64_t tick  = ScanTicksLocked(now);
     const uint64_t frame = uint64_t{lineval_} + 1u;
-    if (!lineval_due_ && (value & kLineValMask) != lineval_) {
-        lineval_due_  = true;
-        lineval_tick_ = (tick / frame + 1u) * frame;
-    }
+    if (((value >> kVidRateShift) & kVidRateMask) != vidrate_) loads_.DueVidRate(tick + 1u);
+    if ((value & kLineValMask) != lineval_) loads_.DueLineVal((tick / frame + 1u) * frame);
     ArmLoadLocked();
 }
 
 void Pr31x00Lcd::ArmLoadLocked() {
-    if (!ScanLiveLocked() || (!lineval_due_ && !freeze_due_)) {
+    uint64_t tick = 0;
+    if (!ScanLiveLocked() || loads_.Next(tick) == Pr31x00LcdLoads::Kind::kNone) {
         cycles_->Disarm(load_event_);
         return;
     }
-    uint64_t tick = UINT64_MAX;
-    if (lineval_due_) tick = lineval_tick_;
-    if (freeze_due_ && freeze_tick_ < tick) tick = freeze_tick_;
     cycles_->Arm(load_event_, ScanCycleOfTickLocked(tick));
 }
 
 void Pr31x00Lcd::ApplyLoadsLocked(uint64_t now) {
-    if (lineval_due_ && (!freeze_due_ || lineval_tick_ < freeze_tick_)) {
-        const uint64_t at = ScanCycleOfTickLocked(lineval_tick_);
-        if (at <= now) {
-            CatchUpLocked(at);
-            LoadTimingLocked();
-            StartScanLocked(at);
-            if (freeze_due_) freeze_tick_ = uint64_t{lineval_} + 1u;
+    for (;;) {
+        uint64_t tick = 0;
+        const Pr31x00LcdLoads::Kind kind = loads_.Next(tick);
+        if (kind == Pr31x00LcdLoads::Kind::kNone) break;
+        const uint64_t at = ScanCycleOfTickLocked(tick);
+        if (at > now) break;
+        CatchUpLocked(at);
+        loads_.Take(kind);
+        if (kind == Pr31x00LcdLoads::Kind::kVidRate) {
+            vidrate_ = (reg_[kCtl2] >> kVidRateShift) & kVidRateMask;
+            RescaleScanLocked(at);
+            continue;
         }
-    }
-    if (freeze_due_) {
-        const uint64_t at = ScanCycleOfTickLocked(freeze_tick_);
-        if (at <= now) {
-            CatchUpLocked(at);
+        if (kind == Pr31x00LcdLoads::Kind::kFreeze) {
             held_linecnt_ = LineCntLocked(at);
+            df_.Stop(tick);
             StopScanLocked();
             LoadTimingLocked();
-            freeze_due_     = false;
-            freeze_stopped_ = true;
             return;
         }
+        LoadTimingLocked();
+        StartScanLocked(at);
+        df_.Restart(tick, uint64_t{lineval_} + 1u);
+        loads_.MoveFreeze(uint64_t{lineval_} + 1u);
+        df_.SetFrameEnd(loads_.FrameEnd());
     }
     CatchUpLocked(now);
     ArmLoadLocked();
@@ -359,12 +379,11 @@ void Pr31x00Lcd::WriteRegLocked(uint32_t addr, uint32_t value, uint64_t now) {
             const bool cp_changed = ((reg_[kCtl1] ^ value) & kCtl1Timing) != 0u;
             const bool was_enabled = (reg_[kCtl1] & kEnVid) != 0u;
             reg_[kCtl1] = value & kCtl1Writable;
-            if ((value & kEnFreezeFrame) == 0u) {
-                freeze_due_     = false;
-                freeze_stopped_ = false;
-            }
+            loads_.WriteControl((value & kEnVid) != 0u, (value & kEnFreezeFrame) != 0u);
+            if (was_live && ScanLiveLocked()) df_.SetMode(ScanTicksLocked(now), (value & kDfMode) == 0u);
             SyncScanLocked(now);
             ScheduleFreezeLocked(now);
+            df_.SetFrameEnd(loads_.FrameEnd());
             if (was_live && ScanLiveLocked() && cp_changed) cp_rate_changed_ = true;
             if (!was_enabled && (reg_[kCtl1] & kEnVid)) enabled_edge_ = true;
             return;
@@ -394,6 +413,7 @@ void Pr31x00Lcd::WriteRegLocked(uint32_t addr, uint32_t value, uint64_t now) {
                 HaltUnsupportedAccess("PR31x00 LCD VIDEO_CTL4 FRAMEMASKVAL", addr, value);
             }
             reg_[kCtl4] = value;
+            df_.SetDfVal(DfTickLocked(now), (value >> kDfValShift) & kDfValMask);
             return;
 
         default:
@@ -408,11 +428,9 @@ void Pr31x00Lcd::SaveState(StateWriter& w) {
     SaveScanLocked(w);
     w.Write("vidrate", vidrate_);
     w.Write("lineval", lineval_);
-    w.Write<uint8_t>("lineval_due", lineval_due_ ? 1u : 0u);
-    w.Write("lineval_tick", lineval_tick_);
-    w.Write<uint8_t>("freeze_due", freeze_due_ ? 1u : 0u);
-    w.Write<uint8_t>("freeze_stopped", freeze_stopped_ ? 1u : 0u);
-    w.Write("freeze_tick", freeze_tick_);
+    loads_.Save(w);
+    df_.Save(w, DfTickLocked(ScanNow()));
+    counter_->SaveState(df_port_, w);
 }
 
 void Pr31x00Lcd::RestoreState(StateReader& r) {
@@ -420,18 +438,11 @@ void Pr31x00Lcd::RestoreState(StateReader& r) {
     for (uint32_t i = 0; i < kRegs; ++i) r.Read("reg", reg_[i]);
     r.Read("held_linecnt", held_linecnt_);
     RestoreScanLocked(r);
-    uint8_t lineval_due = 0;
     r.Read("vidrate", vidrate_);
     r.Read("lineval", lineval_);
-    r.Read("lineval_due", lineval_due);
-    r.Read("lineval_tick", lineval_tick_);
-    uint8_t freeze_due = 0, freeze_stopped = 0;
-    r.Read("freeze_due", freeze_due);
-    r.Read("freeze_stopped", freeze_stopped);
-    r.Read("freeze_tick", freeze_tick_);
-    freeze_due_         = freeze_due != 0u;
-    freeze_stopped_     = freeze_stopped != 0u;
-    lineval_due_        = lineval_due != 0u;
+    loads_.Restore(r);
+    df_.Restore(r);
+    counter_->RestoreState(df_port_, r);
     frame_edge_pending_ = false;
     enabled_edge_       = false;
     cp_rate_changed_    = false;
