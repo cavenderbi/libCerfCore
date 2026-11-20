@@ -26,7 +26,7 @@ public:
 
     void OnGuestData(const uint8_t* data, size_t n);   /* online-mode guest TX */
     void OnGuestBreak();
-    void SetRts(bool on);                              /* guest RTS flow control */
+    void SetReceiveReady(bool ready);
 
 private:
     void OnPppFrame(uint16_t proto, const uint8_t* p, size_t len);
@@ -53,8 +53,6 @@ private:
     void DrainTx();
     void BuildGratuitousArp(std::vector<uint8_t>& out) const;
 
-    /* Feed one held RX frame to the UART when RTS is asserted and the UART has
-       drained - paces delivery to the guest's serial buffer. */
     void Pump();
     void PumpLocked();
 
@@ -88,10 +86,7 @@ private:
     std::mutex                        out_mu_;     /* leaf lock, never nested */
     std::vector<std::vector<uint8_t>> outbound_;
 
-    /* Guest-bound frames queue in rx_hold_ and are fed to the UART one at a
-       time, only while the guest asserts RTS and the UART RX has drained - RTS
-       flow control + pacing to the guest's serial buffer. Under mu_. */
-    bool                              rts_ = true;
+    bool                              rx_ready_ = true;
     std::vector<std::vector<uint8_t>> rx_hold_;
 };
 

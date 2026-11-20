@@ -11,12 +11,14 @@ namespace {
 
 constexpr uint8_t  kFlag    = 0x7E;
 constexpr uint8_t  kEsc     = 0x7D;
+constexpr uint32_t kRxAccm  = 0xFFFFFFFFu;
 
 }
 
 void PppHdlc::Feed(const uint8_t* data, size_t n) {
     for (size_t i = 0; i < n; ++i) {
         const uint8_t b = data[i];
+        if (b < 0x20u && (kRxAccm & (1u << b)) != 0u) continue;
         if (b == kFlag) {
             if (in_frame_ && !in_escape_ && !rx_.empty()) EndFrame();
             rx_.clear();

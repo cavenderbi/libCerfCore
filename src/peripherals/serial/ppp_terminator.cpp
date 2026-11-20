@@ -27,6 +27,7 @@ constexpr uint8_t kProtoRej = 8, kEchoReq = 9, kEchoRep = 10;
 constexpr uint8_t kLcpMru = 1, kLcpAccm = 2, kLcpAuth = 3, kLcpMagic = 5,
                   kLcpPfc = 7, kLcpAcfc = 8;
 constexpr uint8_t kIpcpAddr = 3, kIpcpDns = 129;
+constexpr uint32_t kFlowControlAccm = (1u << 0x11) | (1u << 0x13);
 
 /* IPCP hands these to the guest; they must equal libslirp's configured guest /
    gateway / DNS addresses or traffic will not route. */
@@ -94,7 +95,7 @@ void PppTerminator::Start() {
         lcp_req_id_ = ipcp_req_id_ = 0;
         negotiated_tx_accm_ = 0xFFFFFFFFu;
         next_id_ = 1;
-        rts_ = true;
+        rx_ready_ = true;
         rx_hold_.clear();
         active_ = true;
     }
@@ -283,7 +284,7 @@ void PppTerminator::HandleIpcpConfReq(uint8_t id, const uint8_t* opts,
 void PppTerminator::MaybeOpenLcp() {
     if (lcp_open_ || !lcp_peer_acked_ || !lcp_we_acked_) return;
     lcp_open_ = true;
-    hdlc_.SetTxAccm(negotiated_tx_accm_);   /* both ends Open: safe to relax */
+    hdlc_.SetTxAccm(negotiated_tx_accm_ | kFlowControlAccm);
     LOG(Net, "[PPP] LCP up\n");
 }
 
@@ -333,9 +334,9 @@ void PppTerminator::SendPpp(uint16_t proto, const uint8_t* p, size_t len) {
     PumpLocked();
 }
 
-void PppTerminator::SetRts(bool on) {
+void PppTerminator::SetReceiveReady(bool ready) {
     std::lock_guard<std::mutex> lk(mu_);
-    rts_ = on;
+    rx_ready_ = ready;
     PumpLocked();
 }
 
@@ -345,9 +346,7 @@ void PppTerminator::Pump() {
 }
 
 void PppTerminator::PumpLocked() {
-    /* One frame in flight at a time: feed the next only when RTS is asserted and
-       the guest has drained the UART, so its serial buffer is never flooded. */
-    if (!rts_ || rx_hold_.empty() || !uart_.RxEmpty()) return;
+    if (!rx_ready_ || rx_hold_.empty() || !uart_.RxEmpty()) return;
     std::vector<uint8_t> f = std::move(rx_hold_.front());
     rx_hold_.erase(rx_hold_.begin());
     uart_.PushRx(f.data(), f.size());

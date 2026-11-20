@@ -1,5 +1,6 @@
 #include "modem_personality.h"
 
+#include "at_decimal.h"
 #include "serial_line.h"
 #include "ppp_terminator.h"
 #include "../external_device_clock.h"
@@ -10,8 +11,7 @@
 
 #include <algorithm>
 #include <cctype>
-#include <cstdio>
-#include <iterator>
+#include <vector>
 
 namespace cerfcore {
 
@@ -20,61 +20,17 @@ namespace {
 constexpr int64_t  kNsPer10Ms    = 10'000'000;
 constexpr int64_t  kNsPer20Ms    = 20'000'000;
 constexpr int64_t  kNoDue        = INT64_MAX;
-constexpr unsigned kSValueMax    = 255u;
 constexpr size_t   kBodyLimit    = 256u;
 constexpr uint8_t  kEscapeLength = 3u;
 
-constexpr size_t kRegEscape     = 2u;
-constexpr size_t kRegTerminator = 3u;
-constexpr size_t kRegFormat     = 4u;
-constexpr size_t kRegEdit       = 5u;
-constexpr size_t kRegGuard      = 12u;
-constexpr size_t kRegDtrDetect  = 25u;
-constexpr size_t kRegLineSpeed  = 37u;
+constexpr size_t kRegEscape     = ModemSRegisters::kEscape;
+constexpr size_t kRegTerminator = ModemSRegisters::kTerminator;
+constexpr size_t kRegFormat     = ModemSRegisters::kFormat;
+constexpr size_t kRegEdit       = ModemSRegisters::kEdit;
+constexpr size_t kRegGuard      = ModemSRegisters::kGuard;
+constexpr size_t kRegDtrDetect  = ModemSRegisters::kDtrDetect;
 
-struct SRegisterSpec {
-    bool    defined;
-    uint8_t min;
-    uint8_t max;
-    uint8_t def;
-};
-
-constexpr SRegisterSpec kSRegisters[] = {
-    {true, 0, 255, 0},  {true, 0, 255, 0},  {true, 0, 255, 43}, {true, 0, 127, 13},
-    {true, 0, 127, 10}, {true, 0, 127, 8},  {true, 2, 255, 2},  {true, 1, 255, 30},
-    {true, 0, 255, 2},  {true, 1, 255, 60}, {true, 1, 255, 14}, {true, 50, 255, 95},
-    {true, 0, 255, 50}, {},                 {},                 {},
-    {},                 {},                 {true, 0, 255, 0},  {},
-    {},                 {},                 {},                 {},
-    {},                 {true, 0, 255, 5},  {true, 0, 255, 1},  {},
-    {},                 {},                 {},                 {},
-    {},                 {},                 {},                 {},
-    {true, 0, 1, 1},    {true, 0, 9, 0},    {true, 0, 255, 20},
-};
-static_assert(std::size(kSRegisters) == ModemPersonality::kSRegisterCount);
-
-bool SValueValid(size_t reg, unsigned value) {
-    const SRegisterSpec& spec = kSRegisters[reg];
-    if (value < spec.min || value > spec.max) return false;
-    if (reg == kRegEdit) return value <= 32u || value == 127u;
-    if (reg == kRegLineSpeed) return value != 4u && value != 8u;
-    return true;
-}
-
-size_t ParseDecimal(const std::string& u, size_t at, unsigned& value) {
-    size_t n = 0;
-    value = 0;
-    while (at + n < u.size() && isdigit((unsigned char)u[at + n])) {
-        if (value <= kSValueMax) value = value * 10u + static_cast<unsigned>(u[at + n] - '0');
-        ++n;
-    }
-    return n;
-}
-
-bool ReadValue(const std::string& body, size_t& i, unsigned max, unsigned& value) {
-    i += ParseDecimal(body, i, value);
-    return value <= max;
-}
+constexpr char kIfcName[] = "IFC";
 
 void WriteText(StateWriter& w, const char* count_key, const char* bytes_key, const std::string& s) {
     w.Write<uint32_t>(count_key, static_cast<uint32_t>(s.size()));
@@ -126,7 +82,7 @@ void ModemPersonality::OnControlLines(bool dtr, bool rts) {
     const bool rose = !dtr_ && dtr;
     dtr_ = dtr;
     rts_ = rts;
-    UpdateRts();
+    UpdateReceiveReady();
     if (rose && dtr_loss_pending_) {
         dtr_loss_pending_ = false;
         ArmTimer();
@@ -166,11 +122,14 @@ void ModemPersonality::OnGuestTx(const uint8_t* data, size_t n) {
         for (size_t i = 0; i < n; ++i) HandleCommandByte(data[i]);
         return;
     }
-    const int64_t now     = NowNs();
-    bool          rearm   = false;
+    std::vector<uint8_t> passed;
+    const bool           ready_moved = flow_.TakeGuestData(data, n, passed);
+    const int64_t        now         = NowNs();
+    bool                 rearm       = false;
     for (size_t i = 0; i < n; ++i) rearm = OnGuestDataByte(data[i], now) || rearm;
+    if (ready_moved) UpdateReceiveReady();
     if (rearm) ArmTimer();
-    terminator_->OnGuestData(data, n);
+    if (!passed.empty()) terminator_->OnGuestData(passed.data(), passed.size());
 }
 
 bool ModemPersonality::OnGuestDataByte(uint8_t b, int64_t now) {
@@ -260,25 +219,25 @@ void ModemPersonality::ExecuteBody(const std::string& body) {
         unsigned   v = 0;
         switch (c) {
             case 'E':
-                if (!ReadValue(body, i, 1u, v)) return Reply(Result::Error);
+                if (!ReadAtValue(body, i, 1u, v)) return Reply(Result::Error);
                 echo_ = v != 0u;
                 break;
             case 'Q':
-                if (!ReadValue(body, i, 1u, v)) return Reply(Result::Error);
+                if (!ReadAtValue(body, i, 1u, v)) return Reply(Result::Error);
                 quiet_ = v != 0u;
                 break;
             case 'V':
-                if (!ReadValue(body, i, 1u, v)) return Reply(Result::Error);
+                if (!ReadAtValue(body, i, 1u, v)) return Reply(Result::Error);
                 verbose_ = v != 0u;
                 break;
             case 'X':
-                if (!ReadValue(body, i, 4u, v)) return Reply(Result::Error);
+                if (!ReadAtValue(body, i, 4u, v)) return Reply(Result::Error);
                 break;
             case 'L':
-                if (!ReadValue(body, i, 3u, v)) return Reply(Result::Error);
+                if (!ReadAtValue(body, i, 3u, v)) return Reply(Result::Error);
                 break;
             case 'M':
-                if (!ReadValue(body, i, 2u, v)) return Reply(Result::Error);
+                if (!ReadAtValue(body, i, 2u, v)) return Reply(Result::Error);
                 break;
             case 'T':
             case 'P':
@@ -286,11 +245,11 @@ void ModemPersonality::ExecuteBody(const std::string& body) {
                     return Reply(Result::Error);
                 break;
             case 'H':
-                if (!ReadValue(body, i, 0u, v)) return Reply(Result::Error);
+                if (!ReadAtValue(body, i, 0u, v)) return Reply(Result::Error);
                 SetCarrier(false);
                 break;
             case 'O':
-                if (!ReadValue(body, i, 0u, v)) return Reply(Result::Error);
+                if (!ReadAtValue(body, i, 0u, v)) return Reply(Result::Error);
                 if (!online_) return Reply(Result::NoCarrier);
                 Reply(Result::Connect);
                 EnterDataMode();
@@ -309,28 +268,36 @@ void ModemPersonality::ExecuteBody(const std::string& body) {
                 break;
             }
             case 'Z':
-                if (!ReadValue(body, i, 0u, v)) return Reply(Result::Error);
+                if (!ReadAtValue(body, i, 0u, v)) return Reply(Result::Error);
                 if (online_) SetCarrier(false);
                 LoadDefaults();
                 PushModemInputs();
                 return Reply(Result::Ok);
             case 'S':
-                if (!ExecuteSRegister(body, i)) return Reply(Result::Error);
+            case '+': {
+                std::string info;
+                const bool  ok = c == 'S' ? s_.Execute(body, i, info) : ExecuteExtended(body, i, info);
+                if (!ok) return Reply(Result::Error);
+                if (!info.empty()) PushInfo(info.c_str());
                 break;
+            }
             case '&': {
                 if (i >= body.size()) return Reply(Result::Error);
                 const char a = body[i++];
                 if (a == 'C') {
-                    if (!ReadValue(body, i, 1u, v)) return Reply(Result::Error);
+                    if (!ReadAtValue(body, i, 1u, v)) return Reply(Result::Error);
                     dcd_mode_ = static_cast<uint8_t>(v);
                     PushModemInputs();
                 } else if (a == 'D') {
-                    if (!ReadValue(body, i, 2u, v)) return Reply(Result::Error);
+                    if (!ReadAtValue(body, i, 2u, v)) return Reply(Result::Error);
                     dtr_mode_ = static_cast<uint8_t>(v);
                 } else if (a == 'F') {
-                    if (!ReadValue(body, i, 0u, v)) return Reply(Result::Error);
+                    if (!ReadAtValue(body, i, 0u, v)) return Reply(Result::Error);
                     LoadDefaults();
                     PushModemInputs();
+                } else if (a == 'K') {
+                    i += ParseAtDecimal(body, i, v);
+                    if (!flow_.SelectAmpK(v)) return Reply(Result::Error);
                 } else {
                     return Reply(Result::Error);
                 }
@@ -343,35 +310,24 @@ void ModemPersonality::ExecuteBody(const std::string& body) {
     Reply(Result::Ok);
 }
 
-bool ModemPersonality::ExecuteSRegister(const std::string& body, size_t& i) {
-    unsigned     reg    = 0;
-    const size_t digits = ParseDecimal(body, i, reg);
-    if (digits == 0 || reg >= kSRegisterCount || !kSRegisters[reg].defined) return false;
-    i += digits;
-    if (i >= body.size()) return false;
-    const char op = body[i++];
-    if (op == '?') {
-        char text[4];
-        std::snprintf(text, sizeof text, "%03u", static_cast<unsigned>(s_[reg]));
-        PushInfo(text);
-        return true;
-    }
-    if (op != '=') return false;
-    unsigned     value = 0;
-    const size_t n     = ParseDecimal(body, i, value);
-    if (n == 0 || !SValueValid(reg, value)) return false;
-    i += n;
-    s_[reg] = static_cast<uint8_t>(value);
+bool ModemPersonality::ExecuteExtended(const std::string& body, size_t& i, std::string& info) {
+    const size_t start = i;
+    while (i < body.size() && body[i] != '=' && body[i] != '?' && body[i] != ';') ++i;
+    if (body.compare(start, i - start, kIfcName) != 0 || !flow_.ExecuteIfc(body, i, info)) return false;
+    if (i == body.size()) return true;
+    if (body[i] != ';') return false;
+    ++i;
     return true;
 }
 
 void ModemPersonality::LoadDefaults() {
-    for (size_t reg = 0; reg < kSRegisterCount; ++reg) s_[reg] = kSRegisters[reg].def;
+    s_.LoadDefaults();
     echo_     = true;
     quiet_    = false;
     verbose_  = true;
     dcd_mode_ = 1u;
     dtr_mode_ = 2u;
+    flow_.LoadDefaults();
 }
 
 void ModemPersonality::PushInfo(const char* text) {
@@ -422,7 +378,8 @@ void ModemPersonality::EnterDataMode() {
     data_mode_    = true;
     escape_count_ = 0u;
     last_tx_ns_   = NowNs();
-    UpdateRts();
+    flow_.EnterDataState();
+    UpdateReceiveReady();
 }
 
 void ModemPersonality::EnterOnlineCommandState() {
@@ -432,7 +389,7 @@ void ModemPersonality::EnterOnlineCommandState() {
     line_.clear();
     prefix_        = Prefix::None;
     line_overflow_ = false;
-    UpdateRts();
+    UpdateReceiveReady();
     ArmTimer();
     Reply(Result::Ok);
 }
@@ -441,8 +398,8 @@ void ModemPersonality::PushModemInputs() {
     uart_->SetModemInputs(true, true, false, dcd_mode_ == 0u || online_);
 }
 
-void ModemPersonality::UpdateRts() {
-    if (terminator_) terminator_->SetRts(rts_ && data_mode_);
+void ModemPersonality::UpdateReceiveReady() {
+    if (terminator_) terminator_->SetReceiveReady(data_mode_ && flow_.ReceiveReady(rts_));
 }
 
 void ModemPersonality::PushStr(const std::string& s) {
@@ -450,7 +407,7 @@ void ModemPersonality::PushStr(const std::string& s) {
 }
 
 void ModemPersonality::SaveState(StateWriter& w) {
-    w.WriteBytes("modem_s_registers", s_.data(), s_.size());
+    s_.SaveState(w);
     w.Write<uint8_t>("modem_echo", echo_ ? 1u : 0u);
     w.Write<uint8_t>("modem_quiet", quiet_ ? 1u : 0u);
     w.Write<uint8_t>("modem_verbose", verbose_ ? 1u : 0u);
@@ -460,12 +417,13 @@ void ModemPersonality::SaveState(StateWriter& w) {
     w.Write<uint8_t>("modem_line_overflow", line_overflow_ ? 1u : 0u);
     w.Write<uint8_t>("modem_dtr", dtr_ ? 1u : 0u);
     w.Write<uint8_t>("modem_rts", rts_ ? 1u : 0u);
+    flow_.SaveState(w);
     WriteText(w, "modem_line_count", "modem_line", line_);
     WriteText(w, "modem_last_body_count", "modem_last_body", last_body_);
 }
 
 void ModemPersonality::RestoreState(StateReader& r) {
-    r.ReadBytes("modem_s_registers", s_.data(), s_.size());
+    s_.RestoreState(r);
     uint8_t echo = 0u, quiet = 0u, verbose = 0u, prefix = 0u, overflow = 0u, dtr = 0u, rts = 0u;
     r.Read("modem_echo", echo);
     r.Read("modem_quiet", quiet);
@@ -476,6 +434,7 @@ void ModemPersonality::RestoreState(StateReader& r) {
     r.Read("modem_line_overflow", overflow);
     r.Read("modem_dtr", dtr);
     r.Read("modem_rts", rts);
+    flow_.RestoreState(r);
     dtr_ = dtr != 0u;
     rts_ = rts != 0u;
     prefix_ = static_cast<Prefix>(prefix);

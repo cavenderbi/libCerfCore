@@ -1,8 +1,9 @@
 #pragma once
 
+#include "modem_flow_control.h"
+#include "modem_s_registers.h"
 #include "serial_endpoint.h"
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -15,8 +16,6 @@ class PppTerminator;
 
 class ModemPersonality : public SerialEndpoint {
 public:
-    static constexpr size_t kSRegisterCount = 39u;
-
     ModemPersonality(CerfEmulator& emu, std::string net_id);
     ~ModemPersonality() override;
 
@@ -38,7 +37,7 @@ private:
     void HandleCommandByte(uint8_t b);
     void ProcessCommandLine();
     void ExecuteBody(const std::string& body);
-    bool ExecuteSRegister(const std::string& body, size_t& i);
+    bool ExecuteExtended(const std::string& body, size_t& i, std::string& info);
     void LoadDefaults();
     void Reply(Result result);
     void PushInfo(const char* text);
@@ -47,7 +46,7 @@ private:
     void EnterDataMode();
     void EnterOnlineCommandState();
     void PushModemInputs();
-    void UpdateRts();
+    void UpdateReceiveReady();
     bool OnGuestDataByte(uint8_t b, int64_t now);
     void OnDtrLoss();
     void ArmTimer();
@@ -56,8 +55,9 @@ private:
     CerfEmulator& emu_;
     std::string   net_id_;
     std::unique_ptr<PppTerminator> terminator_;
+    ModemFlowControl               flow_;
 
-    std::array<uint8_t, kSRegisterCount> s_{};
+    ModemSRegisters s_;
     std::string line_;
     std::string last_body_;
     Prefix      prefix_        = Prefix::None;
