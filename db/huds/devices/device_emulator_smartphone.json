@@ -1,0 +1,9 @@
+{
+  "name": "Smartphone",
+  "board_ids": ["devemu_sp", "devemu_sp_qvga", "devemu_gen1_sp", "devemu_gen1_sp_qvga"],
+  "gap": 0.02,
+  "panels": [
+    { "side": "bottom", "align": "center", "width": 1.0, "height": 0.48, "content": "device_emulator_smartphone_keys" },
+    { "side": "bottom", "align": "center", "width": 1.0, "height": 0.667, "content": "device_emulator_keypad" }
+  ]
+}

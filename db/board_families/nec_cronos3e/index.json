@@ -1,0 +1,9 @@
+{
+  "name": "NEC CRONOS3E",
+  "soc_id": "vr4121",
+  "device_year": 2001,
+  "notes": [],
+  "ga_window_size": 50331648,
+  "rom_placing_mode": "flat_container",
+  "board_config": { "mips16en": { "default": "low", "values": ["low", "high"] } }
+}

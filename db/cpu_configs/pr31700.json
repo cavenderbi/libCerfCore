@@ -1,0 +1,1 @@
+{ "soc_id": "pr31700", "inherits_cpu_config_id": "tx39", "values": { "prid": "0x00002202" } }

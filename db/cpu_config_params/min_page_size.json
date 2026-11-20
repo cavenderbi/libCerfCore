@@ -1,0 +1,6 @@
+{
+  "name": "Minimum page size",
+  "arch": "MIPS",
+  "type": "enum",
+  "enum_values": [{ "id": "1kb", "name": "1 KB" }, { "id": "4kb", "name": "4 KB" }]
+}

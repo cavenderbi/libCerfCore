@@ -1,0 +1,6 @@
+{
+  "name": "NEC MobilePro 900(c)",
+  "short_name": "MobilePro 900(c)",
+  "board_family_id": "nec_mobilepro_900_series",
+  "support_level": "bootable_full"
+}

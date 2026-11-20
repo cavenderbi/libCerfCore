@@ -1,0 +1,7 @@
+{
+  "name": "Casio Cassiopeia E-11",
+  "short_name": "E-11",
+  "board_family_id": "casio_tomcat",
+  "support_level": "unknown_partial",
+  "board_config": { "ram": { "default": "8mb" } }
+}

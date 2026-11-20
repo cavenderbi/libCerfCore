@@ -1,0 +1,7 @@
+{
+  "name": "Device Emulator 2008 (VGA)",
+  "short_name": "Device Emulator",
+  "board_family_id": "samsung_smdk2410",
+  "support_level": "bootable_full",
+  "dynamic_scale_factor": -1
+}

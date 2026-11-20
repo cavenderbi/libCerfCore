@@ -1,0 +1,10 @@
+{
+  "name": "Casio PocketPostPet",
+  "soc_id": "vr4121",
+  "device_year": 2000,
+  "notes": ["Stock camera: access causes imminent crash", "Stock microphone: access causes imminent crash"],
+  "ga_color_depth": 24,
+  "ga_window_size": 100663296,
+  "rom_placing_mode": "flat_container",
+  "board_config": { "mips16en": { "default": "low", "values": ["low", "high"] } }
+}

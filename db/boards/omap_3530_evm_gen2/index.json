@@ -1,0 +1,6 @@
+{
+  "name": "TI OMAP35x EVM Gen2",
+  "short_name": "OMAP35x EVM",
+  "board_family_id": "ti_omap35x_evm",
+  "support_level": "bootable_partial"
+}

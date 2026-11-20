@@ -1,0 +1,18 @@
+{
+  "column": [
+    "hp_300_upper_rows",
+    {
+      "row": [
+        { "grow": 1.25, "button": { "keys": ["VK_CONTROL"] } },
+        { "button": { "keys": ["VK_LWIN"] } },
+        { "grow": 1.25, "button": { "keys": ["VK_MENU"] } },
+        { "grow": 5.5, "column": ["space_key"] },
+        { "button": { "keys": ["VK_F10"] } },
+        { "button": { "keys": ["VK_DELETE"] } },
+        "jornada_left",
+        "jornada_down",
+        "jornada_right"
+      ]
+    }
+  ]
+}

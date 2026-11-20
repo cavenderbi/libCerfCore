@@ -1,0 +1,12 @@
+{
+  "soc_id": "s3c2410",
+  "inherits_cpu_config_id": "arm",
+  "values": {
+    "midr": "0x69059201",
+    "ctr": "0x0B172172",
+    "pc_store_offset": "plus_12",
+    "base_restored_abort_model": true,
+    "dsp": true,
+    "load_store_double": true
+  }
+}

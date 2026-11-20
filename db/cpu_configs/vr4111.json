@@ -1,0 +1,5 @@
+{
+  "soc_id": "vr4111",
+  "inherits_cpu_config_id": "vr41xx",
+  "values": { "prid": "0x00000C50", "mips16": true, "madd16_dmadd16": true, "config_reset": "0x000258C0" }
+}

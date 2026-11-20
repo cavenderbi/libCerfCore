@@ -1,0 +1,7 @@
+{
+  "id": "eeprom",
+  "name": "EEPROM",
+  "optional": true,
+  "board_family_ids": ["hp_jornada_700"],
+  "formats": ["bin", "img"]
+}

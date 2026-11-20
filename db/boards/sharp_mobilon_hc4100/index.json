@@ -1,0 +1,6 @@
+{
+  "name": "Sharp Mobilon HC-4100",
+  "short_name": "Mobilon HC-4100",
+  "board_family_id": "sharp_mobilon_hc",
+  "support_level": "bootable_full"
+}

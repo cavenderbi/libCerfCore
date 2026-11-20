@@ -1,0 +1,6 @@
+{
+  "name": "Philips Nino 300",
+  "short_name": "Nino 300",
+  "board_family_id": "philips_nino",
+  "support_level": "bootable_full"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "emmc",
+  "name": "eMMC",
+  "picker_type": "existing_or_point",
+  "board_family_ids": ["nokia_sea_ray"],
+  "formats": ["img"]
+}

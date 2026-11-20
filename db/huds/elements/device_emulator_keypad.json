@@ -1,0 +1,8 @@
+{
+  "column": [
+    { "row": ["key_1", "key_2", "key_3"] },
+    { "row": ["key_4", "key_5", "key_6"] },
+    { "row": ["key_7", "key_8", "key_9"] },
+    { "row": ["device_emulator_star", "key_0", "device_emulator_pound"] }
+  ]
+}

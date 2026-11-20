@@ -1,0 +1,7 @@
+{
+  "name": "Sharp Mobilon HC-4000",
+  "short_name": "Mobilon HC-4000",
+  "board_family_id": "sharp_mobilon_hc",
+  "support_level": "unknown_partial",
+  "board_config": { "ram": { "default": "4mb" } }
+}

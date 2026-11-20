@@ -1,0 +1,8 @@
+{
+  "column": [
+    "bezel_settings",
+    { "button": { "action": "page_up", "icon": "keyboard_double_arrow_up" } },
+    { "button": { "action": "page_down", "icon": "keyboard_double_arrow_down" } },
+    { "button": { "action": "task_switch", "icon": "select_window" } }
+  ]
+}

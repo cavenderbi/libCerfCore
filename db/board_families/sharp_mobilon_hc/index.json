@@ -1,0 +1,13 @@
+{
+  "name": "Sharp Mobilon HC",
+  "soc_id": "pr31700",
+  "device_year": 1997,
+  "board_config": {
+    "ram": { "default": "12mb", "values": ["4mb", "8mb", "12mb", "16mb"] },
+    "lcd_panel": { "default": "monochrome_stn", "values": ["monochrome_stn", "color_dstn"] },
+    "backlight": { "default": "none", "values": ["none", "installed"] }
+  },
+  "notes": [],
+  "ga_color_depth": 8,
+  "rom_placing_mode": "flat_container"
+}

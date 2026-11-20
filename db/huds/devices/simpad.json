@@ -1,0 +1,6 @@
+{
+  "name": "SIMpad",
+  "board_family_ids": ["siemens_simpad"],
+  "gap": 0.02,
+  "panels": [{ "side": "right", "align": "start", "width": 0.187, "height": 0.5, "content": "simpad_keys" }]
+}

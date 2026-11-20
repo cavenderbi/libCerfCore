@@ -1,0 +1,7 @@
+{
+  "name": "Nokia Lumia 800 (RM-819)",
+  "short_name": "Lumia 800",
+  "board_family_id": "nokia_sea_ray",
+  "support_level": "no_support",
+  "internal__spec_divergences": "HSDPA 850/900/1900/2100"
+}

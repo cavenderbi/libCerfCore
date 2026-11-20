@@ -1,0 +1,7 @@
+{
+  "name": "Casio Cassiopeia E-707",
+  "short_name": "E-707",
+  "board_family_id": "casio_jx670",
+  "support_level": "unknown_partial",
+  "internal__spec_divergences": "CF slot"
+}

@@ -1,0 +1,94 @@
+{
+  "column": [
+    {
+      "grow": 0.45,
+      "row": [
+        {},
+        { "sticker": { "icon": "mail" } },
+        { "sticker": { "icon": "language" } },
+        { "sticker": { "icon": "calendar_month" } },
+        { "sticker": { "icon": "contacts" } },
+        { "sticker": { "icon": "checklist" } },
+        { "sticker": { "icon": "docs" } },
+        { "sticker": { "icon": "sheets" } },
+        { "sticker": { "icon": "slides" } },
+        { "sticker": { "icon": "database" } },
+        { "sticker": { "icon": "calculate" } },
+        { "sticker": { "icon": "voicemail" } },
+        { "sticker": { "icon": "apps" } },
+        {},
+        {},
+        {}
+      ]
+    },
+    {
+      "row": [
+        { "button": { "keys": ["VK_ESCAPE"] } },
+        { "button": { "keys": ["VK_F1"], "label": "A1" } },
+        { "button": { "keys": ["VK_F2"], "label": "A2" } },
+        { "button": { "keys": ["VK_F3"], "label": "A3" } },
+        { "button": { "keys": ["VK_F4"], "label": "A4" } },
+        { "button": { "keys": ["VK_F5"], "label": "A5" } },
+        { "button": { "keys": ["VK_F6"], "label": "A6" } },
+        { "button": { "keys": ["VK_F7"], "label": "A7" } },
+        { "button": { "keys": ["VK_F8"], "label": "A8" } },
+        { "button": { "keys": ["VK_F9"], "label": "A9" } },
+        { "button": { "keys": ["VK_F10"], "label": "A10" } },
+        { "button": { "keys": ["VK_F11"], "label": "A11" } },
+        { "button": { "keys": ["VK_F12"], "label": "A12" } },
+        { "button": { "keys": ["VK_NUMLOCK"], "label": "NumLk" } },
+        { "button": { "keys": ["VK_DELETE"] } },
+        "jornada_power"
+      ]
+    },
+    "cronos3e_number_row",
+    "hp_620lx_q_row",
+    {
+      "row": [
+        { "grow": 1.5, "column": ["tab_key"] },
+        { "button": { "keys": ["VK_A"] } },
+        { "button": { "keys": ["VK_S"] } },
+        { "button": { "keys": ["VK_D"] } },
+        { "button": { "keys": ["VK_F"] } },
+        { "button": { "keys": ["VK_G"] } },
+        { "button": { "keys": ["VK_H"] } },
+        { "button": { "keys": ["VK_J"] } },
+        { "button": { "keys": ["VK_K"] } },
+        { "button": { "keys": ["VK_L"] } },
+        { "button": { "keys": ["VK_OEM_1"] } },
+        { "button": { "keys": ["VK_OEM_7"] } },
+        { "grow": 1.5, "column": ["jornada_enter"] }
+      ]
+    },
+    {
+      "row": [
+        { "grow": 2, "column": ["shift_key"] },
+        { "button": { "keys": ["VK_Z"] } },
+        { "button": { "keys": ["VK_X"] } },
+        { "button": { "keys": ["VK_C"] } },
+        { "button": { "keys": ["VK_V"] } },
+        { "button": { "keys": ["VK_B"] } },
+        { "button": { "keys": ["VK_N"] } },
+        { "button": { "keys": ["VK_M"] } },
+        { "button": { "keys": ["VK_OEM_COMMA"] } },
+        { "button": { "keys": ["VK_OEM_PERIOD"] } },
+        { "button": { "keys": ["VK_OEM_2"] } },
+        "jornada_up",
+        "right_shift_key"
+      ]
+    },
+    {
+      "row": [
+        { "button": { "keys": ["VK_CONTROL"] } },
+        { "button": { "keys": ["VK_LWIN"] } },
+        { "button": { "keys": ["VK_MENU"] } },
+        { "grow": 6, "column": ["space_key"] },
+        { "button": { "keys": ["VK_RMENU"] } },
+        { "button": { "keys": ["VK_RCONTROL"], "label": "Ctrl" } },
+        "jornada_left",
+        "jornada_down",
+        "jornada_right"
+      ]
+    }
+  ]
+}

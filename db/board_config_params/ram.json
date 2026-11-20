@@ -1,0 +1,19 @@
+{
+  "name": "RAM",
+  "enum_values": [
+    { "id": "2mb", "name": "2 MB" },
+    { "id": "3mb", "name": "3 MB" },
+    { "id": "4mb", "name": "4 MB" },
+    { "id": "5mb", "name": "5 MB" },
+    { "id": "6mb", "name": "6 MB" },
+    { "id": "7mb", "name": "7 MB" },
+    { "id": "8mb", "name": "8 MB" },
+    { "id": "12mb", "name": "12 MB" },
+    { "id": "16mb", "name": "16 MB" },
+    { "id": "32mb", "name": "32 MB" },
+    { "id": "64mb", "name": "64 MB" },
+    { "id": "128mb", "name": "128 MB" },
+    { "id": "256mb", "name": "256 MB" }
+  ],
+  "generic_part_id": "ram"
+}

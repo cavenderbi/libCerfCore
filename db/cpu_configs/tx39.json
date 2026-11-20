@@ -1,0 +1,28 @@
+{
+  "values": {
+    "isa_level": "mips1",
+    "tlb_size": 32,
+    "min_page_size": "4kb",
+    "phys_addr_mask": "0xFFFFFFFF",
+    "device_ip_mask": "0x00005000",
+    "fpu": false,
+    "llsc": false,
+    "counter": false,
+    "watch": false,
+    "vr41xx_power_modes": false,
+    "mips16": false,
+    "mips16_syscall": false,
+    "tx39_multiply_add": true,
+    "macc_dmacc": false,
+    "madd16_dmadd16": false,
+    "cop1_cop2_unusable": false,
+    "config_reset": "0x00100030",
+    "config_writable": "0x00000FFF",
+    "config_fixed_mask": "0x00000000",
+    "config_fixed_value": "0x00000000",
+    "status_reset": "0x00600000",
+    "status_writable": "0xF040FF3F",
+    "status_fixed_mask": "0x02000000",
+    "status_fixed_value": "0x00000000"
+  }
+}

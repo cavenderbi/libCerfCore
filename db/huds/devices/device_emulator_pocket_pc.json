@@ -1,0 +1,6 @@
+{
+  "name": "Pocket PC",
+  "board_ids": ["devemu", "devemu_vga", "devemu_wqvga", "devemu_wvga", "devemu_gen1", "devemu_gen1_vga"],
+  "gap": 0.02,
+  "panels": [{ "side": "bottom", "align": "center", "width": 1.0, "height": 0.48, "content": "device_emulator_keys" }]
+}

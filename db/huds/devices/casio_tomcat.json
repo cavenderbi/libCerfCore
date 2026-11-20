@@ -1,0 +1,9 @@
+{
+  "name": "Casio Tomcat",
+  "board_family_ids": ["casio_tomcat"],
+  "gap": 0.02,
+  "panels": [
+    { "side": "bottom", "align": "center", "width": 1.0, "height": 0.4, "content": "tomcat_keys" },
+    { "side": "left", "align": "start", "width": 0.2, "height": 0.31, "content": "tomcat_side_keys" }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "NEC MobilePro 700",
+  "short_name": "MobilePro 700",
+  "board_family_id": "nec_mobilepro_700",
+  "support_level": "bootable_full"
+}

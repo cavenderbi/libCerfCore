@@ -1,0 +1,9 @@
+{
+  "name": "HP 620LX",
+  "short_name": "620LX",
+  "board_family_id": "hp_600",
+  "soc_id": "sh7709",
+  "support_level": "bootable_full",
+  "board_config": { "ram": { "default": "16mb", "values": ["4mb", "8mb", "12mb", "16mb", "32mb"] } },
+  "ga_color_depth": 8
+}

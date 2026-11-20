@@ -1,0 +1,7 @@
+{
+  "id": "nand",
+  "name": "NAND",
+  "picker_type": "existing_or_point",
+  "board_family_ids": ["ford_sync_gen2"],
+  "formats": ["img"]
+}

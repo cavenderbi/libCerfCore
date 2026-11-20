@@ -1,0 +1,7 @@
+{
+  "id": "velo1_rom_upgrade_card",
+  "name": "ROM Upgrade Miniature Card",
+  "optional": true,
+  "board_family_ids": ["philips_velo_1"],
+  "formats": ["bin"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Philips Velo 1",
+  "short_name": "Velo 1",
+  "board_family_id": "philips_velo_1",
+  "support_level": "bootable_full"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "Casio PocketPostPet",
+  "short_name": "PocketPostPet",
+  "board_family_id": "casio_pocketpostpet",
+  "support_level": "bootable_full",
+  "internal__spec_divergences": "no camera, PDC phone interface"
+}

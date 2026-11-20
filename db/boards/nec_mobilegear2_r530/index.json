@@ -1,0 +1,7 @@
+{
+  "name": "NEC MobileGear II MC/R530",
+  "short_name": "MobileGear II R530",
+  "board_family_id": "nec_cronos3e",
+  "support_level": "unknown_partial",
+  "device_year": 1999
+}

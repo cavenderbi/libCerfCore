@@ -1,0 +1,8 @@
+{
+  "name": "Casio Message-Cam",
+  "short_name": "Message-Cam",
+  "board_family_id": "casio_pocketpostpet",
+  "support_level": "bootable_full",
+  "internal__spec_divergences": "GSM phone interface",
+  "device_year": 2001
+}

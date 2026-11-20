@@ -1,0 +1,6 @@
+{
+  "name": "Siemens SIMpad SLC",
+  "short_name": "SIMpad SLC",
+  "board_family_id": "siemens_simpad",
+  "support_level": "unknown_partial"
+}

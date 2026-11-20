@@ -1,0 +1,8 @@
+{
+  "name": "NEC MobileGear II MC/R550",
+  "short_name": "MobileGear II R550",
+  "board_family_id": "nec_cronos3e",
+  "support_level": "unknown_partial",
+  "internal__spec_divergences": "phone interface (PDC, cdmaOne, PHS), earphone-mic jack",
+  "device_year": 2000
+}

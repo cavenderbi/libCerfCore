@@ -1,0 +1,10 @@
+{
+  "inherits_cpu_config_id": "arm",
+  "values": {
+    "pc_store_offset": "plus_8",
+    "base_restored_abort_model": true,
+    "thumb": false,
+    "dsp": false,
+    "load_store_double": false
+  }
+}

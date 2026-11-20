@@ -21,8 +21,9 @@ namespace {
 
 using nlohmann::json;
 
-constexpr char kElements[]       = "elements";
 constexpr char kHuds[]           = "huds";
+constexpr char kElements[]       = "elements";
+constexpr char kDevices[]        = "devices";
 constexpr char kId[]             = "id";
 constexpr char kName[]           = "name";
 constexpr char kBoardIds[]       = "board_ids";
@@ -169,9 +170,10 @@ bool Contains(const std::vector<std::string>& list, std::string_view id) {
 }
 
 void HudDatabase::OnReady() {
-    const json      root = CfgReadInstalledJsonFile(HudsJsonPath());
-    const HudReader reader(root.at(kElements));
-    for (const json& h : root.at(kHuds)) {
+    const json      root = CfgReadInstalledJsonFile(DbJsonPath());
+    const json&     huds = root.at(kHuds);
+    const HudReader reader(huds.at(kElements));
+    for (const json& h : huds.at(kDevices)) {
         DbHud hud;
         hud.id               = h.at(kId).get<std::string>();
         hud.name             = h.at(kName).get<std::string>();

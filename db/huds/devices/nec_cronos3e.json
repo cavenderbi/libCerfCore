@@ -1,0 +1,6 @@
+{
+  "name": "NEC CRONOS3E",
+  "board_family_ids": ["nec_cronos3e"],
+  "gap": 0.01,
+  "panels": [{ "side": "bottom", "align": "center", "width": 1.0, "height": 0.4, "content": "cronos3e_keyboard" }]
+}

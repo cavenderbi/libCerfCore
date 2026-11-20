@@ -1,0 +1,6 @@
+{
+  "name": "NEC MobilePro 790",
+  "short_name": "MobilePro 790",
+  "board_family_id": "nec_cronos3e",
+  "support_level": "bootable_full"
+}

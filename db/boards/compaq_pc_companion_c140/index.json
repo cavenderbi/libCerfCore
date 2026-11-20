@@ -1,0 +1,9 @@
+{
+  "name": "Compaq PC Companion C140",
+  "short_name": "PC Companion C140",
+  "board_family_id": "casio_cassiopeia_a10",
+  "support_level": "unknown_partial",
+  "board_config": {
+    "dram_card": { "default": "none", "values": ["none", "1mb", "2mb", "3mb", "4mb", "5mb", "6mb", "7mb", "8mb"] }
+  }
+}

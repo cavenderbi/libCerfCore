@@ -1,0 +1,7 @@
+{
+  "name": "Askey PC3xx",
+  "soc_id": "pxa255",
+  "notes": ["Stock video: visual artifacts present"],
+  "ga_color_depth": 24,
+  "rom_placing_mode": "flat_container"
+}

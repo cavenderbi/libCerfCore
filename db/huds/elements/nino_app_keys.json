@@ -1,0 +1,8 @@
+{
+  "column": [
+    "hp_620lx_voice",
+    { "button": { "keys": ["VK_F2"], "icon": "calendar_month" } },
+    { "button": { "keys": ["VK_F3"], "icon": "contacts" } },
+    { "button": { "keys": ["VK_F4"], "icon": "mail" } }
+  ]
+}

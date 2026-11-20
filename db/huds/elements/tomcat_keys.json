@@ -1,0 +1,8 @@
+{
+  "row": [
+    { "grow": 2, "column": ["arrows"] },
+    "pocket_pc_calendar",
+    { "button": { "keys": ["VK_F2"], "icon": "apps" } },
+    { "button": { "keys": ["VK_F3"], "icon": "search" } }
+  ]
+}

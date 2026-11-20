@@ -1,0 +1,6 @@
+{
+  "name": "IBM WorkPad z50 (Canada)",
+  "short_name": "WorkPad z50",
+  "board_family_id": "ibm_workpad_z50",
+  "support_level": "bootable_partial"
+}

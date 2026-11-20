@@ -1,0 +1,7 @@
+{
+  "id": "ce_dictionary",
+  "name": "Dictionary Dump",
+  "optional": true,
+  "board_family_ids": ["casio_tomcat", "casio_jx670"],
+  "formats": ["bin"]
+}

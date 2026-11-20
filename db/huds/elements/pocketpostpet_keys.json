@@ -1,0 +1,9 @@
+{
+  "column": [
+    "jornada_power",
+    { "grow": 3, "column": ["pocketpostpet_navigation"] },
+    "tab_key",
+    { "button": { "keys": ["VK_ESCAPE"] } },
+    { "button": { "keys": ["VK_F10"] } }
+  ]
+}

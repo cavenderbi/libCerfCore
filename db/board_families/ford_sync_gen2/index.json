@@ -1,0 +1,12 @@
+{
+  "name": "Ford SYNC Gen 2",
+  "soc_id": "imx51",
+  "device_year": 2010,
+  "notes": [
+    "Stock video: some visuals are glitching; most stock features might crash it",
+    "Guest Additions: do not use this mode when booting without NAND. Flash your device first.",
+    "Guest Additions: driver will OVERWRITE your registry and permanently force WinCE Shell even for stock device runs."
+  ],
+  "ga_color_depth": 24,
+  "rom_placing_mode": "imx51_nand"
+}

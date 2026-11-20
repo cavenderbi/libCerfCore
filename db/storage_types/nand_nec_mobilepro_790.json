@@ -1,0 +1,7 @@
+{
+  "id": "nand",
+  "name": "Internal Flash",
+  "picker_type": "existing_or_point",
+  "board_ids": ["nec_mobilepro_790", "nec_mobilegear2_r550", "nec_mobilegear2_r450"],
+  "formats": ["img"]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "primary",
+  "name": "SYNC 2 Upgrade Package",
+  "board_family_ids": ["ford_sync_gen2"],
+  "formats": ["sec"],
+  "optional_for_storage_ids": ["nand"],
+  "note": "If you don't have a NAND image, CERF will use this package to seed the bootloader, enter factory recovery mode and will transfer it fully into the recovery program via USB."
+}

@@ -1,0 +1,9 @@
+{
+  "name": "HP 660LX",
+  "short_name": "660LX",
+  "board_family_id": "hp_600",
+  "soc_id": "sh7709",
+  "support_level": "unknown_partial",
+  "board_config": { "ram": { "default": "32mb", "values": ["4mb", "8mb", "12mb", "16mb", "32mb"] } },
+  "ga_color_depth": 8
+}

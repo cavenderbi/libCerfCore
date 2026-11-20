@@ -1,0 +1,10 @@
+{
+  "name": "Casio Cassiopeia A-10",
+  "short_name": "A-10",
+  "board_family_id": "casio_cassiopeia_a10",
+  "support_level": "unknown_partial",
+  "board_config": {
+    "ram": { "default": "2mb" },
+    "dram_card": { "default": "none", "values": ["none", "1mb", "2mb", "3mb", "4mb", "5mb", "6mb", "7mb", "8mb"] }
+  }
+}

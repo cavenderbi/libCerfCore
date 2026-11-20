@@ -1,0 +1,6 @@
+{
+  "name": "Compaq Aero 1530",
+  "short_name": "Aero 1530",
+  "board_family_id": "compaq_aero_1500",
+  "support_level": "bootable_partial"
+}

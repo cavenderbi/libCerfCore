@@ -1,0 +1,9 @@
+{
+  "name": "Casio Cassiopeia A-23G",
+  "short_name": "A-23G",
+  "board_family_id": "casio_cassiopeia_a10",
+  "support_level": "unknown_partial",
+  "internal__spec_divergences": "CompactFlash slot",
+  "device_year": 1999,
+  "board_config": { "ram": { "default": "16mb", "values": ["8mb", "16mb"] } }
+}

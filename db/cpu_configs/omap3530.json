@@ -1,0 +1,11 @@
+{
+  "soc_id": "omap3530",
+  "inherits_cpu_config_id": "cortex_a8",
+  "values": {
+    "midr": "0x410FC080",
+    "clidr": "0x0A000003",
+    "ccsidr_l1i": "0x2007E01A",
+    "ccsidr_l1d": "0xE007E01A",
+    "ccsidr_l2": "0xF0000000"
+  }
+}

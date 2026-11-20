@@ -1,0 +1,7 @@
+{
+  "row": [
+    "smartphone_back",
+    { "grow": 2, "column": ["pocketpostpet_navigation"] },
+    { "button": { "keys": ["VK_SPACE"], "icon": "play_pause" } }
+  ]
+}

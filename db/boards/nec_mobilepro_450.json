@@ -1,0 +1,8 @@
+{
+  "name": "NEC MobilePro 450",
+  "short_name": "MobilePro 450",
+  "board_family_id": "nec_mobilepro_200",
+  "support_level": "bootable_full",
+  "device_year": 1997,
+  "board_config": { "ram": { "default": "4mb" }, "backlight": { "default": "installed" } }
+}

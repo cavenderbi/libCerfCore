@@ -1,0 +1,27 @@
+{
+  "inherits_cpu_config_id": "arm",
+  "values": {
+    "pc_store_offset": "plus_8",
+    "base_restored_abort_model": true,
+    "supersection_format": "unknown",
+    "thumb2": true,
+    "dsp": true,
+    "load_store_double": true,
+    "preload": true,
+    "clz": true,
+    "blx_reg": true,
+    "armv5_unconditional_space": true,
+    "load_to_pc_interworking": true,
+    "data_proc_to_pc_interworking": true,
+    "mls": true,
+    "movw_movt": true,
+    "bit_field": true,
+    "rev": true,
+    "extend_rotate": true,
+    "ldrex_strex": true,
+    "ldrex_strex_v6k": true,
+    "barrier_insn": true,
+    "cp15_v6": true,
+    "cp15_v7": true
+  }
+}

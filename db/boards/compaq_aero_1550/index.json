@@ -1,0 +1,7 @@
+{
+  "name": "Compaq Aero 1550",
+  "short_name": "Aero 1550",
+  "board_family_id": "compaq_aero_1500",
+  "support_level": "unknown_partial",
+  "device_year": 2000
+}

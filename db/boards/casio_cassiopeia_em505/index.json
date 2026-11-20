@@ -1,0 +1,7 @@
+{
+  "name": "Casio Cassiopeia EM-505",
+  "short_name": "EM-505",
+  "board_family_id": "casio_jx670",
+  "support_level": "unknown_partial",
+  "board_config": { "ram": { "default": "32mb" } }
+}

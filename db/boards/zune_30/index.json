@@ -1,0 +1,6 @@
+{
+  "name": "Microsoft Zune 30",
+  "short_name": "Zune 30",
+  "board_family_id": "toshiba_gigabeat_s",
+  "support_level": "bootable_full"
+}

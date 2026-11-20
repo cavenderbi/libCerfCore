@@ -1,0 +1,7 @@
+{
+  "button": {
+    "keys": ["VK_DOWN"],
+    "icon": "arrow_downward",
+    "held": { "VK_MENU": { "icon": "keyboard_double_arrow_down" } }
+  }
+}

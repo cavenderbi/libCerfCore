@@ -1,0 +1,9 @@
+{
+  "name": "Stored PC value",
+  "arch": "ARM",
+  "type": "enum",
+  "enum_values": [
+    { "id": "plus_8", "name": "Instruction address + 8" },
+    { "id": "plus_12", "name": "Instruction address + 12" }
+  ]
+}

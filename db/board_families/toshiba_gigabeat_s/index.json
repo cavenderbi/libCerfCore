@@ -1,0 +1,8 @@
+{
+  "name": "Toshiba Gigabeat S",
+  "soc_id": "imx31",
+  "device_year": 2006,
+  "notes": [],
+  "ga_color_depth": 16,
+  "rom_placing_mode": "flat_container"
+}

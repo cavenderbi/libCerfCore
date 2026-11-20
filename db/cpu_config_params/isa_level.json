@@ -1,0 +1,10 @@
+{
+  "name": "ISA level",
+  "arch": "MIPS",
+  "type": "enum",
+  "enum_values": [
+    { "id": "mips1", "name": "MIPS I" },
+    { "id": "mips3", "name": "MIPS III" },
+    { "id": "mips4", "name": "MIPS IV" }
+  ]
+}

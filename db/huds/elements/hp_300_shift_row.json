@@ -1,0 +1,17 @@
+{
+  "row": [
+    { "grow": 2, "column": ["shift_key"] },
+    { "button": { "keys": ["VK_Z"] } },
+    { "button": { "keys": ["VK_X"] } },
+    { "button": { "keys": ["VK_C"] } },
+    { "button": { "keys": ["VK_V"] } },
+    { "button": { "keys": ["VK_B"] } },
+    { "button": { "keys": ["VK_N"] } },
+    { "button": { "keys": ["VK_M"] } },
+    { "button": { "keys": ["VK_OEM_COMMA"] } },
+    { "button": { "keys": ["VK_OEM_PERIOD"] } },
+    { "button": { "keys": ["VK_OEM_2"] } },
+    "jornada_up",
+    "right_shift_key"
+  ]
+}

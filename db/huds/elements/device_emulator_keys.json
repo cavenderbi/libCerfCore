@@ -1,0 +1,7 @@
+{
+  "row": [
+    "device_emulator_call_keys",
+    "arrows_column",
+    { "column": [{ "row": ["app_2", "soft_right"] }, { "row": ["pocket_pc_back", "hang"] }] }
+  ]
+}

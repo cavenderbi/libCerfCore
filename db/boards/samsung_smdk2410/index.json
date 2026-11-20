@@ -1,0 +1,7 @@
+{
+  "name": "Samsung SMDK2410",
+  "short_name": "SMDK2410",
+  "board_family_id": "samsung_smdk2410",
+  "support_level": "no_support",
+  "internal__spec_divergences": "physical board, no Device Emulator virtual devices"
+}

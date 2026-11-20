@@ -1,0 +1,1 @@
+{ "name": "ARMv7 CP15 registers", "arch": "ARM", "type": "boolean" }

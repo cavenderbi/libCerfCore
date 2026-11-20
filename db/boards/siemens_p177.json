@@ -1,0 +1,6 @@
+{
+  "name": "Siemens SIMATIC TP 177B 4\" color PN/DP",
+  "short_name": "SIMATIC TP 177B",
+  "board_family_id": "siemens_simatic_tp177b_4",
+  "support_level": "bootable_full"
+}

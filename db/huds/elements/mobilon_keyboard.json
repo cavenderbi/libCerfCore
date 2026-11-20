@@ -1,0 +1,51 @@
+{
+  "column": [
+    {
+      "row": [
+        { "button": { "keys": ["VK_ESCAPE"] } },
+        { "button": { "keys": ["VK_F1"], "icon": "docs" } },
+        { "button": { "keys": ["VK_F2"], "icon": "sheets" } },
+        { "button": { "keys": ["VK_F3"], "icon": "mail" } },
+        "jornada_contacts",
+        "hp_620lx_calendar",
+        "hp_620lx_tasks",
+        { "button": { "keys": ["VK_F7"], "icon": "language" } }
+      ]
+    },
+    {
+      "row": [
+        { "button": { "keys": ["VK_1"] } },
+        { "button": { "keys": ["VK_2"] } },
+        { "button": { "keys": ["VK_3"] } },
+        { "button": { "keys": ["VK_4"] } },
+        { "button": { "keys": ["VK_5"] } },
+        { "button": { "keys": ["VK_6"] } },
+        { "button": { "keys": ["VK_7"] } },
+        { "button": { "keys": ["VK_8"] } },
+        { "button": { "keys": ["VK_9"] } },
+        { "button": { "keys": ["VK_0"] } },
+        { "button": { "keys": ["VK_OEM_MINUS"] } },
+        { "grow": 2, "column": ["jornada_backspace"] }
+      ]
+    },
+    "velo_letter_rows",
+    {
+      "row": [
+        { "grow": 1.5, "column": ["shift_key"] },
+        { "button": { "keys": ["VK_Z"] } },
+        { "button": { "keys": ["VK_X"] } },
+        { "button": { "keys": ["VK_C"] } },
+        { "button": { "keys": ["VK_V"] } },
+        { "button": { "keys": ["VK_B"] } },
+        { "button": { "keys": ["VK_N"] } },
+        { "button": { "keys": ["VK_M"] } },
+        { "button": { "keys": ["VK_OEM_COMMA"] } },
+        { "button": { "keys": ["VK_OEM_PERIOD"] } },
+        { "button": { "keys": ["VK_OEM_2"] } },
+        "jornada_up",
+        "right_shift_key"
+      ]
+    },
+    "velo_bottom_row"
+  ]
+}

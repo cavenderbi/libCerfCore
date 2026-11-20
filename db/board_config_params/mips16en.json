@@ -1,0 +1,1 @@
+{ "name": "MIPS16EN pin", "enum_values": [{ "id": "low", "name": "Low" }, { "id": "high", "name": "High" }] }

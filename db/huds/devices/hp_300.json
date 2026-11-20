@@ -1,0 +1,6 @@
+{
+  "name": "HP 300 series",
+  "board_family_ids": ["hp_300"],
+  "gap": 0.01,
+  "panels": [{ "side": "bottom", "align": "center", "width": 1.0, "height": 0.35, "content": "hp_300_keyboard" }]
+}

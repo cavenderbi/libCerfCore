@@ -13,17 +13,18 @@ REGISTER_SERVICE(GaPaletteDatabase);
 
 namespace {
 
-constexpr char kGaPalettes[] = "ga_palettes";
-constexpr char kId[]         = "id";
-constexpr char kName[]       = "name";
-constexpr char kBpp[]        = "bpp";
-constexpr char kValues[]     = "values";
+constexpr char kGuestAdditions[] = "guest_additions";
+constexpr char kPalettes[]       = "palettes";
+constexpr char kId[]             = "id";
+constexpr char kName[]           = "name";
+constexpr char kBpp[]            = "bpp";
+constexpr char kValues[]         = "values";
 
 }
 
 void GaPaletteDatabase::OnReady() {
-    const nlohmann::json root = CfgReadInstalledJsonFile(PalettesJsonPath());
-    for (const auto& p : root.at(kGaPalettes))
+    const nlohmann::json root = CfgReadInstalledJsonFile(DbJsonPath());
+    for (const auto& p : root.at(kGuestAdditions).at(kPalettes))
         palettes_.push_back(DbGaPalette{p.at(kId).get<std::string>(), p.at(kName).get<std::string>(),
                                         p.at(kBpp).get<uint32_t>(), GaPaletteFromJson(p.at(kValues)).value()});
 }

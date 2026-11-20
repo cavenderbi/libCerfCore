@@ -1,0 +1,6 @@
+{
+  "name": "PSC/Datalogic Falcon 4220",
+  "short_name": "Falcon 4220",
+  "board_family_id": "askey_pc3xx",
+  "support_level": "bootable_full"
+}

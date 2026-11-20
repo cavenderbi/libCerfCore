@@ -1,0 +1,13 @@
+{
+  "soc_id": "vr4122",
+  "inherits_cpu_config_id": "vr41xx",
+  "values": {
+    "prid": "0x00000C70",
+    "device_ip_mask": "0x00001C00",
+    "mips16": true,
+    "mips16_syscall": true,
+    "macc_dmacc": true,
+    "config_reset": "0x00025B00",
+    "config_writable": "0x80010027"
+  }
+}

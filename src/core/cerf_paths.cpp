@@ -21,10 +21,6 @@ std::string GetCerfDir() { return host_platform::InstallDirectory(); }
 
 std::string DbJsonPath() { return GetCerfDir() + kDbJsonFileName; }
 
-std::string HudsJsonPath() { return GetCerfDir() + kHudsJsonFileName; }
-
-std::string PalettesJsonPath() { return GetCerfDir() + kPalettesJsonFileName; }
-
 std::string DevicesDir() { return GetCerfDir() + kDevicesDirName + kSeparator; }
 
 std::string GetDeviceDir(const std::string& device_name) { return DevicesDir() + device_name + kSeparator; }

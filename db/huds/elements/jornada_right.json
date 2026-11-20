@@ -1,0 +1,1 @@
+{ "button": { "keys": ["VK_RIGHT"], "icon": "arrow_forward", "held": { "VK_MENU": { "icon": "last_page" } } } }

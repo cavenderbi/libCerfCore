@@ -1,0 +1,6 @@
+{
+  "name": "Compaq iPAQ H3600 Series",
+  "short_name": "iPAQ H3600",
+  "board_family_id": "compaq_ipaq_h3000",
+  "support_level": "bootable_full"
+}

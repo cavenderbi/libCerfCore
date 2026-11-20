@@ -1,0 +1,12 @@
+{
+  "name": "Compaq iPAQ H3000",
+  "soc_id": "sa1110",
+  "device_year": 2000,
+  "board_config": {
+    "ram": { "default": "32mb", "values": ["16mb", "32mb", "64mb"] },
+    "lcd_panel": { "default": "color_tft", "values": ["color_tft", "monochrome_stn"] }
+  },
+  "notes": [],
+  "ga_color_depth": 24,
+  "rom_placing_mode": "flat_container"
+}

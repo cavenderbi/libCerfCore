@@ -1,0 +1,11 @@
+{
+  "name": "NEC MobilePro 200",
+  "soc_id": "vr4101",
+  "device_year": 1996,
+  "board_config": {
+    "ram": { "default": "2mb", "values": ["2mb", "4mb"] },
+    "backlight": { "default": "none", "values": ["none", "installed"] }
+  },
+  "notes": [],
+  "rom_placing_mode": "flat_container"
+}

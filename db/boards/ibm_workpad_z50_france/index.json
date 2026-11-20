@@ -1,0 +1,7 @@
+{
+  "name": "IBM WorkPad z50 (France)",
+  "short_name": "WorkPad z50",
+  "board_family_id": "ibm_workpad_z50",
+  "support_level": "unknown_partial",
+  "internal__spec_divergences": "EMEA main board"
+}

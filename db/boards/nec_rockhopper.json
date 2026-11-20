@@ -1,0 +1,6 @@
+{
+  "name": "NEC Rockhopper SG2_VR5500",
+  "short_name": "Rockhopper",
+  "board_family_id": "nec_sg2_vr5500",
+  "support_level": "bootable_full"
+}

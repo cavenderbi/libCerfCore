@@ -1,0 +1,6 @@
+{
+  "name": "Ford MyFord Touch",
+  "short_name": "MyFord Touch",
+  "board_family_id": "ford_sync_gen2",
+  "support_level": "bootable_full"
+}

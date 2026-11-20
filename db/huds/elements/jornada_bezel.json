@@ -1,0 +1,8 @@
+{
+  "column": [
+    "bezel_settings",
+    { "button": { "action": "backup", "icon": "backup" } },
+    { "button": { "action": "dialer", "icon": "dialpad" } },
+    { "button": { "action": "media_player", "icon": "play_circle" } }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "inherits_cpu_config_id": "armv7a",
+  "values": {
+    "ctr": "0x82048004",
+    "supersection_format": "pa32",
+    "security_extensions": true,
+    "aux_control_register": true,
+    "l2_cache_aux_control": true,
+    "l1_system_array_debug": true,
+    "vfp": true,
+    "neon": true,
+    "fpsid": "0x410330C0",
+    "mvfr0": "0x11110222",
+    "mvfr1": "0x00011111"
+  }
+}

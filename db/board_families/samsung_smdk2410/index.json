@@ -1,0 +1,11 @@
+{
+  "name": "Samsung SMDK2410",
+  "soc_id": "s3c2410",
+  "notes": [
+    "Stock video: don't exceed 640x480 on Windows Mobile 6.5 or newer - shell hang imminent.",
+    "Stock video: don't exceed 800x600 on any OS - CERF crash imminent."
+  ],
+  "configurable_screen": true,
+  "ga_color_depth": 24,
+  "rom_placing_mode": "flat_container"
+}

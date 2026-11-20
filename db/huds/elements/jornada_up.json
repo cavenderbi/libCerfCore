@@ -1,0 +1,3 @@
+{
+  "button": { "keys": ["VK_UP"], "icon": "arrow_upward", "held": { "VK_MENU": { "icon": "keyboard_double_arrow_up" } } }
+}

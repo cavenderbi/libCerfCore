@@ -1,0 +1,8 @@
+{
+  "name": "Nokia Sea Ray",
+  "soc_id": "msm8255",
+  "device_year": 2011,
+  "notes": [],
+  "ga_color_depth": 24,
+  "rom_placing_mode": "flat_container"
+}

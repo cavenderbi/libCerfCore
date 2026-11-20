@@ -1,0 +1,6 @@
+{
+  "name": "SmartBook G138",
+  "short_name": "SmartBook G138",
+  "board_family_id": "pangolin",
+  "support_level": "bootable_full"
+}

@@ -1,0 +1,12 @@
+{
+  "row": [
+    { "column": ["pocket_pc_calendar", "pocket_pc_contacts"] },
+    "arrows_column",
+    {
+      "column": [
+        { "button": { "keys": ["VK_F3"], "label": "Q" } },
+        { "button": { "keys": ["VK_F4"], "icon": "rotate_right" } }
+      ]
+    }
+  ]
+}

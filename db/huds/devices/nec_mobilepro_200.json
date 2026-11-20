@@ -1,0 +1,8 @@
+{
+  "name": "NEC MobilePro 200",
+  "board_family_ids": ["nec_mobilepro_200"],
+  "gap": 0.01,
+  "panels": [
+    { "side": "bottom", "align": "center", "width": 1.0, "height": 0.375, "content": "mobilepro_200_keyboard" }
+  ]
+}

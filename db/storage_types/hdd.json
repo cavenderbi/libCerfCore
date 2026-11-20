@@ -1,0 +1,8 @@
+{
+  "id": "hdd",
+  "name": "HDD",
+  "picker_type": "existing_or_point",
+  "board_family_ids": ["toshiba_gigabeat_s"],
+  "formats": ["img"],
+  "note": "HDD image with Zune 30 system/user storage partitions. CERF does not boot from it unlike real hardware - the operating system stored in your dump is inert for CERF."
+}

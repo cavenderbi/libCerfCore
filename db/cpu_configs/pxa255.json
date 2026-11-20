@@ -1,0 +1,5 @@
+{
+  "soc_id": "pxa255",
+  "inherits_cpu_config_id": "xscale",
+  "values": { "midr": "0x69052D06", "ctr": "0x0B1AA1AA", "accesses_spsr_in_system_mode": true }
+}

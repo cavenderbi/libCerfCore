@@ -1,0 +1,6 @@
+{
+  "name": "Siemens SIMATIC MP 377 19\" Touch",
+  "short_name": "SIMATIC MP 377",
+  "board_family_id": "siemens_simatic_mp377",
+  "support_level": "bootable_full"
+}

@@ -1,0 +1,8 @@
+{
+  "row": [
+    "pocket_pc_calendar",
+    "pocket_pc_contacts",
+    { "button": { "keys": ["VK_F3"], "icon": "checklist" } },
+    { "button": { "keys": ["VK_F4"], "icon": "edit_note" } }
+  ]
+}

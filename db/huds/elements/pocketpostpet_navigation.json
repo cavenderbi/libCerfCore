@@ -1,0 +1,10 @@
+{
+  "dpad": {
+    "up": ["VK_UP"],
+    "down": ["VK_DOWN"],
+    "left": ["VK_LEFT"],
+    "right": ["VK_RIGHT"],
+    "center": ["VK_RETURN"],
+    "shape": "circle"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "Siemens SIMpad",
+  "soc_id": "sa1110",
+  "device_year": 2001,
+  "notes": [],
+  "ga_color_depth": 24,
+  "rom_placing_mode": "flat_container",
+  "board_config": { "ram": { "default": "64mb", "values": ["64mb"] } }
+}

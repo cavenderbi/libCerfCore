@@ -1,0 +1,1 @@
+{ "id": "primary", "name": "iPAQ Upgrade Package", "board_family_ids": ["compaq_ipaq_h3000"], "formats": ["nbf"] }

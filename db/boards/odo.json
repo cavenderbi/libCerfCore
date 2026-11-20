@@ -1,0 +1,6 @@
+{
+  "name": "Microsoft Hardware Reference Platform",
+  "short_name": "Reference Platform",
+  "board_family_id": "odo",
+  "support_level": "bootable_full"
+}

@@ -76,6 +76,25 @@ if(NOT CERFCORE_DEVICE_TRACES)
     list(FILTER cerfcore_sources EXCLUDE REGEX "/src/tracing/[^/]+/(.*/)?[^/]+\\.cpp$")
 endif()
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(cerfcore_sad_dir "${CMAKE_CURRENT_SOURCE_DIR}/sad")
+set(cerfcore_db_dir "${CMAKE_CURRENT_SOURCE_DIR}/db")
+set(cerfcore_install_layout_header "${CMAKE_CURRENT_SOURCE_DIR}/include/cerfcore/core/install_layout_text.h")
+file(STRINGS "${cerfcore_install_layout_header}" cerfcore_db_json_define REGEX "^#define CERF_DB_JSON_NAME ")
+string(REGEX REPLACE "^#define CERF_DB_JSON_NAME +\"([^\"]+)\".*$" "\\1" cerfcore_db_json_name
+       "${cerfcore_db_json_define}")
+set(CERFCORE_DB_JSON "${CMAKE_CURRENT_BINARY_DIR}/${cerfcore_db_json_name}" CACHE INTERNAL
+    "The compiled board database")
+file(GLOB_RECURSE cerfcore_db_inputs CONFIGURE_DEPENDS "${cerfcore_db_dir}/*" "${cerfcore_sad_dir}/sad/*.py")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${cerfcore_db_inputs}
+                                                                "${cerfcore_install_layout_header}")
+execute_process(COMMAND "${Python3_EXECUTABLE}" -B -m sad "${cerfcore_db_dir}" json "${CERFCORE_DB_JSON}"
+                WORKING_DIRECTORY "${cerfcore_sad_dir}"
+                RESULT_VARIABLE cerfcore_db_rc)
+if(NOT cerfcore_db_rc EQUAL 0)
+    message(FATAL_ERROR "sad could not compile ${cerfcore_db_dir} (${cerfcore_db_rc})")
+endif()
+
 add_library(cerfcore STATIC ${cerfcore_sources})
 add_library(cerfcore::cerfcore ALIAS cerfcore)
 target_include_directories(cerfcore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include"

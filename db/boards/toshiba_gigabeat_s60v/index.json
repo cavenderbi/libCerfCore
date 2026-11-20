@@ -1,0 +1,6 @@
+{
+  "name": "Toshiba Gigabeat S60V",
+  "short_name": "Gigabeat S60V",
+  "board_family_id": "toshiba_gigabeat_s",
+  "support_level": "no_support"
+}

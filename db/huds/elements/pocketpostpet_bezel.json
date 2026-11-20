@@ -1,0 +1,11 @@
+{
+  "column": [
+    { "button": { "action": "top_menu", "icon": "apps" } },
+    { "button": { "action": "get_mail", "icon": "mail" } },
+    { "button": { "action": "internet", "icon": "language" } },
+    { "button": { "action": "mic", "icon": "mic" } },
+    { "button": { "action": "tools", "icon": "build" } },
+    { "button": { "action": "set_up", "icon": "settings" } },
+    { "button": { "action": "text_edit", "icon": "edit_note" } }
+  ]
+}

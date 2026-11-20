@@ -1,0 +1,77 @@
+{
+  "column": [
+    {
+      "row": [
+        "jornada_escape", "jornada_820_inbox", "jornada_820_internet", "jornada_820_calendar", "jornada_contacts",
+        "jornada_tasks", "jornada_820_word", "jornada_820_excel", "jornada_820_powerpoint", "jornada_820_viewer",
+        "jornada_820_recorder", "jornada_820_settings", "jornada_power"
+      ]
+    },
+    "jornada_number_row",
+    {
+      "row": [
+        { "button": { "keys": ["VK_Q"] } },
+        { "button": { "keys": ["VK_W"] } },
+        { "button": { "keys": ["VK_E"] } },
+        { "button": { "keys": ["VK_R"] } },
+        { "button": { "keys": ["VK_T"] } },
+        { "button": { "keys": ["VK_Y"] } },
+        { "button": { "keys": ["VK_U"] } },
+        { "button": { "keys": ["VK_I"] } },
+        { "button": { "keys": ["VK_O"] } },
+        { "button": { "keys": ["VK_P"] } },
+        { "button": { "keys": ["VK_OEM_4"] } },
+        { "button": { "keys": ["VK_OEM_6"] } },
+        { "button": { "keys": ["VK_OEM_5"] } }
+      ]
+    },
+    {
+      "row": [
+        "tab_key",
+        { "button": { "keys": ["VK_A"] } },
+        { "button": { "keys": ["VK_S"] } },
+        { "button": { "keys": ["VK_D"] } },
+        { "button": { "keys": ["VK_F"] } },
+        { "button": { "keys": ["VK_G"] } },
+        { "button": { "keys": ["VK_H"] } },
+        { "button": { "keys": ["VK_J"] } },
+        { "button": { "keys": ["VK_K"] } },
+        { "button": { "keys": ["VK_L"] } },
+        { "button": { "keys": ["VK_OEM_1"] } },
+        { "button": { "keys": ["VK_OEM_7"] } },
+        "jornada_enter"
+      ]
+    },
+    {
+      "row": [
+        { "grow": 1.5, "column": ["shift_key"] },
+        { "button": { "keys": ["VK_Z"] } },
+        { "button": { "keys": ["VK_X"] } },
+        { "button": { "keys": ["VK_C"] } },
+        { "button": { "keys": ["VK_V"] } },
+        { "button": { "keys": ["VK_B"] } },
+        { "button": { "keys": ["VK_N"] } },
+        { "button": { "keys": ["VK_M"] } },
+        { "button": { "keys": ["VK_OEM_COMMA"] } },
+        { "button": { "keys": ["VK_OEM_PERIOD"] } },
+        { "button": { "keys": ["VK_OEM_2"] } },
+        "jornada_up",
+        "shift_key"
+      ]
+    },
+    {
+      "row": [
+        { "button": { "keys": ["VK_CONTROL"] } },
+        { "button": { "keys": ["VK_LWIN"] } },
+        { "button": { "keys": ["VK_MENU"] } },
+        { "button": { "keys": ["VK_OEM_3"] } },
+        { "grow": 4.5, "column": ["space_key"] },
+        { "button": { "keys": ["VK_F12"] } },
+        { "button": { "keys": ["VK_DELETE"] } },
+        "jornada_left",
+        "jornada_down",
+        "jornada_right"
+      ]
+    }
+  ]
+}

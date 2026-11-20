@@ -1,0 +1,9 @@
+{
+  "name": "Casio Cassiopeia PA-2400",
+  "board_ids": ["casio_cassiopeia_pa_2300v", "casio_cassiopeia_pa2400", "casio_cassiopeia_pa2400w"],
+  "gap": 0.02,
+  "panels": [
+    { "side": "left", "align": "start", "width": 0.2, "height": 0.2, "content": "casio_pa2400_input_panel" },
+    { "side": "right", "align": "start", "width": 0.2, "height": 0.2, "content": "jornada_power" }
+  ]
+}

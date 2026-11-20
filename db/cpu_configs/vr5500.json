@@ -1,0 +1,30 @@
+{
+  "soc_id": "vr5500",
+  "values": {
+    "prid": "0x00005500",
+    "isa_level": "mips4",
+    "tlb_size": 48,
+    "min_page_size": "4kb",
+    "phys_addr_mask": "0xFFFFFFFF",
+    "device_ip_mask": "0x00003C00",
+    "fpu": true,
+    "llsc": true,
+    "counter": true,
+    "watch": true,
+    "vr41xx_power_modes": false,
+    "mips16": false,
+    "mips16_syscall": false,
+    "tx39_multiply_add": false,
+    "macc_dmacc": false,
+    "madd16_dmadd16": false,
+    "cop1_cop2_unusable": false,
+    "config_reset": "0x003266F0",
+    "config_writable": "0x0F000007",
+    "config_fixed_mask": "0x00C00000",
+    "config_fixed_value": "0x00000000",
+    "status_reset": "0x00400004",
+    "status_writable": "0xF557FFFF",
+    "status_fixed_mask": "0x00000000",
+    "status_fixed_value": "0x00000000"
+  }
+}

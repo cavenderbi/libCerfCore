@@ -1,0 +1,13 @@
+{
+  "row": [
+    { "button": { "keys": ["VK_CONTROL"] } },
+    { "button": { "keys": ["VK_LWIN"] } },
+    { "button": { "keys": ["VK_MENU"] } },
+    { "grow": 5.5, "column": ["space_key"] },
+    { "button": { "keys": ["VK_OEM_4"] } },
+    { "button": { "keys": ["VK_OEM_6"] } },
+    "jornada_left",
+    "jornada_down",
+    "jornada_right"
+  ]
+}

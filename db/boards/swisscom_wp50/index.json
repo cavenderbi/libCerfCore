@@ -1,0 +1,8 @@
+{
+  "name": "Swisscom WP50",
+  "short_name": "WP50",
+  "board_family_id": "siemens_simpad",
+  "support_level": "unknown_partial",
+  "internal__spec_divergences": "16 MB flash",
+  "board_config": { "ram": { "default": "32mb", "values": ["32mb"] } }
+}

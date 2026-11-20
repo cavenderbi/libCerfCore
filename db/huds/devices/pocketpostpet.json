@@ -1,0 +1,9 @@
+{
+  "name": "PocketPostPet",
+  "board_family_ids": ["casio_pocketpostpet"],
+  "gap": 0.02,
+  "panels": [
+    { "side": "left", "align": "center", "width": 0.4, "height": 1.0, "content": "pocketpostpet_keys" },
+    { "side": "right", "align": "center", "width": 0.25, "height": 1.0, "content": "pocketpostpet_bezel" }
+  ]
+}

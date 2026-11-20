@@ -1,0 +1,13 @@
+{
+  "name": "Casio Tomcat",
+  "soc_id": "vr4111",
+  "device_year": 1998,
+  "notes": [],
+  "ga_color_depth": 8,
+  "ga_window_size": 50331648,
+  "rom_placing_mode": "flat_container",
+  "board_config": {
+    "mips16en": { "default": "low", "values": ["low", "high"] },
+    "ram": { "default": "16mb", "values": ["16mb"] }
+  }
+}

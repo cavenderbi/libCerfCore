@@ -1,0 +1,6 @@
+{
+  "name": "Casio Cassiopeia EM-500",
+  "short_name": "EM-500",
+  "board_family_id": "casio_jx670",
+  "support_level": "bootable_full"
+}

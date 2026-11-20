@@ -1,0 +1,9 @@
+{
+  "name": "Philips Velo 1",
+  "soc_id": "pr31500",
+  "device_year": 1997,
+  "board_config": { "dram_card": { "default": "none", "values": ["none", "1mb", "2mb", "4mb", "8mb", "16mb"] } },
+  "notes": [],
+  "ga_color_depth": 24,
+  "rom_placing_mode": "flat_container"
+}

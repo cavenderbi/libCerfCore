@@ -1,0 +1,6 @@
+{
+  "name": "Symbol MK500 (A035QN02 panel)",
+  "short_name": "MK500",
+  "board_family_id": "symbol_hamptons",
+  "support_level": "bootable_full"
+}

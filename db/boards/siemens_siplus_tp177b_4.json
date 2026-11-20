@@ -1,0 +1,7 @@
+{
+  "name": "Siemens SIPLUS HMI TP 177B 4\"",
+  "short_name": "SIPLUS TP 177B",
+  "board_family_id": "siemens_simatic_tp177b_4",
+  "support_level": "unknown_partial",
+  "internal__spec_divergences": "conformal coating"
+}

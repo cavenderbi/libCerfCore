@@ -1,0 +1,6 @@
+{
+  "name": "Siemens SIMpad SL4",
+  "short_name": "SIMpad SL4",
+  "board_family_id": "siemens_simpad",
+  "support_level": "bootable_full"
+}

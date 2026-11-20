@@ -1,0 +1,1 @@
+{ "grow": 3, "rocker": { "up": ["VK_UP"], "down": ["VK_DOWN"], "center": ["VK_RETURN"] } }

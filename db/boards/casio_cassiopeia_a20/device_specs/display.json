@@ -1,0 +1,7 @@
+{
+  "generic_part_id": "display",
+  "supported": true,
+  "displayed_name": "Display B",
+  "display_width": 640,
+  "display_height": 240
+}

@@ -1,0 +1,7 @@
+{
+  "name": "NEC MobilePro 780",
+  "short_name": "MobilePro 780",
+  "board_family_id": "nec_cronos3e",
+  "support_level": "bootable_partial",
+  "device_year": 2000
+}

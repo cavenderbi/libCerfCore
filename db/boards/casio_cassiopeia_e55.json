@@ -1,0 +1,6 @@
+{
+  "name": "Casio Cassiopeia E-55",
+  "short_name": "E-55",
+  "board_family_id": "casio_tomcat",
+  "support_level": "bootable_full"
+}

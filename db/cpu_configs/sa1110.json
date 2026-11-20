@@ -1,0 +1,1 @@
+{ "soc_id": "sa1110", "inherits_cpu_config_id": "strongarm", "values": { "midr": "0x6901B118", "ctr": "0x6901B118" } }

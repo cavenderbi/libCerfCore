@@ -1,0 +1,12 @@
+{
+  "soc_id": "arm720t",
+  "inherits_cpu_config_id": "arm",
+  "values": {
+    "midr": "0x41807200",
+    "ctr": "0x41807200",
+    "pc_store_offset": "plus_12",
+    "base_restored_abort_model": false,
+    "dsp": false,
+    "load_store_double": false
+  }
+}

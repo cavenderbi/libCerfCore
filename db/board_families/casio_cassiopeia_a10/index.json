@@ -1,0 +1,13 @@
+{
+  "name": "Casio Cassiopeia A-10",
+  "soc_id": "hd6417096",
+  "device_year": 1996,
+  "board_config": {
+    "ram": { "default": "4mb", "values": ["2mb", "3mb", "4mb", "5mb", "6mb"] },
+    "backlight": { "default": "installed", "values": ["none", "installed"] }
+  },
+  "notes": [],
+  "ga_color_depth": 8,
+  "ga_window_size": 67108864,
+  "rom_placing_mode": "flat_container"
+}

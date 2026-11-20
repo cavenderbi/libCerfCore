@@ -1,0 +1,7 @@
+{
+  "column": [
+    { "button": { "keys": ["VK_MEDIA_PREV_TRACK"], "icon": "skip_previous_fill" } },
+    { "button": { "keys": ["VK_MEDIA_NEXT_TRACK"], "icon": "play_arrow_fill" } },
+    { "button": { "keys": ["VK_F12"], "icon": "fiber_manual_record_fill" } }
+  ]
+}

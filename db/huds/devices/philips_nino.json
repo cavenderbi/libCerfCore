@@ -1,0 +1,9 @@
+{
+  "name": "Philips Nino",
+  "board_family_ids": ["philips_nino"],
+  "gap": 0.02,
+  "panels": [
+    { "side": "left", "align": "start", "width": 0.2, "height": 0.5, "content": "nino_rocker_keys" },
+    { "side": "right", "align": "start", "width": 0.2, "height": 0.6, "content": "nino_app_keys" }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Supersections",
+  "arch": "ARM",
+  "type": "enum",
+  "enum_values": [
+    { "id": "unknown", "name": "Undetermined" },
+    { "id": "none", "name": "Not supported" },
+    { "id": "pa32", "name": "32-bit physical address" },
+    { "id": "pa36", "name": "36-bit physical address" }
+  ]
+}

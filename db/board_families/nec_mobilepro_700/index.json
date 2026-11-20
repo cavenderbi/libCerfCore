@@ -1,0 +1,9 @@
+{
+  "name": "NEC MobilePro 700",
+  "soc_id": "vr4102",
+  "device_year": 1997,
+  "notes": [],
+  "ga_color_depth": 8,
+  "ga_window_size": 100663296,
+  "rom_placing_mode": "flat_container"
+}

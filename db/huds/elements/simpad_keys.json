@@ -1,0 +1,7 @@
+{
+  "column": [
+    { "row": ["jornada_power", "simpad_alt"] },
+    { "grow": 2, "column": ["simpad_navigation"] },
+    { "row": ["simpad_keyboard"] }
+  ]
+}

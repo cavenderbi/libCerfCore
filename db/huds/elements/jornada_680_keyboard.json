@@ -1,0 +1,28 @@
+{
+  "column": [
+    {
+      "row": [
+        "jornada_escape", "jornada_820_inbox", "jornada_820_internet", "jornada_recorder", "jornada_contacts",
+        "jornada_tasks", "jornada_calendar", "jornada_quick_view", "jornada_quick_pad", "jornada_access",
+        "jornada_excel", "jornada_word", "jornada_power"
+      ]
+    },
+    "jornada_number_row",
+    "jornada_letter_rows",
+    "jornada_shift_row",
+    {
+      "row": [
+        { "button": { "keys": ["VK_CONTROL"] } },
+        { "button": { "keys": ["VK_LWIN"] } },
+        { "button": { "keys": ["VK_MENU"] } },
+        { "button": { "keys": ["VK_RMENU"], "label": "Fn" } },
+        { "grow": 4, "column": ["space_key"] },
+        { "button": { "keys": ["VK_OEM_2"] } },
+        { "button": { "keys": ["VK_DELETE"] } },
+        "jornada_left",
+        "jornada_down",
+        "jornada_right"
+      ]
+    }
+  ]
+}

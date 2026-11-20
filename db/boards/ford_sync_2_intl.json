@@ -1,0 +1,6 @@
+{
+  "name": "Ford SYNC 2 (Europe, Asia-Pacific)",
+  "short_name": "SYNC 2",
+  "board_family_id": "ford_sync_gen2",
+  "support_level": "unknown_partial"
+}

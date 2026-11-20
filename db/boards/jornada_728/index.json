@@ -1,0 +1,8 @@
+{
+  "name": "HP Jornada 728",
+  "short_name": "Jornada 728",
+  "board_family_id": "hp_jornada_700",
+  "support_level": "unknown_partial",
+  "device_year": 2002,
+  "board_config": { "ram": { "default": "64mb" } }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Casio Toricomail",
+  "short_name": "Toricomail",
+  "board_family_id": "casio_pocketpostpet",
+  "support_level": "bootable_full"
+}

@@ -1,0 +1,7 @@
+{
+  "name": "NEC MobilePro 400",
+  "short_name": "MobilePro 400",
+  "board_family_id": "nec_mobilepro_200",
+  "support_level": "unknown_partial",
+  "board_config": { "ram": { "default": "4mb" } }
+}

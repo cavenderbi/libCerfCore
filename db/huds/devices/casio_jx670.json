@@ -1,0 +1,9 @@
+{
+  "name": "Casio JX670",
+  "board_family_ids": ["casio_jx670"],
+  "gap": 0.02,
+  "panels": [
+    { "side": "bottom", "align": "center", "width": 1.0, "height": 0.4, "content": "jx670_keys" },
+    { "side": "left", "align": "start", "width": 0.2, "height": 0.31, "content": "jx670_side_keys" }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "inherits_cpu_config_id": "arm",
+  "values": {
+    "pc_store_offset": "plus_8",
+    "base_restored_abort_model": true,
+    "dsp": true,
+    "load_store_double": true,
+    "preload": true,
+    "clz": true,
+    "blx_reg": true,
+    "armv5_unconditional_space": true,
+    "load_to_pc_interworking": true,
+    "aux_control_register": true
+  }
+}

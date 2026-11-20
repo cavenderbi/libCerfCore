@@ -1,0 +1,19 @@
+{
+  "soc_id": "msm8255",
+  "inherits_cpu_config_id": "armv7a",
+  "values": {
+    "midr": "0x510F02D0",
+    "ctr": "0x8003C003",
+    "clidr": "0x0A000023",
+    "ccsidr_l1i": "0x201FE019",
+    "ccsidr_l1d": "0xE01FE019",
+    "ccsidr_l2": "0xF07FE039",
+    "security_extensions": true,
+    "aux_control_register": true,
+    "vfp": true,
+    "neon": true,
+    "fpsid": "0x51400000",
+    "mvfr0": "0x11110222",
+    "mvfr1": "0x00011111"
+  }
+}

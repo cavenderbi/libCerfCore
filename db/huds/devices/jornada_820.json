@@ -1,0 +1,6 @@
+{
+  "name": "HP Jornada 820",
+  "board_family_ids": ["hp_jornada_820"],
+  "gap": 0.01,
+  "panels": [{ "side": "bottom", "align": "center", "width": 1.0, "height": 0.42, "content": "jornada_820_keyboard" }]
+}

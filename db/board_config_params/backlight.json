@@ -1,0 +1,1 @@
+{ "name": "Backlight", "enum_values": [{ "id": "none", "name": "None" }, { "id": "installed", "name": "Installed" }] }

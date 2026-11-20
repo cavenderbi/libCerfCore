@@ -1,0 +1,7 @@
+{
+  "name": "Casio Cassiopeia E-15",
+  "short_name": "E-15",
+  "board_family_id": "casio_tomcat",
+  "support_level": "unknown_partial",
+  "device_year": 1999
+}

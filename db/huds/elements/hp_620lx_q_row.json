@@ -1,0 +1,18 @@
+{
+  "row": [
+    { "button": { "keys": ["VK_OEM_3"] } },
+    { "button": { "keys": ["VK_Q"] } },
+    { "button": { "keys": ["VK_W"] } },
+    { "button": { "keys": ["VK_E"] } },
+    { "button": { "keys": ["VK_R"] } },
+    { "button": { "keys": ["VK_T"] } },
+    { "button": { "keys": ["VK_Y"] } },
+    { "button": { "keys": ["VK_U"] } },
+    { "button": { "keys": ["VK_I"] } },
+    { "button": { "keys": ["VK_O"] } },
+    { "button": { "keys": ["VK_P"] } },
+    { "button": { "keys": ["VK_OEM_4"] } },
+    { "button": { "keys": ["VK_OEM_6"] } },
+    { "button": { "keys": ["VK_OEM_5"] } }
+  ]
+}

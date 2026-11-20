@@ -1,0 +1,9 @@
+{
+  "name": "LCD panel",
+  "enum_values": [
+    { "id": "color_tft", "name": "Color TFT" },
+    { "id": "color_dstn", "name": "Color DSTN" },
+    { "id": "monochrome_stn", "name": "Monochrome STN" }
+  ],
+  "generic_part_id": "display"
+}

@@ -20,6 +20,7 @@ namespace {
 
 using nlohmann::json;
 
+constexpr char kGuestAdditions[]           = "guest_additions";
 constexpr char kGaSharedFolderMountPoint[] = "ga_shared_folder_mount_point";
 constexpr char kGaVideoDriverNames[]       = "ga_video_driver_names";
 constexpr char kValues[]                   = "values";
@@ -148,8 +149,9 @@ const DbBoardConfigSetting* FindBoardConfigSetting(std::span<const DbBoardConfig
 void BoardDatabase::OnReady() {
     const json root = CfgReadInstalledJsonFile(DbJsonPath());
 
-    ga_shared_folder_mount_point_ = root.at(kGaSharedFolderMountPoint).get<std::string>();
-    ga_video_driver_names_        = root.at(kGaVideoDriverNames).get<std::vector<std::string>>();
+    const json& guest_additions   = root.at(kGuestAdditions);
+    ga_shared_folder_mount_point_ = guest_additions.at(kGaSharedFolderMountPoint).get<std::string>();
+    ga_video_driver_names_        = guest_additions.at(kGaVideoDriverNames).get<std::vector<std::string>>();
 
     for (const auto& f : root.at(kSocFamilies))
         soc_families_.push_back(DbSocFamily{f.at(kId).get<std::string>(), f.at(kName).get<std::string>(),

@@ -1,0 +1,8 @@
+{
+  "name": "Siemens SIMATIC MP 377 15\" Touch daylight readable",
+  "short_name": "SIMATIC MP 377",
+  "board_family_id": "siemens_simatic_mp377",
+  "support_level": "no_support",
+  "internal__spec_divergences": "LED backlight",
+  "device_year": 2009
+}

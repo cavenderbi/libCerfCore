@@ -1,0 +1,8 @@
+{
+  "name": "HP Jornada 820",
+  "soc_id": "sa1100",
+  "device_year": 1998,
+  "notes": [],
+  "ga_color_depth": 24,
+  "rom_placing_mode": "flat_container"
+}

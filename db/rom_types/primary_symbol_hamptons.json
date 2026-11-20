@@ -1,0 +1,1 @@
+{ "id": "primary", "name": "Mk500 Flash Dump", "board_family_ids": ["symbol_hamptons"], "formats": ["bin"] }
