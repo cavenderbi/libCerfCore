@@ -1,5 +1,5 @@
 #include <cerfcore/boot/guest_cold_boot.h>
-#include "../../boot/rom_placer.h"
+#include "../../boot/board_boot_placer.h"
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
@@ -30,19 +30,16 @@ constexpr uint32_t kHwInfoPointerPa = 0x00000020u;
 constexpr uint32_t kHwInfoPa   = 0x00000800u;
 constexpr size_t   kHwInfoSize = 128u;
 
-class SiemensSimaticTp177b4BootloaderHwi : public Service {
+class SiemensSimaticTp177b4BootloaderHwi : public BoardBootPlacer {
 public:
-    using Service::Service;
+    using BoardBootPlacer::BoardBootPlacer;
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticTp177b4;
     }
 
-    void OnReady() override {
-        /* The block lives in NOR, so place the ROM first, then overlay the
-           handoff the bootloader would have written. */
-        (void)emu_.Get<RomPlacer>();
+    void PlaceAfterRom() override {
         WriteHwi();
         emu_.Get<GuestColdBoot>().RegisterReplay([this] { WriteHwi(); });
     }
@@ -87,6 +84,6 @@ private:
 
 }  // namespace
 
-REGISTER_SERVICE(SiemensSimaticTp177b4BootloaderHwi);
+REGISTER_SERVICE_AS(SiemensSimaticTp177b4BootloaderHwi, BoardBootPlacer);
 
 }

@@ -23,6 +23,7 @@ public:
     uint32_t MmioBase() const override { return 0x40F00000u; }
     uint32_t MmioSize() const override { return 0x00000100u; }
 
+    uint8_t  ReadByte (uint32_t addr) override;
     uint32_t ReadWord (uint32_t addr) override;
     void     WriteWord(uint32_t addr, uint32_t value) override;
 
@@ -41,7 +42,11 @@ public:
 
     bool RtcWakeEnabled() const;
     void LatchRtcWakeEdge();
-    bool FrequencyVoltageChange() const;
+    bool PiDomainPoweredInSleep() const;
+    bool VoltageChangeOnFrequencyChange() const;
+    void RunVoltageChangeSequence();
+    void StartVoltageChange();
+    bool ResetOutAsserted(ResetLineKind kind) const;
 
 private:
     void OnResetLine(ResetLineKind kind);

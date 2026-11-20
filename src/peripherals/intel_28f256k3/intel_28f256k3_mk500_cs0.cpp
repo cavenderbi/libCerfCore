@@ -2,16 +2,17 @@
 
 #include <cerfcore/boards/board_context.h>
 #include "../../boards/symbol_hamptons/symbol_hamptons_family_id.h"
+#include "../../core/no_emulation_runtime_service.h"
+#include "../../socs/pxa27x/pxa27x_power_manager.h"
+#include "../../storage/nor_flash_store.h"
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/device_config.h>
+#include <cerfcore/core/fatal.h>
 
 namespace cerfcore {
 
 namespace {
 
-/* symbol_mk500 dump.bin OEMAddressTable 0x00001E80: pa=0x00000000 size 64 MB.
-   symbol_mk500 MK500c50XenMO0152XX.bin 0x027847: mfr 0x0089 device 0x8803 array
-   0x04000000 erase 0x00040000 = 2x the 32 MB array and 0x20000 block of the x16
-   28F256K3 in Intel StrataFlash K3/K18 order 290737 section 2.6 => 2 in parallel. */
 class Intel28F256K3Mk500Cs0 : public Intel28F256K3 {
 public:
     using Intel28F256K3::Intel28F256K3;
@@ -21,14 +22,47 @@ public:
         return bd && bd->GetBoardFamilyId() == BoardFamilyId::SymbolHamptons;
     }
 
+    void OnReady() override {
+        Intel28F256K3::OnReady();
+        emu_.Get<NoEmulationRuntimeService>().EnsureEmulationPrevented();
+        if (!emu_.TryGet<NorFlashStore>()) {
+            emu_.Get<Fatal>().UserError("NOR flash image '%s' (storage.nor) is missing or empty",
+                                        emu_.Get<DeviceConfig>().storage_nor.c_str());
+        }
+    }
+
+    void SaveState(StateWriter& w) override {
+        emu_.Get<NorFlashStore>().SaveState(w);
+        Intel28F256K3::SaveState(w);
+    }
+
+    void RestoreState(StateReader& r) override {
+        RestoreArray();
+        emu_.Get<NorFlashStore>().RestoreState(r);
+        Intel28F256K3::RestoreState(r);
+    }
+
     uint32_t MmioBase() const override { return 0x00000000u; }
     uint32_t MmioSize() const override { return 0x04000000u; }
 
 protected:
     uint32_t Parallel() const override { return 2u; }
+    bool     ArrayIsStorage() const override { return true; }
+
+    bool ResetPinAsserted(ResetLineKind kind) const override {
+        return emu_.Get<Pxa27xPowerManager>().ResetOutAsserted(kind);
+    }
+
+    void ArrayWillChange(uint32_t addr, uint32_t length) override {
+        emu_.Get<NorFlashStore>().DropOverlay(addr - MmioBase(), length);
+    }
+
+    void ArrayStored(uint32_t addr, uint32_t length) override {
+        emu_.Get<NorFlashStore>().Store(addr - MmioBase(), Host(addr), length);
+    }
 };
 
-}  /* namespace */
+}
 
 REGISTER_SERVICE(Intel28F256K3Mk500Cs0);
 

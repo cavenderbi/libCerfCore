@@ -4,20 +4,16 @@
 #include "ce_image_relocator.h"
 #include "ce_import_binder.h"
 #include "guest_additions_binaries.h"
-#include <cerfcore/boot/guest_cold_boot.h>
 #include "guest_module_placer.h"
 #include "guest_stub_host.h"
+#include "guest_xip_image.h"
 #include "imgfs_injector.h"
 #include "pe_image.h"
-#include <cerfcore/boot/rom_parser_queries.h>
-#include <cerfcore/boot/rom_parser_service.h>
-#include "rom_placer.h"
-
-#include <cerfcore/boards/board_context.h>
 #include "rom_record_layout.h"
+#include "rom_toc_lookup.h"
 
-#include "../core/ascii_case.h"
 #include <cerfcore/core/board_database.h>
+#include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/fatal.h>
@@ -26,7 +22,6 @@
 #include <cerfcore/core/service.h>
 #include <cerfcore/cpu/emulated_memory.h>
 #include "../boards/page_table_builder.h"
-#include <cerfcore/socs/guest_cpu_reset.h>
 
 #include <cstdint>
 #include <cstring>
@@ -47,18 +42,14 @@ public:
     using Service::Service;
 
     bool ShouldRegister() override {
-        return emu_.Get<DeviceConfig>().guest_additions
-            && emu_.Get<BoardContext>().GetRomPlacingMode()
-                   == RomPlacingMode::FlatContainer;
+        return emu_.Get<DeviceConfig>().guest_additions && emu_.TryGet<GuestXipImage>() != nullptr;
     }
 
     void OnReady() override {
-        emu_.Get<RomPlacer>();
-
-        auto& parser = emu_.Get<RomParserService>();
-        if (!parser.Ok()) {
-            LOG(Caution, "parser not ready, skipping\n");
-            return;
+        xip_ = emu_.Get<GuestXipImage>().Primary();
+        if (!xip_) {
+            LOG(GuestAdditions, "the ROM has no XIP region that the injection can patch\n");
+            emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
         }
 
         ce_major_ = DetectCeMajor();
@@ -78,15 +69,11 @@ public:
         const std::string stub_path =
             emu_.Get<GuestAdditionsBinaries>().StubPath();
 
-        auto& imgfs = emu_.Get<ImgfsInjector>();
+        auto* imgfs = emu_.TryGet<ImgfsInjector>();
         int matched = 0;
         for (const auto& victim : victims) {
-            /* IMGFS injects the SAME stub, not the full body: a kernel-loaded
-               full body shares one .data across gwes + the device.exe carrier at
-               the high victim vbase (the CE5 loader doesn't per-process it) and
-               corrupts gwes's globals; the stub manual-maps the body per-process. */
             if (Replace(victim.c_str(), stub_path)) ++matched;
-            if (imgfs.ReplaceVictim(victim.c_str(), stub_path)) ++matched;
+            if (imgfs && imgfs->ReplaceVictim(victim.c_str(), stub_path)) ++matched;
         }
         if (matched == 0) {
             LOG(GuestAdditions, "no display-driver victim matched\n");
@@ -101,15 +88,16 @@ private:
     bool FindVictim(const char* name, size_t& out_index, uint32_t& out_entry_kva);
     uint32_t DetectCeMajor();
 
-    void WriteE32Rom(uint32_t pa, const PeImage& pe, uint32_t target_vbase,
+    void WriteE32Rom(uint8_t* e32, const PeImage& pe, uint32_t target_vbase,
                      uint16_t subsys_major, uint16_t subsys_minor);
-    void WriteO32Array(uint32_t pa, const PeImage& pe,
+    void WriteO32Array(uint8_t* o32, const PeImage& pe,
                        const std::vector<uint32_t>& dataptr_kva,
                        const std::vector<uint32_t>& realaddr,
                        const std::vector<uint32_t>& flags);
-    void WriteSectionBytes(const std::vector<uint32_t>& sec_pa, const PeImage& pe,
+    void WriteSectionBytes(std::vector<uint8_t>& foot, const PeImage& pe,
                            const std::vector<uint8_t>& bytes);
 
+    const ParsedXipRegion* xip_     = nullptr;
     uint32_t            ce_major_ = 5;
     uint32_t            ce_minor_ = 0;
     const E32RomLayout* layout_   = &kE32RomCE5plus;
@@ -117,7 +105,7 @@ private:
 
 uint32_t GuestAdditionsInjector::DetectCeMajor() {
     uint16_t major = 0, minor = 0;
-    if (!emu_.Get<RomParserQueries>().KernelSubsystemVersion(major, minor)) {
+    if (!emu_.Get<GuestXipImage>().KernelSubsystemVersion(major, minor)) {
         LOG(GuestAdditions, "nk.exe e32_rom subsystem version not locatable\n");
         emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
     }
@@ -131,84 +119,82 @@ uint32_t GuestAdditionsInjector::DetectCeMajor() {
 
 bool GuestAdditionsInjector::FindVictim(const char* name, size_t& out_index,
                                          uint32_t& out_entry_kva) {
-    auto& parser = emu_.Get<RomParserService>();
-    const auto& rom = parser.Primary();
-    if (rom.xips.empty()) return false;
-    const auto& toc = rom.xips[0].toc;
-    for (size_t i = 0; i < toc.modules.size(); ++i) {
-        if (cerf::AsciiEqualIgnoreCase(toc.modules[i].lpszFileName, name)) {
-            out_index     = i;
-            out_entry_kva = toc.romhdr_va + kRomHdrSize
-                          + uint32_t(i) * kTocEntrySize;
-            return true;
-        }
-    }
-    return false;
+    const auto& toc = xip_->toc;
+    const ParsedTOCentry* m = cerf::rom_toc::FindModule(toc, name);
+    if (!m) return false;
+    out_index     = size_t(m - toc.modules.data());
+    out_entry_kva = toc.romhdr_va + kRomHdrSize + uint32_t(out_index) * kTocEntrySize;
+    return true;
 }
 
-void GuestAdditionsInjector::WriteE32Rom(uint32_t pa, const PeImage& pe,
+void GuestAdditionsInjector::WriteE32Rom(uint8_t* e32, const PeImage& pe,
                                           uint32_t target_vbase,
                                           uint16_t subsys_major,
                                           uint16_t subsys_minor) {
-    auto& mem = emu_.Get<EmulatedMemory>();
+    using cerf::le::Put16;
+    using cerf::le::Put32;
     const E32RomLayout& L = *layout_;
 
-    mem.WriteHalf(pa + L.off_objcnt,      uint16_t(pe.Sections().size()));
-    mem.WriteHalf(pa + L.off_imageflags,  pe.ImageFlags());
-    mem.WriteWord(pa + L.off_entryrva,    pe.EntryRva());
-    mem.WriteWord(pa + L.off_vbase,       target_vbase);
-    mem.WriteHalf(pa + L.off_subsysmajor, subsys_major);
-    mem.WriteHalf(pa + L.off_subsysminor, subsys_minor);
+    Put16(e32 + L.off_objcnt,      uint16_t(pe.Sections().size()));
+    Put16(e32 + L.off_imageflags,  pe.ImageFlags());
+    Put32(e32 + L.off_entryrva,    pe.EntryRva());
+    Put32(e32 + L.off_vbase,       target_vbase);
+    Put16(e32 + L.off_subsysmajor, subsys_major);
+    Put16(e32 + L.off_subsysminor, subsys_minor);
     if (L.off_stackmax >= 0) {
-        mem.WriteWord(pa + uint32_t(L.off_stackmax), pe.StackReserve());
+        Put32(e32 + L.off_stackmax, pe.StackReserve());
     }
     if (L.off_vsize >= 0) {
-        mem.WriteWord(pa + uint32_t(L.off_vsize), pe.ImageSize());
+        Put32(e32 + L.off_vsize, pe.ImageSize());
     }
     if (L.off_sect14rva >= 0) {
-        mem.WriteWord(pa + uint32_t(L.off_sect14rva),  0);
+        Put32(e32 + L.off_sect14rva,  0);
     }
     if (L.off_sect14size >= 0) {
-        mem.WriteWord(pa + uint32_t(L.off_sect14size), 0);
+        Put32(e32 + L.off_sect14size, 0);
     }
     if (L.off_timestamp >= 0) {
-        mem.WriteWord(pa + uint32_t(L.off_timestamp), 0);
+        Put32(e32 + L.off_timestamp, 0);
     }
     for (int i = 0; i < kE32UnitCount; ++i) {
-        mem.WriteWord(pa + L.off_unit + uint32_t(i) * 8u + 0, pe.DirRva (i));
-        mem.WriteWord(pa + L.off_unit + uint32_t(i) * 8u + 4, pe.DirSize(i));
+        Put32(e32 + L.off_unit + uint32_t(i) * 8u + 0, pe.DirRva (i));
+        Put32(e32 + L.off_unit + uint32_t(i) * 8u + 4, pe.DirSize(i));
     }
-    mem.WriteHalf(pa + L.off_subsys,      pe.Subsystem());
+    Put16(e32 + L.off_subsys,      pe.Subsystem());
 }
 
-void GuestAdditionsInjector::WriteO32Array(uint32_t pa, const PeImage& pe,
+void GuestAdditionsInjector::WriteO32Array(uint8_t* o32, const PeImage& pe,
                                             const std::vector<uint32_t>& dataptr_kva,
                                             const std::vector<uint32_t>& realaddr,
                                             const std::vector<uint32_t>& flags) {
-    auto& mem = emu_.Get<EmulatedMemory>();
+    using cerf::le::Put32;
     for (size_t i = 0; i < pe.Sections().size(); ++i) {
         const auto& s = pe.Sections()[i];
-        const uint32_t off = pa + uint32_t(i) * kO32RomSize;
-        mem.WriteWord(off + kO32OffVsize,    s.vsize);
-        mem.WriteWord(off + kO32OffRva,      s.rva);
-        mem.WriteWord(off + kO32OffPsize,    s.psize);
-        mem.WriteWord(off + kO32OffDataptr,  dataptr_kva[i]);
-        mem.WriteWord(off + kO32OffRealaddr, realaddr[i]);
-        mem.WriteWord(off + kO32OffFlags,    flags[i]);
+        uint8_t* const off = o32 + i * kO32RomSize;
+        Put32(off + kO32OffVsize,    s.vsize);
+        Put32(off + kO32OffRva,      s.rva);
+        Put32(off + kO32OffPsize,    s.psize);
+        Put32(off + kO32OffDataptr,  dataptr_kva[i]);
+        Put32(off + kO32OffRealaddr, realaddr[i]);
+        Put32(off + kO32OffFlags,    flags[i]);
         LOG(GuestAdditions, "  o32[%zu] vsize=0x%05X rva=0x%05X psize=0x%05X "
                   "dataptr=0x%08X realaddr=0x%08X flags=0x%08X\n",
             i, s.vsize, s.rva, s.psize, dataptr_kva[i], realaddr[i], flags[i]);
     }
 }
 
-void GuestAdditionsInjector::WriteSectionBytes(const std::vector<uint32_t>& sec_pa,
+void GuestAdditionsInjector::WriteSectionBytes(std::vector<uint8_t>& foot,
                                                 const PeImage& pe,
                                                 const std::vector<uint8_t>& bytes) {
-    auto& mem = emu_.Get<EmulatedMemory>();
-    for (size_t i = 0; i < pe.Sections().size(); ++i) {
-        const auto& s = pe.Sections()[i];
+    const uint64_t image_bytes = AlignRomPage(pe.ImageSize());
+    for (const auto& s : pe.Sections()) {
         if (s.psize > 0 && size_t(s.pe_file_off) + s.psize <= bytes.size()) {
-            mem.CopyIn(sec_pa[i], bytes.data() + s.pe_file_off, s.psize);
+            if (uint64_t(s.rva) + s.psize > image_bytes) {
+                LOG(GuestAdditions, "stub section rva 0x%X psize 0x%X ends past the image size "
+                                    "0x%X\n", s.rva, s.psize, pe.ImageSize());
+                emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
+            }
+            std::memcpy(foot.data() + s.rva, bytes.data() + s.pe_file_off, s.psize);
         }
     }
 }
@@ -235,13 +221,7 @@ bool GuestAdditionsInjector::Replace(const char* victim_name,
         emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
     }
 
-    auto& parser = emu_.Get<RomParserService>();
-    const auto& rom = parser.Primary();
-    if (rom.xips.empty()) {
-        LOG(GuestAdditions, "primary ROM has no XIP regions, victim %s\n", victim_name);
-        emu_.Get<Fatal>().UserError("Guest Additions can't run on this ROM");
-    }
-    const auto& primary_toc = rom.xips[0].toc;
+    const auto& primary_toc = xip_->toc;
     auto& pt  = emu_.Get<PageTableBuilder>();
     auto& mem = emu_.Get<EmulatedMemory>();
     const E32RomLayout& L = *layout_;
@@ -326,10 +306,9 @@ bool GuestAdditionsInjector::Replace(const char* victim_name,
         run_base = target_vbase + slot_base;
     }
 
-    std::vector<uint32_t> sec_pa(nsec), dataptr(nsec), realaddr(nsec), flags(nsec);
+    std::vector<uint32_t> dataptr(nsec), realaddr(nsec), flags(nsec);
     for (size_t i = 0; i < nsec; ++i) {
         const auto& s = pe.Sections()[i];
-        sec_pa[i]   = host_pa + s.rva;
         dataptr[i]  = host_va + s.rva;
         realaddr[i] = run_base + s.rva;
         flags[i] = in_place
@@ -362,19 +341,19 @@ bool GuestAdditionsInjector::Replace(const char* victim_name,
         emu_.Get<CeImportBinder>().BindImports(patched_bytes, pe, L);
     }
 
-    const uint32_t e32_pa = host_pa + (e32_va - host_va);
-    const uint32_t o32_pa = host_pa + (o32_va - host_va);
-    const std::vector<uint8_t> zeros(foot_bytes, 0);
-    mem.CopyIn(host_pa, zeros.data(), zeros.size());
-    WriteE32Rom(e32_pa, pe, target_vbase, orig_subsysmaj, orig_subsysmin);
-    WriteO32Array(o32_pa, pe, dataptr, realaddr, flags);
-    WriteSectionBytes(sec_pa, pe, patched_bytes);
+    std::vector<uint8_t> foot(foot_bytes, 0);
+    WriteE32Rom(foot.data() + (e32_va - host_va), pe, target_vbase, orig_subsysmaj, orig_subsysmin);
+    WriteO32Array(foot.data() + (o32_va - host_va), pe, dataptr, realaddr, flags);
+    WriteSectionBytes(foot, pe, patched_bytes);
+
+    auto& image = emu_.Get<GuestXipImage>();
+    image.Patch(host_pa, foot);
 
     const uint32_t entry_pa = pt.VaToPa(entry_kva);
-    mem.WriteWord(entry_pa + kTocOffNFileSize,  uint32_t(pe_bytes_size));
-    mem.WriteWord(entry_pa + kTocOffE32Offset,  e32_va);
-    mem.WriteWord(entry_pa + kTocOffO32Offset,  o32_va);
-    mem.WriteWord(entry_pa + kTocOffLoadOffset, host_va);
+    image.PatchWord(entry_pa + kTocOffNFileSize,  uint32_t(pe_bytes_size));
+    image.PatchWord(entry_pa + kTocOffE32Offset,  e32_va);
+    image.PatchWord(entry_pa + kTocOffO32Offset,  o32_va);
+    image.PatchWord(entry_pa + kTocOffLoadOffset, host_va);
 
     LOG(GuestAdditions, "%s stub injected (%s, %s): idx=%zu entry_kva=0x%08X "
               "host VA=0x%08X PA=0x%08X used=0x%X avail=0x%X e32=0x%08X o32=0x%08X "
@@ -383,27 +362,7 @@ bool GuestAdditionsInjector::Replace(const char* victim_name,
         victim_idx, entry_kva, host_va, host_pa, foot_bytes, host.avail,
         e32_va, o32_va, nsec, target_vbase, run_base);
 
-    auto& coldboot = emu_.Get<GuestColdBoot>();
-    coldboot.RecordPatch(host_pa, foot_bytes);
-    coldboot.RecordPatch(entry_pa + kTocOffNFileSize,  4);
-    coldboot.RecordPatch(entry_pa + kTocOffE32Offset,  4);
-    coldboot.RecordPatch(entry_pa + kTocOffO32Offset,  4);
-    coldboot.RecordPatch(entry_pa + kTocOffLoadOffset, 4);
-    /* ComputeVbase may have lowered ROMHDR.dllfirst (DllLoadBase) for a
-       relocated section-1 vbase; replay it on hard reset. */
-    if (!in_place) {
-        coldboot.RecordPatch(pt.VaToPa(primary_toc.romhdr_va) + kHdrDllFirstOff, 4);
-    }
-
-    if (in_place) {
-        std::vector<uint8_t> host_initial(foot_bytes);
-        mem.CopyOut(host_pa, host_initial.data(), foot_bytes);
-        emu_.Get<GuestCpuReset>().RegisterResetListener(
-            [this, host_pa, host_initial = std::move(host_initial)](ResetLineKind) {
-                emu_.Get<EmulatedMemory>().CopyIn(host_pa, host_initial.data(),
-                                                  host_initial.size());
-            });
-    }
+    if (in_place) image.RestoreOnEveryReset(host_pa, foot_bytes);
     return true;
 }
 

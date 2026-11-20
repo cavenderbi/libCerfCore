@@ -36,6 +36,8 @@ constexpr void VisitCpuHead(cerfengine::ArmCpuState& s, F& field) {
     field("vfp_d", s.vfp_d);
     field("fpscr", s.fpscr);
     field("fpexc", s.fpexc);
+    field("xscale_cp0", s.xscale_cp0);
+    field("xscale_cp1", s.xscale_cp1);
 }
 
 template <typename F>
@@ -81,9 +83,8 @@ constexpr void VisitMmuContext(cerfengine::ArmMmuState& s, F& field) {
 }
 
 template <typename F>
-void VisitCpuSection(cerfengine::ArmCpuState& s, uint64_t& acc0, F& field) {
+void VisitCpuSection(cerfengine::ArmCpuState& s, F& field) {
     VisitCpuHead(s, field);
-    field("acc0", acc0);
     VisitCpuTail(s, field);
 }
 
@@ -113,14 +114,13 @@ public:
                           }),
                       "the ARM CPU visitors must name or skip every field of ArmCpuState");
         StateWriteField field(w);
-        VisitCpuSection(*Engine().Get<cerfengine::ArmCpu>().State(),
-                        emu_.Get<ArmCoprocProvider>().Accumulator(), field);
+        VisitCpuSection(*Engine().Get<cerfengine::ArmCpu>().State(), field);
     }
 
     void RestoreCpuState(StateReader& r) override {
         cerfengine::ArmCpu& cpu = Engine().Get<cerfengine::ArmCpu>();
         StateReadField field(r);
-        VisitCpuSection(*cpu.State(), emu_.Get<ArmCoprocProvider>().Accumulator(), field);
+        VisitCpuSection(*cpu.State(), field);
         cpu.OnStateRestored();
         emu_.Get<GuestCycleClock>().OnCyclesRestored();
     }
@@ -183,6 +183,9 @@ protected:
         f.dsp                           = cfg.HasDsp();
         f.neon                          = cfg.HasNeon();
         f.vfp                           = cfg.HasVfp();
+        f.xscale_accumulator            = cfg.HasXscaleAccumulator();
+        f.iwmmxt                        = cfg.HasIwmmxt();
+        f.wcid                          = cfg.Wcid();
         f.integer_divide                = cfg.HasIntegerDivide();
         f.bit_field                     = cfg.HasBitField();
         f.rev                           = cfg.HasRev();

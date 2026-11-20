@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cerfcore/peripherals/peripheral_base.h>
+#include <cerfcore/socs/guest_cpu_reset.h>
 
 #include <cstdint>
 #include <utility>
@@ -41,12 +42,30 @@ protected:
     virtual uint8_t DecodeCommand(uint32_t value, uint32_t width);
     virtual bool    CommandEnabled(uint8_t) const { return true; }
     virtual void    PresentIdentifier(uint32_t addr);
+    virtual void    ArrayWillChange(uint32_t, uint32_t) {}
+    virtual void    ArrayStored(uint32_t, uint32_t) {}
+    virtual bool    PartCommand(uint32_t, uint8_t) { return false; }
+    virtual void    LockSetupCommand(uint32_t addr, uint8_t cmd);
+    virtual bool    ArrayIsStorage() const { return false; }
+    virtual bool    ResetPinAsserted(ResetLineKind) const { return true; }
+    virtual void    ResetDevice() { ResetToReadArray(); }
+    virtual bool    WriteBufferRefused() const { return (status_errors_ & (kSrEraseErr | kSrProgErr)) != 0u; }
+    virtual bool    WriteBufferUsesXsr() const { return true; }
+    virtual uint32_t WriteBufferWords(uint32_t addr, uint32_t value);
 
     void     SaveAndWrite(uint32_t addr, uint8_t v);
     void     SaveAndWriteWord(uint32_t addr, uint32_t word);
     void     RestoreArray();
-    void     EmitLaneByte(uint32_t addr, uint8_t v);
+    void     EmitLane(uint32_t addr, uint32_t value);
+    void     PresentStatus(uint32_t addr, uint8_t sr = kSrReady);
+    void     PresentRegister(uint32_t addr, uint8_t value);
+    void     ClearStatus() { status_errors_ = 0u; }
+    uint8_t  StatusErrors() const { return status_errors_; }
+    void     ResetToReadArray();
     uint8_t* Host(uint32_t addr);
+
+    uint8_t  BlockLockBits(uint32_t i) const { return block_locked_[i]; }
+    void     SetBlockLockBits(uint32_t i, uint8_t bits) { block_locked_[i] = bits; }
 
     uint32_t BusBytes()        const { return Parallel() * DeviceWidth(); }
     uint32_t EraseBlockBytes() const { return ChipEraseBlockBytes() * Parallel(); }
@@ -61,6 +80,8 @@ protected:
     static constexpr uint8_t  kSrEraseErr  = 0x20u;
     static constexpr uint8_t  kSrProgErr   = 0x10u;
     static constexpr uint8_t  kSrLockAbort = 0x02u;
+    static constexpr uint8_t  kSrErrorBits = 0x3Au;
+    static constexpr uint8_t  kXsrBufferAvailable = 0x80u;
     static constexpr uint32_t kCfiFirst    = 0x10u;
     /* SIMpad FLite probe reads the block lock bit at block_base + 8
        (psmfsd sub_12AD330, 0x12AD854 `ADD R0,R6,#8`). */
@@ -72,15 +93,26 @@ private:
         kWriteBufCount, kWriteBufData, kWriteBufConfirm,
     };
 
-    void PresentStatus(uint32_t addr, uint8_t sr = kSrReady);
     void PresentCfi();
     bool ProgramInto(uint32_t addr, uint32_t value, uint32_t width);
     void CommitProgram(uint32_t addr, uint32_t value, uint32_t width);
     void EraseBlock(uint32_t addr);
     void Command(uint32_t addr, uint32_t value, uint32_t width);
 
+    struct BufferedWrite {
+        uint32_t addr  = 0u;
+        uint32_t value = 0u;
+        uint32_t width = 0u;
+    };
+
+    void ConfirmBufferedWrite(uint32_t addr, uint32_t value);
+
     Mode     mode_          = Mode::kArray;
     uint32_t buf_remaining_ = 0u;
+    uint32_t buf_block_     = 0u;
+    bool     buf_locked_    = false;
+    uint8_t  status_errors_ = 0u;
+    std::vector<BufferedWrite> buffer_;
     std::vector<std::pair<uint32_t, uint8_t>> shadow_;
     std::vector<uint8_t> block_locked_;
 };

@@ -4,6 +4,9 @@
 #include "pxa270_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include "../pxa2xx/pxa2xx_intc.h"
+#include "pxa27x_power_manager.h"
+#include <cerfcore/socs/guest_cpu_reset.h>
+#include <cerfcore/state/state_stream.h>
 
 namespace cerfcore {
 
@@ -43,7 +46,31 @@ public:
         return static_cast<uint8_t>(LaneByte(addr));
     }
 
-    FastReadFn FastReader() override { return &Pxa27xOsTimer::FastReadThunk; }
+    FastReadFn  FastReader() override { return &Pxa27xOsTimer::FastReadThunk; }
+    FastWriteFn FastWriter() override { return &Pxa27xOsTimer::FastWriteThunk; }
+
+    uint32_t ReadWord(uint32_t addr) override {
+        if (const uint32_t* osmr = DisabledChannelMatch(addr - MmioBase())) return *osmr;
+        return IntelOsTimerBase<kOscrHz>::ReadWord(addr);
+    }
+
+    void WriteWord(uint32_t addr, uint32_t value) override {
+        if (uint32_t* osmr = DisabledChannelMatch(addr - MmioBase())) {
+            *osmr = value;
+            return;
+        }
+        IntelOsTimerBase<kOscrHz>::WriteWord(addr, value);
+    }
+
+    void SaveState(StateWriter& w) override {
+        IntelOsTimerBase<kOscrHz>::SaveState(w);
+        for (uint32_t v : osmr_channels_) w.Write<uint32_t>("osmr_channel", v);
+    }
+
+    void RestoreState(StateReader& r) override {
+        IntelOsTimerBase<kOscrHz>::RestoreState(r);
+        for (uint32_t& v : osmr_channels_) r.Read("osmr_channel", v);
+    }
 
 protected:
     void SetMatchLevel(uint32_t level4) override {
@@ -52,7 +79,32 @@ protected:
                             (level4 & 0xFu) << kIntcOst0Bit);
     }
 
+    void OnResetLine() override {
+        IntelOsTimerBase<kOscrHz>::OnResetLine();
+        if (emu_.Get<GuestCpuReset>().DeliveredResetWasResume() &&
+            emu_.Get<Pxa27xPowerManager>().PiDomainPoweredInSleep()) {
+            return;
+        }
+        for (uint32_t& v : osmr_channels_) v = 0u;
+    }
+
 private:
+    static constexpr uint32_t kOsmr4 = 0x80u;
+    static constexpr uint32_t kOsmr11 = 0x9Cu;
+
+    uint32_t* DisabledChannelMatch(uint32_t off) {
+        if (off < kOsmr4 || off > kOsmr11 || (off & 0x3u) != 0u) return nullptr;
+        return &osmr_channels_[(off - kOsmr4) / 4u];
+    }
+
+    static void FastWriteThunk(void* ctx, uint32_t off, uint32_t value, uint32_t width) {
+        auto* self = static_cast<Pxa27xOsTimer*>(ctx);
+        if (width != 4u) self->HaltUnsupportedAccess("FastWrite", self->MmioBase() + off, value);
+        self->Pxa27xOsTimer::WriteWord(self->MmioBase() + off, value);
+    }
+
+    uint32_t osmr_channels_[8] = {};
+
     uint32_t LaneByte(uint32_t addr) {
         const uint32_t off = (addr - MmioBase()) & ~0x3u;
         if (off != 0x10u) HaltUnsupportedAccess("ReadByte", addr, 0);
@@ -63,7 +115,10 @@ private:
 
     static uint32_t FastReadThunk(void* ctx, uint32_t off, uint32_t width) {
         auto* self = static_cast<Pxa27xOsTimer*>(ctx);
-        if (width == 4u) return self->FastRead(off, 4u);
+        if (width == 4u) {
+            if (const uint32_t* osmr = self->DisabledChannelMatch(off)) return *osmr;
+            return self->FastRead(off, 4u);
+        }
         if (width == 1u) return self->LaneByte(self->MmioBase() + off);
         self->HaltUnsupportedAccess("FastRead", self->MmioBase() + off, 0);
     }

@@ -2,7 +2,7 @@
 
 #include "guest_module_placer.h"
 
-#include <cerfcore/boot/rom_parser_service.h>
+#include "guest_xip_image.h"
 #include "rom_record_layout.h"
 
 #include <cerfcore/core/cerf_emulator.h>
@@ -34,10 +34,10 @@ uint32_t GuestModulePlacer::ComputeVbase(uint32_t orig_vbase,
                                           uint32_t ce_major,
                                           uint32_t e32_off_vbase,
                                           const char* victim_name) {
-    auto& parser = emu_.Get<RomParserService>();
-    auto& pt  = emu_.Get<PageTableBuilder>();
-    auto& mem = emu_.Get<EmulatedMemory>();
-    const auto& toc = parser.Primary().xips[0].toc;
+    auto& image = emu_.Get<GuestXipImage>();
+    auto& pt    = emu_.Get<PageTableBuilder>();
+    auto& mem   = emu_.Get<EmulatedMemory>();
+    const auto& toc = image.Primary()->toc;
 
     uint32_t slot_ceiling = 0xFFFFFFFFu;   /* lowest module vbase > victim */
     uint32_t lowest_code  = 0xFFFFFFFFu;   /* lowest section-1 code realaddr */
@@ -81,16 +81,12 @@ uint32_t GuestModulePlacer::ComputeVbase(uint32_t orig_vbase,
     }
     const uint32_t new_vbase = new_code - orig_slot_base;
 
-    /* The kernel only loads ROM DLLs inside [DllLoadBase, dlllast); when the
-       relocated vbase falls below DllLoadBase, grow the region down by lowering
-       dllfirst's high half (DllLoadBase). Keep the low half - on a CE3 ROM it is
-       0 (no RW split), so no per-process reservation is added. */
     const uint32_t romhdr_pa     = pt.VaToPa(toc.romhdr_va);
     const uint32_t dllfirst      = mem.ReadWord(romhdr_pa);
     const uint32_t dll_load_base = dllfirst & 0xFFFF0000u;
     if (new_vbase < dll_load_base) {
         const uint32_t new_dllfirst = (new_vbase & 0xFFFF0000u) | (dllfirst & 0xFFFFu);
-        mem.WriteWord(romhdr_pa, new_dllfirst);
+        image.PatchWord(romhdr_pa, new_dllfirst);
         LOG(GuestAdditions, "%s grew DLL region: DllLoadBase 0x%08X -> 0x%08X "
                   "(dllfirst 0x%08X -> 0x%08X)\n",
             victim_name, dll_load_base, new_vbase & 0xFFFF0000u, dllfirst, new_dllfirst);

@@ -142,7 +142,7 @@ void Twl4030::TxnStart(uint8_t slave_addr) {
     sub_addr_pending_[idx] = true;
 }
 
-void Twl4030::TxnWriteByte(uint8_t slave_addr, uint8_t byte) {
+bool Twl4030::TxnWriteByte(uint8_t slave_addr, uint8_t byte) {
     const int idx = AddrIndex(slave_addr);
     uint8_t   sub = 0;
     {
@@ -150,24 +150,24 @@ void Twl4030::TxnWriteByte(uint8_t slave_addr, uint8_t byte) {
         if (sub_addr_pending_[idx]) {
             sub_addr_[idx] = byte;
             sub_addr_pending_[idx] = false;
-            return;
+            return true;
         }
         sub = sub_addr_[idx];
         sub_addr_[idx] = (sub_addr_[idx] + 1u) & 0xFFu;
     }
-    if (slave_addr == kTwlAddr_PWR_RTC && !ApplyMsecure(sub, byte)) return;
-    if (slave_addr == kTwlAddr_PWR_RTC && emu_.Get<Tps65950PowerMaster>().ConsumeWrite(sub, byte)) return;
+    if (slave_addr == kTwlAddr_PWR_RTC && !ApplyMsecure(sub, byte)) return true;
+    if (slave_addr == kTwlAddr_PWR_RTC && emu_.Get<Tps65950PowerMaster>().ConsumeWrite(sub, byte)) return true;
     if (slave_addr == kTwlAddr_PWR_RTC && Tps65950Rtc::Owns(sub)) {
         emu_.Get<Tps65950Rtc>().Write(sub, byte);
-        return;
+        return true;
     }
     if (slave_addr == kTwlAddr_PWR_RTC && Tps65950Interrupts::OwnsPower(sub)) {
         emu_.Get<Tps65950Interrupts>().WritePower(sub, byte);
-        return;
+        return true;
     }
     if (slave_addr == kTwlAddr_AUDIO_INTBR && Tps65950Interrupts::OwnsPih(sub)) {
         emu_.Get<Tps65950Interrupts>().WritePih(sub, byte);
-        return;
+        return true;
     }
     const bool audio    = slave_addr == kTwlAddr_AUDIO_INTBR;
     const bool timing   = audio && InterfaceTiming(sub);
@@ -179,6 +179,7 @@ void Twl4030::TxnWriteByte(uint8_t slave_addr, uint8_t byte) {
         regs_[idx][sub] = byte;
     }
     AudioChanged(timing, uplink, downlink);
+    return true;
 }
 
 /* TPS65950 TRM SWCU050E Table 3-29 (page 137): the secure mode is P(MSecure) = 0; Table 3-20 (page 133): the

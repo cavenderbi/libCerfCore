@@ -128,7 +128,7 @@ std::vector<BackedRegion> SymbolHamptonsPageTableBuilder::BackedMemoryRegions() 
     for (const auto& e : kOat) {
         if (e.kind == OatKind::Mmio) continue;
         const MemoryKind kind =
-            (e.kind == OatKind::Flash) ? MemoryKind::kFlash : MemoryKind::kRam;
+            (e.kind == OatKind::Flash) ? MemoryKind::kStorage : MemoryKind::kRam;
         regions.push_back({ e.va_base, e.pa_base, e.size, kind });
     }
     return MergeBackedPaOverlaps(std::move(regions));

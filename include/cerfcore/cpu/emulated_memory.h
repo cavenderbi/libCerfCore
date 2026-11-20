@@ -145,6 +145,7 @@ private:
     Region*  BulkRegion(uint32_t vaddr, size_t size);
     void     CopyIntoRegion(Region* r, uint32_t vaddr, const void* host_src, size_t size);
     static bool IsFlash(const Region& r);
+    static bool InStateImage(const Region& r, bool flash);
     uint32_t RegionCount(bool flash) const;
     void     SaveRegions(StateWriter& w, bool flash);
     uint8_t* EnsureBacked(Region* r);

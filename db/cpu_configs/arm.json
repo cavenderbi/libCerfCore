@@ -31,6 +31,9 @@
     "l1_system_array_debug": false,
     "vfp": false,
     "neon": false,
+    "xscale_accumulator": false,
+    "iwmmxt": false,
+    "wcid": "0x00000000",
     "fpsid": "0x00000000",
     "mvfr0": "0x00000000",
     "mvfr1": "0x00000000"

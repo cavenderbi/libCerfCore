@@ -1,5 +1,11 @@
 {
   "soc_id": "pxa270",
   "inherits_cpu_config_id": "xscale",
-  "values": { "midr": "0x69054117", "ctr": "0x0D172172", "accesses_spsr_in_system_mode": true }
+  "values": {
+    "midr": "0x69054117",
+    "ctr": "0x0D172172",
+    "accesses_spsr_in_system_mode": true,
+    "iwmmxt": true,
+    "wcid": "0x69051000"
+  }
 }

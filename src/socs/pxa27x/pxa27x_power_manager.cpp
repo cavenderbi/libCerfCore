@@ -5,6 +5,8 @@
 #include <cerfcore/boards/board_context.h>
 #include "pxa270_id.h"
 #include "pxa27x_gpio.h"
+#include "pxa27x_power_i2c.h"
+#include <cerfcore/core/log.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
 
@@ -38,7 +40,21 @@ constexpr uint32_t kPcfrFvc    = 1u << 10;
 constexpr uint32_t kPcfrGprod  = 1u << 12;
 constexpr uint32_t kPcfrPo     = 1u << 14;
 
+constexpr uint32_t kPvcrSlaveAddress      = 0x7Fu;
+constexpr uint32_t kPvcrReadPointerShift  = 20u;
+constexpr uint32_t kPvcrReadPointer       = 0x1Fu << kPvcrReadPointerShift;
+constexpr uint32_t kPvcrWritable          = kPvcrReadPointer | 0x00000FFFu;
+
+constexpr uint32_t kPcmdCount = 32u;
+constexpr uint32_t kPcmdData  = 0xFFu;
+constexpr uint32_t kPcmdSqc         = 3u << 8;
+constexpr uint32_t kPcmdSqcContinue = 0u << 8;
+constexpr uint32_t kPcmdSqcPause    = 1u << 8;
+constexpr uint32_t kPcmdLc    = 1u << 10;
+constexpr uint32_t kPcmdMbc   = 1u << 12;
+
 constexpr uint32_t kPslrSlPi   = 3u << 2;
+constexpr uint32_t kPslrSlRod  = 1u << 20;
 constexpr uint32_t kPslrReset  = 0xCC000000u;
 
 /* Table 3-17 PWER: WERTC 31; WE15-WE9, WE4, WE3, WE1, WE0 are GPIO edge
@@ -122,10 +138,55 @@ void Pxa27xPowerManager::LatchRtcWakeEdge() {
     pedr_.fetch_or(kPwerRtc, std::memory_order_acq_rel);
 }
 
-/* Table 3-21 PCFR bit 10 FVC: "controls initiation of the voltage-change
-   sequence during a frequency change". */
-bool Pxa27xPowerManager::FrequencyVoltageChange() const {
-    return (pcfr_ & kPcfrFvc) != 0u;
+bool Pxa27xPowerManager::PiDomainPoweredInSleep() const {
+    return (pslr_ & kPslrSlPi) != 0u;
+}
+
+bool Pxa27xPowerManager::VoltageChangeOnFrequencyChange() const {
+    return (pcfr_ & (kPcfrFvc | kPcfrPi2cEn)) == (kPcfrFvc | kPcfrPi2cEn);
+}
+
+void Pxa27xPowerManager::StartVoltageChange() {
+    if ((pcfr_ & kPcfrPi2cEn) == 0u) {
+        emu_.Get<Fatal>().Die("Pxa27xPowerManager: PWRMODE[VC] written with PCFR 0x%08X; "
+                              "PCFR[PI2C_EN] is clear", pcfr_);
+    }
+    RunVoltageChangeSequence();
+}
+
+bool Pxa27xPowerManager::ResetOutAsserted(ResetLineKind kind) const {
+    if (emu_.Get<GuestCpuReset>().DeliveredResetWasResume()) return (pslr_ & kPslrSlRod) == 0u;
+    if (kind == ResetLineKind::Other) return (pcfr_ & kPcfrGprod) == 0u;
+    return true;
+}
+
+void Pxa27xPowerManager::RunVoltageChangeSequence() {
+    const uint32_t slave = pvcr_ & kPvcrSlaveAddress;
+    const uint32_t start = (pvcr_ & kPvcrReadPointer) >> kPvcrReadPointerShift;
+    uint32_t       n     = start;
+    for (uint32_t sent = 0; sent < kPcmdCount; ++sent) {
+        const uint32_t cmd = pcmd_[n];
+        const uint32_t sqc = cmd & kPcmdSqc;
+        if (sqc != kPcmdSqcContinue && sqc != kPcmdSqcPause) {
+            emu_.Get<Fatal>().Die("Pxa27xPowerManager: PCMD%u 0x%08X sets reserved SQC %u", n,
+                                  cmd, sqc >> 8);
+        }
+        LOG(SocClkpwr, "Pxa27xPowerManager: voltage-change PCMD%u byte 0x%02X to slave 0x%02X\n",
+            n, cmd & kPcmdData, slave);
+        if ((cmd & kPcmdMbc) == 0u && (cmd & kPcmdLc) != 0u) {
+            emu_.Get<Pxa27xPowerI2c>().SequencerTransmitted(uint8_t(cmd & kPcmdData), true);
+            pvcr_ = (pvcr_ & ~kPvcrReadPointer) | (n << kPvcrReadPointerShift);
+            return;
+        }
+        n = (n + 1u) % kPcmdCount;
+        if (sqc == kPcmdSqcPause && (cmd & kPcmdMbc) == 0u) {
+            emu_.Get<Pxa27xPowerI2c>().SequencerTransmitted(uint8_t(cmd & kPcmdData), true);
+            pvcr_ = (pvcr_ & ~kPvcrReadPointer) | (n << kPvcrReadPointerShift);
+            return;
+        }
+    }
+    emu_.Get<Fatal>().Die("Pxa27xPowerManager: no last command in the %u PCMD registers from "
+                          "PCMD%u", kPcmdCount, start);
 }
 
 void Pxa27xPowerManager::OnSleepEntry() {
@@ -148,7 +209,7 @@ void Pxa27xPowerManager::OnSleepEntry() {
 void Pxa27xPowerManager::ResetForSleepExit() {
     for (uint32_t& v : pgsr_) v = 0u;
     const bool island = (pcfr_ & kPcfrPi2cEn) != 0u;
-    const bool pi_on  = (pslr_ & kPslrSlPi) != 0u;
+    const bool pi_on  = PiDomainPoweredInSleep();
     if (island && pi_on) return;
     bool loaded = pvcr_ != 0u;
     for (uint32_t v : pcmd_) loaded = loaded || v != 0u;
@@ -159,6 +220,7 @@ void Pxa27xPowerManager::ResetForSleepExit() {
     }
     pvcr_ = 0u;
     for (uint32_t& v : pcmd_) v = 0u;
+    emu_.Get<Pxa27xPowerI2c>().ResetRegisters();
 }
 
 /* Table 3-2 (page 3-12): the power manager registers take their reset
@@ -177,6 +239,7 @@ void Pxa27xPowerManager::ResetAll(bool keep_gprod) {
     pksr_ = 0u;
     for (uint32_t& v : pgsr_) v = 0u;
     for (uint32_t& v : pcmd_) v = 0u;
+    emu_.Get<Pxa27xPowerI2c>().ResetRegisters();
     pwer_.store(kWakeReset, std::memory_order_release);
     prer_.store(kWakeReset, std::memory_order_release);
     pfer_.store(kWakeReset, std::memory_order_release);
@@ -204,6 +267,11 @@ void Pxa27xPowerManager::WritePssr(uint32_t value) {
     const bool held = (pssr_ & kPssrPh) != 0u;
     pssr_ &= ~(value & kPssrW1C);
     if (held && (pssr_ & kPssrPh) == 0u) emu_.Get<Pxa27xGpio>().ReleaseSleepHold();
+}
+
+uint8_t Pxa27xPowerManager::ReadByte(uint32_t addr) {
+    if (addr != MmioBase() + kRCSR) HaltUnsupportedAccess("ReadByte", addr, 0);
+    return static_cast<uint8_t>(ReadWord(addr));
 }
 
 uint32_t Pxa27xPowerManager::ReadWord(uint32_t addr) {
@@ -248,7 +316,7 @@ void Pxa27xPowerManager::WriteWord(uint32_t addr, uint32_t value) {
     case kPCFR: pcfr_ = value; return;
     case kPSLR: pslr_ = value; return;
     case kPSTR: pstr_ = value; return;
-    case kPVCR: pvcr_ = value; return;
+    case kPVCR: pvcr_ = value & kPvcrWritable; return;
     case kPUCR: pucr_ = value; return;
     case kPKWR: pkwr_ = value; return;
     case kPMCR:

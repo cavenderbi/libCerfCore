@@ -181,13 +181,10 @@ uint32_t CERFENGINE_FASTCALL Pxa27xClockManager::ReadClkcfgHelper(void* self) {
 }
 
 void CERFENGINE_FASTCALL Pxa27xClockManager::WriteClkcfgHelper(void* context, uint32_t value) {
-    Pxa27xClockManager* self = static_cast<Pxa27xClockManager*>(context);
-    if ((value & kClkcfgF) != 0u &&
-        self->emu_.Get<Pxa27xPowerManager>().FrequencyVoltageChange()) {
-        self->emu_.Get<Fatal>().Die("Pxa27xClockManager: CLKCFG write 0x%08X starts a frequency "
-                                    "change with PCFR[FVC] set; the voltage-change sequence is "
-                                    "not modelled", value);
-    }
+    Pxa27xClockManager* self  = static_cast<Pxa27xClockManager*>(context);
+    Pxa27xPowerManager& power = self->emu_.Get<Pxa27xPowerManager>();
+    if ((value & kClkcfgF) != 0u && power.VoltageChangeOnFrequencyChange())
+        power.RunVoltageChangeSequence();
     self->WriteClkcfg(value);
 }
 
@@ -221,16 +218,12 @@ void Pxa27xClockManager::WriteWord(uint32_t addr, uint32_t value) {
             cken_listeners_.Call();
             return;
         }
-        /* Section 3.8.2.3 (page 3-99): "OON can be set only by software and
-           cleared only by power-on or hardware reset", and "OOK sets 2-3
-           seconds after OON is set". */
-        case 0x08:
-            if ((value & kOsccOon) != 0u && (oscc_ & kOsccOon) == 0u) {
-                emu_.Get<Fatal>().Die("Pxa27xClockManager: OSCC write 0x%08X sets OON at run time; "
-                                      "the 2-3 s OOK stabilization is not modelled", value);
-            }
+        case 0x08: {
+            const bool turns_on = (value & kOsccOon) != 0u && (oscc_ & kOsccOon) == 0u;
             oscc_ = (value & kOsccMask) | (oscc_ & (kOsccOon | kOsccOok));
+            if (turns_on) SetOscillatorStable();
             return;
+        }
         /* Section 3.8.2.4 (page 3-100): "This is a read-only register." */
         case 0x0C: return;
     }

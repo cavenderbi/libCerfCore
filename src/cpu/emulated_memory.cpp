@@ -225,6 +225,10 @@ bool EmulatedMemory::IsFlash(const Region& r) {
     return r.kind != MemoryKind::kRam;
 }
 
+bool EmulatedMemory::InStateImage(const Region& r, bool flash) {
+    return IsFlash(r) == flash && r.kind != MemoryKind::kStorage;
+}
+
 EmulatedMemory::Region* EmulatedMemory::BulkRegion(uint32_t vaddr, size_t size) {
     Region* r = FindRegion(vaddr);
     if (!r || static_cast<uint64_t>(vaddr) + size >
@@ -419,7 +423,7 @@ uint32_t EmulatedMemory::RegionCount(bool flash) const {
     const size_t n = count_.load(std::memory_order_acquire);
     uint32_t count = 0;
     for (size_t i = 0; i < n; ++i) {
-        if (IsFlash(regions_[i]) == flash) ++count;
+        if (InStateImage(regions_[i], flash)) ++count;
     }
     return count;
 }
@@ -429,7 +433,7 @@ void EmulatedMemory::SaveRegions(StateWriter& w, bool flash) {
     w.Write(flash ? "flash_count" : "volatile_count", RegionCount(flash));
     for (size_t i = 0; i < n; ++i) {
         Region& r = regions_[i];
-        if (IsFlash(r) != flash) continue;
+        if (!InStateImage(r, flash)) continue;
         w.Write("base", r.base);
         w.Write("region_size", r.size);
         uint8_t* host = r.host_ptr.load(std::memory_order_acquire);
@@ -451,7 +455,7 @@ void EmulatedMemory::RestoreRegions(StateReader& r, bool flash, bool write) {
         r.Read("base", base);
         r.Read("region_size", size);
         Region* reg = FindBackingRegion(base);
-        if (!reg || reg->base != base || reg->size != size || IsFlash(*reg) != flash)
+        if (!reg || reg->base != base || reg->size != size || !InStateImage(*reg, flash))
             r.Reject("%s region base=0x%08X size=0x%X is not in this memory map",
                      kind, base, size);
         uint8_t backed = 0;

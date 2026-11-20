@@ -4,5 +4,5 @@
   "device_year": 2009,
   "notes": [],
   "ga_color_depth": 24,
-  "rom_placing_mode": "flat_container"
+  "rom_placing_mode": "reset_vector"
 }

@@ -15,8 +15,7 @@ namespace cerfcore {
 
 namespace {
 
-constexpr uint8_t kAddressWrite = 0xA2u;
-constexpr uint8_t kAddressRead  = 0xA3u;
+constexpr uint8_t kSlaveAddress = 0xA2u >> 1;
 
 class Rtc8564Interface final : public Iop13xxI2cDevice {
 public:
@@ -30,28 +29,26 @@ public:
         clock_->RegisterRateListener([this] { OnRateChange(); });
     }
 
-    bool Address(uint8_t address_byte) override {
+    void BusStart() override {
         std::lock_guard<std::mutex> guard(mutex_);
         const uint64_t now = clock_->Cycles();
         if (!open_ || TimedOut(now)) Open(now);
-        if (address_byte == kAddressWrite) {
-            phase_     = 1;
-            read_mode_ = false;
-        } else if (address_byte == kAddressRead) {
-            phase_     = 3;
-            read_mode_ = true;
-        } else {
-            phase_     = 0;
-            read_mode_ = false;
-            return false;
-        }
+        phase_     = 0;
+        read_mode_ = false;
+    }
+
+    bool MatchesAddress(uint8_t slave_addr) const override { return slave_addr == kSlaveAddress; }
+
+    void TxnStart(uint8_t) override {
+        std::lock_guard<std::mutex> guard(mutex_);
+        phase_     = 1;
+        read_mode_ = false;
         core_->Update();
-        return true;
     }
 
     /* NXP UM10204 section 3.1.6 (p. 10): SDA left HIGH in the acknowledge clock
        pulse is the Not Acknowledge. */
-    bool WriteByte(uint8_t value) override {
+    bool TxnWriteByte(uint8_t, uint8_t value) override {
         std::lock_guard<std::mutex> guard(mutex_);
         if (TimedOut(clock_->Cycles())) return false;
         if (phase_ == 1) {
@@ -66,22 +63,17 @@ public:
         return true;
     }
 
-    bool ReadByte(uint8_t& value) override {
+    uint8_t TxnReadByte(uint8_t) override {
         std::lock_guard<std::mutex> guard(mutex_);
-        if (TimedOut(clock_->Cycles())) {
-            value = 0xFFu;
-            return true;
-        }
-        if (phase_ != 3 || !read_mode_) {
-            value = 0xFFu;
-            return false;
-        }
-        value = core_->ReadAt(pointer_);
+        if (TimedOut(clock_->Cycles())) return 0xFFu;
+        phase_     = 3;
+        read_mode_ = true;
+        const uint8_t value = core_->ReadAt(pointer_);
         IncrementPointer();
-        return true;
+        return value;
     }
 
-    void Stop() override {
+    void BusStop() override {
         std::lock_guard<std::mutex> guard(mutex_);
         phase_     = 0;
         read_mode_ = false;

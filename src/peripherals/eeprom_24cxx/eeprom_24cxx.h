@@ -17,7 +17,7 @@ public:
     void    OnReady() final;
     bool    MatchesAddress(uint8_t slave_addr) const final;
     void    TxnStart(uint8_t slave_addr) final;
-    void    TxnWriteByte(uint8_t slave_addr, uint8_t byte) final;
+    bool    TxnWriteByte(uint8_t slave_addr, uint8_t byte) final;
     uint8_t TxnReadByte(uint8_t slave_addr) final;
     void    BusStart() final;
     void    BusStop() final;

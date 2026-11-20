@@ -218,6 +218,7 @@ void ConfigLoader::LoadStorage(const json& root, DeviceConfig& config, const std
     SetNonEmptyString(config.storage_nand, s, config_key::kStorageNand, path, config_key::kStorage);
     SetNonEmptyString(config.storage_hdd,  s, config_key::kStorageHdd,  path, config_key::kStorage);
     SetNonEmptyString(config.storage_emmc, s, config_key::kStorageEmmc, path, config_key::kStorage);
+    SetNonEmptyString(config.storage_nor,  s, config_key::kStorageNor,  path, config_key::kStorage);
 }
 
 template <class Card>

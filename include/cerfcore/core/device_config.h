@@ -137,6 +137,7 @@ struct DeviceConfig : public Service {
     std::string storage_nand = DefaultStorageFileName(config_key::kStorageNand);
     std::string storage_hdd  = DefaultStorageFileName(config_key::kStorageHdd);
     std::string storage_emmc = DefaultStorageFileName(config_key::kStorageEmmc);
+    std::string storage_nor  = DefaultStorageFileName(config_key::kStorageNor);
 
     /* Optional CF images bundled with the ROM (cerf.json
        "additional_packages.compact_flash_cards"); the CF insert menu offers

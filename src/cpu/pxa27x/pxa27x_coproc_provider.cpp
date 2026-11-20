@@ -4,6 +4,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../socs/pxa27x/pxa270_id.h"
 #include "../../socs/pxa27x/pxa27x_clock_manager.h"
+#include "../../socs/pxa27x/pxa27x_power_manager.h"
 
 namespace cerfcore {
 
@@ -12,9 +13,8 @@ namespace {
 using cerfengine::ArmCoprocAccess;
 using cerfengine::ArmCoprocDecision;
 using A = cerfengine::ArmCoprocAction;
+using C = cerfengine::ArmCoprocCase;
 
-/* Intel PXA27x Developer's Manual 280000-001 Section 2.2.5.4, Table 2-4
-   (page 2-5). */
 uint32_t CparGate(uint32_t cp_num) {
     return cp_num > 13u ? 0u : (1u << cp_num);
 }
@@ -28,27 +28,24 @@ public:
     }
 
 protected:
-    /* symbol_mk500 MK500c50BenOS013014.bin nk.exe 0x801C2258 "MRC p1,0,r1,c1,c0,0",
-       0x801C2268 "ANDS r1,r1,#3", 0x801C226C "BEQ 0x801C2280". */
-    ArmCoprocDecision RegisterTransfer(const ArmCoprocAccess& a) override {
-        if (a.cp_num != 1u) return XscaleCoprocProviderBase::RegisterTransfer(a);
-        if (a.read && a.rt == 15u) {
-            return {.action = A::kUnimplemented, .gate_mask = CparGate(a.cp_num)};
-        }
-        if (a.read) {
-            return {.action = A::kConstant, .gate_mask = CparGate(a.cp_num), .constant = 0u};
-        }
-        return {.action = A::kNoOp, .gate_mask = CparGate(a.cp_num)};
+    ArmCoprocDecision PwrmodeWrite() override {
+        return {.action     = A::kWriteValueSwitch,
+                .context    = this,
+                .case_count = 4u,
+                .cases      = {{1u, C::kWaitForInterrupt},
+                               {3u, C::kHook, &XscaleCoprocProviderBase::EnterDeepSleepHook},
+                               {8u, C::kHook, &Pxa27xCoprocProvider::VoltageChangeHook},
+                               {0u, C::kContinue}}};
     }
-
-    ArmCoprocDecision PwrmodeWrite() override { return PwrmodeRunIdleSleep(); }
 
     ArmCoprocDecision UnhandledCoprocessor(const ArmCoprocAccess& a) override {
         return {.action = A::kUnimplemented, .gate_mask = CparGate(a.cp_num)};
     }
 
-    /* Intel PXA27x Developer's Manual 280000-001 Table 3-40 "Coprocessor 14
-       Clocks and Power Register Summary" (page 3-105): CP14 register 6 CLKCFG. */
+    static void CERFENGINE_FASTCALL VoltageChangeHook(void* self) {
+        static_cast<Pxa27xCoprocProvider*>(self)->emu_.Get<Pxa27xPowerManager>().StartVoltageChange();
+    }
+
     ArmCoprocDecision ClkcfgTransfer(const ArmCoprocAccess& a) override {
         Pxa27xClockManager* clocks = &emu_.Get<Pxa27xClockManager>();
         if (a.read) {

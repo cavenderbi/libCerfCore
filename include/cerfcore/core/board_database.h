@@ -15,7 +15,7 @@ namespace cerfcore {
 
 using CpuArch = cerfengine::Isa;
 
-enum class RomPlacingMode { FlatContainer, Imx51Nand, Unknown };
+enum class RomPlacingMode { FlatContainer, Imx51Nand, ResetVector, Unknown };
 
 enum class SupportLevel { BootableFull, BootablePartial, UnknownPartial, NoSupport };
 

@@ -1,0 +1,7 @@
+{
+  "id": "nor",
+  "name": "NOR Flash",
+  "required": true,
+  "board_family_ids": ["symbol_hamptons"],
+  "formats": ["bin", "img"]
+}

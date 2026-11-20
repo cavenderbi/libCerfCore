@@ -385,6 +385,16 @@ bool ResolveNextStructuralXip(std::span<const uint8_t> flat,
         out, out_romhdr_off);
 }
 
+bool ParseXipAtEcec(std::span<const uint8_t> flat,
+                    const EcecRecord&        ecec,
+                    uint32_t                 flat_base_va,
+                    ParsedXipRegion&         out) {
+    size_t romhdr_off = 0;
+    if (!ResolveRomhdrAtEcec(flat, ecec, flat_base_va, out, romhdr_off)) return false;
+    ParseModulesAndFiles(flat, romhdr_off, out.load_offset, out.toc.romhdr, out.toc);
+    return true;
+}
+
 void ParseModulesAndFiles(std::span<const uint8_t> flat,
                           size_t                   romhdr_off,
                           uint32_t                 load_offset,

@@ -57,6 +57,7 @@ struct ArmCp15File {
     uint32_t tpidruro       = 0;
     uint32_t tpidrprw       = 0;
     uint32_t l2_aux_control = 0;
+    uint32_t data_cache_lock = 0;
 };
 
 class ArmCp15Registers : public Service {
@@ -102,6 +103,7 @@ public:
         field("tpidruro", s.tpidruro);
         field("tpidrprw", s.tpidrprw);
         field("l2_aux_control", s.l2_aux_control);
+        field("data_cache_lock", s.data_cache_lock);
     }
 
 private:

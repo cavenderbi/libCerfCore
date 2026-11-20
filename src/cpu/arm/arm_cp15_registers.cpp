@@ -56,7 +56,8 @@ CERF_FORCEINLINE void ArmCp15Registers::RecordAlignmentFault(uint32_t va, bool i
 cerfengine::ArmResetResult ArmCp15Registers::Reset() {
     /* ARM DDI 0406C.c B4.1.153 (p. B4-1724): TTBCR is "A 32-bit RW register
        that resets to zero". */
-    file_.ttbcr = 0;
+    file_.ttbcr           = 0;
+    file_.data_cache_lock = 0;
 
     cerfengine::ArmResetResult result;
     if (pending_mmu_) {

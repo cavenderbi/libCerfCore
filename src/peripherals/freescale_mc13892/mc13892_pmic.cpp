@@ -12,17 +12,18 @@ void Mc13892Pmic::TxnStart(uint8_t /*slave_addr*/) {
     rd_idx_           = 0;
 }
 
-void Mc13892Pmic::TxnWriteByte(uint8_t /*slave_addr*/, uint8_t byte) {
+bool Mc13892Pmic::TxnWriteByte(uint8_t , uint8_t byte) {
     if (sub_addr_pending_) {
         sub_addr_         = byte & (kRegCount - 1);
         sub_addr_pending_ = false;
-        return;
+        return true;
     }
-    if (wr_idx_ > 2) return;
+    if (wr_idx_ > 2) return true;
     const uint32_t shift = 16u - 8u * wr_idx_;   /* MSB first */
     uint32_t& r = regs_[sub_addr_];
     r = (r & ~(0xFFu << shift)) | (static_cast<uint32_t>(byte) << shift);
     ++wr_idx_;
+    return true;
 }
 
 uint8_t Mc13892Pmic::TxnReadByte(uint8_t /*slave_addr*/) {

@@ -1,12 +1,10 @@
 #include <cerfcore/boot/rom_parser_queries.h>
 
-#include "rom_record_layout.h"
+#include "rom_toc_lookup.h"
 
 #include <cerfcore/boards/board_context.h>
-#include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
-#include "../core/ascii_case.h"
 
 namespace cerfcore {
 
@@ -14,7 +12,7 @@ REGISTER_SERVICE(RomParserQueries);
 
 namespace {
 
-using cerf::le::U16;
+constexpr const char* kKernelModule = "nk.exe";
 
 }  /* namespace */
 
@@ -33,16 +31,15 @@ const std::vector<ParsedRom>& RomParserQueries::Loaded() const {
     return emu_.Get<RomParserService>().Loaded();
 }
 
-const ParsedTOCentry* RomParserQueries::KernelModule() const {
+const ParsedTOCentry* RomParserQueries::FindModule(const char* name) const {
     const auto& loaded = Loaded();
     if (loaded.empty()) return nullptr;
-    for (const auto& xip : loaded[0].xips) {
-        for (const auto& m : xip.toc.modules) {
-            if (cerf::AsciiEqualIgnoreCase(m.lpszFileName, "nk.exe")) return &m;
-        }
-    }
+    for (const auto& xip : loaded[0].xips)
+        if (const ParsedTOCentry* m = cerf::rom_toc::FindModule(xip.toc, name)) return m;
     return nullptr;
 }
+
+const ParsedTOCentry* RomParserQueries::KernelModule() const { return FindModule(kKernelModule); }
 
 std::span<const uint8_t>
 RomParserQueries::ReadVa(uint32_t va, uint32_t len) const {
@@ -62,16 +59,8 @@ bool RomParserQueries::KernelSubsystemVersion(uint16_t& major,
     for (const auto& rom : Loaded()) {
         if (rom.is_ce1) return false;
         for (const auto& xip : rom.xips) {
-            for (const auto& m : xip.toc.modules) {
-                if (!cerf::AsciiEqualIgnoreCase(m.lpszFileName, "nk.exe")) continue;
-                if (m.ulE32Offset < xip.load_offset) return false;
-                const size_t e32_off = size_t(m.ulE32Offset - xip.load_offset);
-                if (e32_off + kE32OffSubsysMinor + 2 > rom.flat.size()) return false;
-                const uint8_t* p = rom.flat.data() + e32_off;
-                major = U16(p, kE32OffSubsysMajor);
-                minor = U16(p, kE32OffSubsysMinor);
-                return true;
-            }
+            if (const ParsedTOCentry* nk = cerf::rom_toc::FindModule(xip.toc, kKernelModule))
+                return cerf::rom_toc::ReadSubsystemVersion(rom.flat, xip, *nk, major, minor);
         }
     }
     return false;

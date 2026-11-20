@@ -84,8 +84,7 @@ bool I2cBitBangTarget::AcknowledgeByte() {
         slave_->TxnStart(addr_);
         return true;
     }
-    slave_->TxnWriteByte(addr_, shift_);
-    return true;
+    return slave_->TxnWriteByte(addr_, shift_);
 }
 
 void I2cBitBangTarget::AfterAck() {

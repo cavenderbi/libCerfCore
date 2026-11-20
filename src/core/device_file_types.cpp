@@ -31,6 +31,7 @@ std::vector<DeviceFileType> ReadTable(const json& root, const char* table, Devic
         t.formats                  = r.value("formats", Strings());
         t.note                     = r.value("note", std::string());
         t.optional                 = r.value("optional", false);
+        t.required                 = r.value("required", false);
         t.optional_for_storage_ids = r.value("optional_for_storage_ids", Strings());
         t.board_ids                = r.value("board_ids", Strings());
         t.board_family_ids         = r.value("board_family_ids", Strings());
@@ -44,7 +45,7 @@ bool Contains(const std::vector<std::string>& list, std::string_view value) {
 }
 
 void PickForBoard(const std::vector<DeviceFileType>& rows, std::string_view board_id,
-                  std::string_view family_id, std::vector<DeviceFileType>& out) {
+                  std::string_view family_id, bool take_unbound, std::vector<DeviceFileType>& out) {
     std::vector<std::string> ids;
     for (const auto& r : rows)
         if (std::find(ids.begin(), ids.end(), r.id) == ids.end()) ids.push_back(r.id);
@@ -57,8 +58,8 @@ void PickForBoard(const std::vector<DeviceFileType>& rows, std::string_view boar
                 bound = &r;
             if (!unbound && r.board_ids.empty() && r.board_family_ids.empty()) unbound = &r;
         }
-        if (bound)        out.push_back(*bound);
-        else if (unbound) out.push_back(*unbound);
+        if (bound)                        out.push_back(*bound);
+        else if (unbound && take_unbound) out.push_back(*unbound);
     }
 }
 
@@ -73,9 +74,10 @@ void DeviceFileTypes::OnReady() {
 std::vector<DeviceFileType> DeviceFileTypes::ForBoard(std::string_view board_id) const {
     const DbBoard*   board     = emu_.Get<BoardDatabase>().FindBoard(board_id);
     std::string_view family_id = board ? std::string_view(board->family_id) : std::string_view();
+    const bool flat_container = !board || board->rom_placing_mode == RomPlacingMode::FlatContainer;
     std::vector<DeviceFileType> out;
-    PickForBoard(rom_types_, board_id, family_id, out);
-    PickForBoard(storage_types_, board_id, family_id, out);
+    PickForBoard(rom_types_, board_id, family_id, flat_container, out);
+    PickForBoard(storage_types_, board_id, family_id, true, out);
     return out;
 }
 

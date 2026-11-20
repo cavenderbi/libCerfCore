@@ -75,6 +75,10 @@ void ArmProcessorConfig::OnReady() {
     fpsid_ = c.Number("fpsid");
     mvfr0_ = c.Number("mvfr0");
     mvfr1_ = c.Number("mvfr1");
+
+    xscale_accumulator_ = c.Boolean("xscale_accumulator");
+    iwmmxt_             = c.Boolean("iwmmxt");
+    wcid_               = c.Number("wcid");
 }
 
 /* ARM DDI 0406C.c B4.1.41 (p. B4-1555) CSSELR: Level bits[3:1], InD bit[0]. */

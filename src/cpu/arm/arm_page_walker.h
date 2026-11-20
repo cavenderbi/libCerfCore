@@ -22,6 +22,9 @@ public:
     void OnReady() override;
     bool ShouldRegister() override;
 
+    bool TranslatesForLock(uint32_t mva, cerfengine::ArmMmuAccess access, bool check_access,
+                           bool check_target, uint32_t control_word);
+
 private:
     template <cerfengine::ArmMmuAccess kAccess>
     friend cerfengine::ArmTranslation CERFENGINE_FASTCALL cerfengine::host::ArmWalk(
@@ -33,6 +36,7 @@ private:
     CERF_FORCEINLINE cerfengine::ArmTranslation Walk(uint32_t p, bool is_user_mode,
                                                      uint32_t control_word);
     CERF_FORCEINLINE bool ProbeWalk(uint32_t mva, uint32_t control_word, uint32_t* pa);
+    CERF_FORCEINLINE bool ProbeTables(uint32_t mva, uint32_t control_word, uint64_t& cpu_pa);
 
     static bool MapPhysicalAddress(ArmPageWalker& self, uint64_t cpu_pa, uint32_t va,
                                    uint32_t domain, cerfengine::ArmMmuAccess access,

@@ -1,0 +1,1 @@
+{ "name": "XScale DSP accumulator (CP0)", "arch": "ARM", "type": "boolean" }

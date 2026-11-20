@@ -99,6 +99,8 @@ protected:
     virtual int TxSyncSource() const { return 0; }
     virtual int RxSyncSource() const { return 0; }
 
+    void RaiseNackLocked();
+
     mutable std::mutex  state_mutex_;
     std::deque<uint8_t> tx_fifo_;
     std::deque<uint8_t> rx_fifo_;

@@ -34,10 +34,11 @@ bool RomPlacer::IsVolatilePa(uint32_t pa) {
     return true;
 }
 
-void RomPlacer::PlaceRomXips(const ParsedRom& rom, bool volatile_only) {
+bool RomPlacer::PlaceRomXips(const ParsedRom& rom, bool volatile_only) {
     auto& page_tables = emu_.Get<PageTableBuilder>();
     auto& mem         = emu_.Get<EmulatedMemory>();
 
+    bool first_placed = false;
     for (size_t i = 0; i < rom.xips.size(); ++i) {
         const auto& xip = rom.xips[i];
         const uint32_t physfirst = xip.toc.romhdr.physfirst;
@@ -92,7 +93,9 @@ void RomPlacer::PlaceRomXips(const ParsedRom& rom, bool volatile_only) {
                 run_va, run_end, run_pa);
             run_va = run_end;
         }
+        if (i == 0) first_placed = true;
     }
+    return first_placed;
 }
 
 void RomPlacer::PlaceB000FFSections(const ParsedRom& rom, bool volatile_only) {
@@ -172,7 +175,8 @@ void RomPlacer::OnReady() {
     }
 
     for (const auto& rom : parser.Loaded()) {
-        PlaceRomXips(rom, /*volatile_only=*/false);
+        if (PlaceRomXips(rom, false) && &rom == &parser.Primary())
+            placed_primary_ = &rom.xips[0];
 
         if (rom.is_b000ff) {
             /* Add the section bytes past every XIP's physfirst..physlast (the
@@ -184,7 +188,6 @@ void RomPlacer::OnReady() {
         {
             uint32_t image_va   = 0;
             uint32_t image_pa   = 0;
-            uint32_t region_pa  = 0;
             uint64_t region_end = 0;
             bool     have_nv    = false;
             for (const auto& xip : rom.xips) {
@@ -197,7 +200,6 @@ void RomPlacer::OnReady() {
                     if (pa >= reg.pa_base + reg.size) continue;
                     image_va   = va;
                     image_pa   = pa;
-                    region_pa  = reg.pa_base;
                     region_end = uint64_t(reg.pa_base) + reg.size;
                     have_nv    = true;
                     break;
@@ -205,25 +207,16 @@ void RomPlacer::OnReady() {
                 if (have_nv) break;
             }
             if (have_nv) {
-                const bool whole_flash =
-                    rom.is_symbol_flash
-                    && page_tables.VaToPa(rom.whole_flash_va) == region_pa;
-                const uint32_t dest_pa = whole_flash ? region_pa : image_pa;
-                const uint32_t dest_va = image_va - (image_pa - dest_pa);
-                const uint8_t* src =
-                    whole_flash ? rom.raw.data() : rom.flat.data();
-                const size_t   len =
-                    whole_flash ? rom.raw.size() : rom.flat.size();
                 const size_t file_len =
-                    std::min<size_t>(len, size_t(region_end - dest_pa));
-                mem.CopyIn(dest_pa, src, file_len);
+                    std::min<size_t>(rom.flat.size(), size_t(region_end - image_pa));
+                mem.CopyIn(image_pa, rom.flat.data(), file_len);
                 LOG(Boot,
                     "RomPlacer %s: full non-volatile image %zu bytes placed at "
                     "kva=0x%08X..0x%08X  pa=0x%08X..0x%08X  "
                     "(fills inter-XIP gaps incl. XIPCHAIN table)\n",
                     rom.filename.c_str(), file_len,
-                    dest_va, uint32_t(dest_va + file_len),
-                    dest_pa, uint32_t(dest_pa + file_len));
+                    image_va, uint32_t(image_va + file_len),
+                    image_pa, uint32_t(image_pa + file_len));
             } else if (rom.has_imgfs) {
                 LOG(Caution,
                     "RomPlacer %s: IMGFS present but no XIP region maps "

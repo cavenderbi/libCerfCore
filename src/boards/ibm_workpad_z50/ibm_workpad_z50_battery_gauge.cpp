@@ -85,16 +85,16 @@ void IbmWorkpadZ50BatteryGauge::TxnStart(uint8_t) {
     read_idx_    = 0;
 }
 
-void IbmWorkpadZ50BatteryGauge::TxnWriteByte(uint8_t, uint8_t byte) {
+bool IbmWorkpadZ50BatteryGauge::TxnWriteByte(uint8_t, uint8_t byte) {
     if (cmd_pending_) {
         cmd_         = byte;
         cmd_pending_ = false;
-        return;
+        return true;
     }
     if (write_count_ == 0u) {
         write_lo_    = byte;
         write_count_ = 1u;
-        return;
+        return true;
     }
     if (write_count_ != 1u) {
         emu_.Get<Fatal>().Die("z50 battery gauge: write byte 0x%02X after a word to command 0x%02X",
@@ -102,6 +102,7 @@ void IbmWorkpadZ50BatteryGauge::TxnWriteByte(uint8_t, uint8_t byte) {
     }
     write_count_ = 2u;
     WriteWord(cmd_, static_cast<uint16_t>(write_lo_ | (byte << 8)));
+    return true;
 }
 
 uint8_t IbmWorkpadZ50BatteryGauge::TxnReadByte(uint8_t) {

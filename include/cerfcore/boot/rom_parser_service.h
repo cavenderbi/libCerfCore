@@ -119,8 +119,6 @@ struct ParsedRom {
     size_t                       wmstore_payload_off   = 0;
     size_t                       wmstore_payload_bytes = 0;
     bool                         is_ce1       = false;
-    bool                         is_symbol_flash = false;
-    uint32_t                     whole_flash_va  = 0;
     bool                         has_imgfs        = false;
     bool                         imgfs_is_ftl     = false;
     uint32_t                     imgfs_file_off   = 0;

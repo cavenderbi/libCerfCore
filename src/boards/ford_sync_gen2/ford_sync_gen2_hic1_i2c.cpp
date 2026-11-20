@@ -77,7 +77,7 @@ public:
         dm_byte_ = 0u;
     }
 
-    void TxnWriteByte(uint8_t slave_addr, uint8_t b) override {
+    bool TxnWriteByte(uint8_t slave_addr, uint8_t b) override {
         if (slave_addr == kTsc2003Addr) {
             tsc2003_->WriteCommand(b);
         } else if (slave_addr == kDmAddr) {
@@ -89,6 +89,7 @@ public:
             cs42448_.WriteReg(reg_, b);
             if (auto_incr_) reg_ = static_cast<uint8_t>((reg_ + 1u) & 0x7Fu);
         }
+        return true;
     }
 
     uint8_t TxnReadByte(uint8_t slave_addr) override {

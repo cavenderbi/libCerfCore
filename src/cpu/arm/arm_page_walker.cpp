@@ -351,8 +351,8 @@ CERF_FORCEINLINE cerfengine::ArmTranslation ArmPageWalker::Walk(uint32_t p, bool
     return result;
 }
 
-CERF_FORCEINLINE bool ArmPageWalker::ProbeWalk(uint32_t mva, uint32_t control_word,
-                                               uint32_t* pa) {
+CERF_FORCEINLINE bool ArmPageWalker::ProbeTables(uint32_t mva, uint32_t control_word,
+                                                 uint64_t& cpu_pa) {
     ArmPageWalker& self = *this;
     cerfengine::ArmSctlr sctlr{};
     sctlr.word = control_word;
@@ -368,8 +368,8 @@ CERF_FORCEINLINE bool ArmPageWalker::ProbeWalk(uint32_t mva, uint32_t control_wo
     case ArmL1PteType::kSection: {
         const ArmSupersectionFormat ss_format = self.processor_config_->SupersectionFormat();
         if (ArmSupersectionUnresolved(l1_pte.word, ss_format)) return false;
-        const ArmSectionTranslation translation = ArmTranslateSection(l1_pte.word, mva, ss_format);
-        return self.address_mapper_->Map(translation.physical_address, 1u, *pa);
+        cpu_pa = ArmTranslateSection(l1_pte.word, mva, ss_format).physical_address;
+        return true;
     }
 
     case ArmL1PteType::kCoarse: {
@@ -381,20 +381,67 @@ CERF_FORCEINLINE bool ArmPageWalker::ProbeWalk(uint32_t mva, uint32_t control_wo
         l2_pte.word = cerf::le::U32(l2_host);
 
         const bool v6_ext_small = self.processor_config_->HasCp15V6() && !sctlr.bits.xp;
-        uint32_t cpu_pa = 0;
+        if (l2_pte.fault.type == ArmL2PteType::kLargePage) {
+            cpu_pa = ArmTranslateLargePage(l2_pte, mva).physical_address;
+            return true;
+        }
         if (l2_pte.fault.type == ArmL2PteType::kSmallPage) {
             cpu_pa = ArmTranslateSmallPage(l2_pte, mva).physical_address;
-        } else if (l2_pte.fault.type == ArmL2PteType::kExtendedSmallPage && v6_ext_small) {
+            return true;
+        }
+        if (l2_pte.fault.type == ArmL2PteType::kExtendedSmallPage && v6_ext_small) {
             cpu_pa = ArmExtSmallPagePa(l2_pte.word, mva);
-        } else {
+            return true;
+        }
+        return false;
+    }
+
+    case ArmL1PteType::kFine: {
+        if (self.processor_config_->HasCp15V6()) return false;
+        const uint32_t l2_pa = (l1_pte.fine.page_table_base << 12) | (((mva >> 10) & 0x3FFu) << 2);
+        uint8_t* l2_host = self.memory_->TryTranslateWrite(l2_pa);
+        if (!l2_host) return false;
+        ArmL2Pte l2_pte;
+        l2_pte.word = cerf::le::U32(l2_host);
+        switch (l2_pte.fault.type) {
+        case ArmL2PteType::kLargePage:
+            cpu_pa = ArmTranslateLargePage(l2_pte, mva).physical_address;
+            return true;
+        case ArmL2PteType::kSmallPage:
+            cpu_pa = ArmTranslateSmallPage(l2_pte, mva).physical_address;
+            return true;
+        case ArmL2PteType::kTinyPage:
+            cpu_pa = ArmTranslateTinyPage(l2_pte, mva).physical_address;
+            return true;
+        default:
             return false;
         }
-        return self.address_mapper_->Map(cpu_pa, 1u, *pa);
     }
 
     default:
         return false;
     }
+}
+
+CERF_FORCEINLINE bool ArmPageWalker::ProbeWalk(uint32_t mva, uint32_t control_word,
+                                               uint32_t* pa) {
+    uint64_t cpu_pa = 0;
+    return ProbeTables(mva, control_word, cpu_pa) && address_mapper_->Map(cpu_pa, 1u, *pa);
+}
+
+bool ArmPageWalker::TranslatesForLock(uint32_t mva, cerfengine::ArmMmuAccess access,
+                                      bool check_access, bool check_target, uint32_t control_word) {
+    uint32_t system_pa = 0;
+    if ((control_word & 1u) == 0u) return !check_target || address_mapper_->Map(mva, 1u, system_pa);
+    if (check_access) {
+        if (access == cerfengine::ArmMmuAccess::kExecute)
+            return Walk<cerfengine::ArmMmuAccess::kExecute>(mva, false, control_word).mapped;
+        return Walk<cerfengine::ArmMmuAccess::kRead>(mva, false, control_word).mapped;
+    }
+    uint64_t cpu_pa = 0;
+    if (!ProbeTables(mva, control_word, cpu_pa))
+        return Walk<cerfengine::ArmMmuAccess::kRead>(mva, false, control_word).mapped;
+    return !check_target || address_mapper_->Map(cpu_pa, 1u, system_pa);
 }
 
 }

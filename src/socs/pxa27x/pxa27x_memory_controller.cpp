@@ -2,6 +2,7 @@
 
 #include <cerfcore/boards/board_context.h>
 #include "pxa270_id.h"
+#include "pxa27x_boot_select.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
@@ -53,7 +54,16 @@ private:
         kBscntr2 = 0x5C, kBscntr3 = 0x60, kSa1110    = 0x64,
     };
 
+    static constexpr uint32_t kBootDefBootSel = 1u << 0;
+    static constexpr uint32_t kBootDefPkgType = 1u << 3;
+
     static bool IsRegister(uint32_t off);
+
+    uint32_t BootDef(uint32_t addr) {
+        const auto* pin = emu_.TryGet<Pxa27xBootSelect>();
+        if (!pin) HaltUnsupportedAccess("ReadWord(BOOT_DEF strap)", addr, 0);
+        return kBootDefPkgType | (pin->BootsFrom16BitMemory() ? kBootDefBootSel : 0u);
+    }
 
     struct ResetBits {
         uint32_t off;
@@ -101,9 +111,7 @@ bool Pxa27xMemoryController::IsRegister(uint32_t off) {
 
 uint32_t Pxa27xMemoryController::ReadWord(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
-    /* Table 6-33 (page 6-75): BOOT_DEF bit 3 PKG_TYPE and bit 0 BOOT_SEL are
-       access "R" pin straps; its Reset row is "? ... ? 1 ? ? *". */
-    if (off == kBootDef) HaltUnsupportedAccess("ReadWord(BOOT_DEF strap)", addr, 0);
+    if (off == kBootDef) return BootDef(addr);
     if (IsRegister(off)) return regs_[off / 4u];
     HaltUnsupportedAccess("ReadWord", addr, 0);
 }

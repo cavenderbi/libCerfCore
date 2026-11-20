@@ -4,6 +4,7 @@
     "pc_store_offset": "plus_8",
     "base_restored_abort_model": true,
     "dsp": true,
+    "xscale_accumulator": true,
     "load_store_double": true,
     "preload": true,
     "clz": true,

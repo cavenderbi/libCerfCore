@@ -8,8 +8,12 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace cerfcore {
+
+class StateReader;
+class StateWriter;
 
 class Imx51NandStore : public Service, public MachineStorage {
 public:
@@ -44,6 +48,9 @@ public:
     void SetReadOverlayPage(uint64_t page_index, const uint8_t* main,
                             const uint8_t* spare);
 
+    void SaveState(StateWriter& w) const;
+    void RestoreState(StateReader& r);
+
     std::string   ObjectId() const override { return "nand_flash"; }
     static constexpr char kObjectName[] = "NAND Flash";
     std::string   ObjectName() const override { return kObjectName; }
@@ -58,11 +65,13 @@ private:
     static constexpr uint32_t kPagesPerBlock = kBlock / kMainBytes;          /* 128 */
 
     void Seed();
+    void DropOverlayPage(uint64_t page);
     static uint32_t MainPopcount(const uint8_t* main);
 
     DiskImage img_;
     uint64_t  device_pages_ = 0;
     std::unordered_map<uint64_t, std::array<uint8_t, kPageStride>> read_overlay_;
+    std::unordered_set<uint64_t>                                    dropped_;
 };
 
 }

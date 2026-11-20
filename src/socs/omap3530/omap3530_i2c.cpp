@@ -67,11 +67,16 @@ void Omap3530I2cBank::ApplyResetLocked() {
     pending_rx_dma_req_ = false;
 }
 
+void Omap3530I2cBank::RaiseNackLocked() {
+    stat_ |= kI2cStatNack;
+}
+
 void Omap3530I2cBank::DispatchWriteLocked(uint32_t /*guest_addr_for_diag*/,
                                           uint8_t  slave_addr) {
     LOG(Caution, "Omap3530I2cBank: I2C write to slave 0x%02X but no "
             "slave is wired on this bus\n", slave_addr);
-    stat_ |= kI2cStatNack | kI2cStatArdy;
+    RaiseNackLocked();
+    stat_ |= kI2cStatArdy;
 }
 
 void Omap3530I2cBank::DispatchReadLocked(uint32_t /*guest_addr_for_diag*/,
@@ -80,7 +85,8 @@ void Omap3530I2cBank::DispatchReadLocked(uint32_t /*guest_addr_for_diag*/,
     LOG(Caution, "Omap3530I2cBank: I2C read from slave 0x%02X "
             "(%u byte%s) but no slave is wired on this bus\n",
             slave_addr, count, count == 1 ? "" : "s");
-    stat_ |= kI2cStatNack | kI2cStatArdy;
+    RaiseNackLocked();
+    stat_ |= kI2cStatArdy;
 }
 
 bool Omap3530I2cBank::IsKnownOffset(uint32_t off) const {

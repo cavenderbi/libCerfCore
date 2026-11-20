@@ -15,7 +15,7 @@ public:
     bool ShouldRegister() override;
     void OnReady() override;
 
-    /* The primary partition's kernel module (nk.exe). Null if absent. */
+    const ParsedTOCentry* FindModule(const char* name) const;
     const ParsedTOCentry* KernelModule() const;
 
     /* Slice of bytes covering kernel-VA [va, va+len), searching every

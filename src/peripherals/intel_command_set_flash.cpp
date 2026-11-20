@@ -13,6 +13,9 @@ void IntelCommandSetFlash::OnReady() {
     (void)emu_.Get<EmulatedMemory>().Translate(MmioBase());
     block_locked_.assign(NumBlocks(), 0u);
     emu_.Get<PeripheralDispatcher>().Register(this);
+    emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
+        if (ResetPinAsserted(kind)) ResetDevice();
+    });
 }
 
 uint8_t* IntelCommandSetFlash::Host(uint32_t addr) {
@@ -31,12 +34,10 @@ void IntelCommandSetFlash::SaveAndWriteWord(uint32_t addr, uint32_t word) {
         SaveAndWrite(addr + i, uint8_t(word >> (8u * i)));
 }
 
-void IntelCommandSetFlash::EmitLaneByte(uint32_t addr, uint8_t v) {
+void IntelCommandSetFlash::EmitLane(uint32_t addr, uint32_t value) {
     const uint32_t dw = DeviceWidth();
-    for (uint32_t c = 0; c < Parallel(); ++c) {
-        SaveAndWrite(addr + c * dw, v);
-        for (uint32_t j = 1; j < dw; ++j) SaveAndWrite(addr + c * dw + j, 0);
-    }
+    for (uint32_t c = 0; c < Parallel(); ++c)
+        for (uint32_t j = 0; j < dw; ++j) SaveAndWrite(addr + c * dw + j, uint8_t(value >> (8u * j)));
 }
 
 void IntelCommandSetFlash::RestoreArray() {
@@ -45,9 +46,31 @@ void IntelCommandSetFlash::RestoreArray() {
     shadow_.clear();
 }
 
-void IntelCommandSetFlash::PresentStatus(uint32_t addr, uint8_t sr) {
+void IntelCommandSetFlash::ResetToReadArray() {
     RestoreArray();
-    EmitLaneByte(addr, sr);
+    mode_          = Mode::kArray;
+    buf_remaining_ = 0u;
+    buf_locked_    = false;
+    status_errors_ = 0u;
+    buffer_.clear();
+}
+
+void IntelCommandSetFlash::PresentStatus(uint32_t addr, uint8_t sr) {
+    status_errors_ = uint8_t(status_errors_ | (sr & kSrErrorBits));
+    RestoreArray();
+    EmitLane(addr, uint8_t((sr & ~kSrErrorBits) | status_errors_));
+}
+
+void IntelCommandSetFlash::PresentRegister(uint32_t addr, uint8_t value) {
+    RestoreArray();
+    EmitLane(addr, value);
+}
+
+uint32_t IntelCommandSetFlash::WriteBufferWords(uint32_t addr, uint32_t value) {
+    const uint32_t count = value & 0xFFu;
+    const uint32_t limit = DeviceWidth() == 1u ? 0x1Fu : 0x0Fu;
+    if (count > limit) HaltUnsupportedAccess("flash write-to-buffer word count", addr, value);
+    return count + 1u;
 }
 
 uint32_t IntelCommandSetFlash::BlockIndexChecked(uint32_t addr) {
@@ -62,16 +85,16 @@ uint32_t IntelCommandSetFlash::BlockIndexChecked(uint32_t addr) {
 void IntelCommandSetFlash::PresentIdentifier(uint32_t addr) {
     RestoreArray();
     const uint32_t bw = BusBytes();
-    EmitLaneByte(MmioBase(),      uint8_t(Manufacturer() & 0xFFu));
-    EmitLaneByte(MmioBase() + bw, uint8_t(Device()       & 0xFFu));
+    EmitLane(MmioBase(),      Manufacturer());
+    EmitLane(MmioBase() + bw, Device());
     const uint32_t qbase = BlockBase(BlockIndex(addr));
     if (qbase != MmioBase()) {
-        EmitLaneByte(qbase,      uint8_t(Manufacturer() & 0xFFu));
-        EmitLaneByte(qbase + bw, uint8_t(Device()       & 0xFFu));
+        EmitLane(qbase,      Manufacturer());
+        EmitLane(qbase + bw, Device());
     }
     const uint32_t n = NumBlocks();
     for (uint32_t i = 0; i < n; ++i)
-        EmitLaneByte(BlockBase(i) + kLockReadOffset, uint8_t(block_locked_[i] & 0x01u));
+        EmitLane(BlockBase(i) + kLockReadOffset, block_locked_[i] & 0x01u);
 }
 
 void IntelCommandSetFlash::PresentCfi() {
@@ -81,13 +104,16 @@ void IntelCommandSetFlash::PresentCfi() {
     RestoreArray();
     const uint32_t bw  = BusBytes();
     const uint32_t win = MmioBase() + kCfiFirst * bw;
-    for (uint32_t i = 0; i < n; ++i) EmitLaneByte(win + i * bw, cfi[i]);
+    for (uint32_t i = 0; i < n; ++i) EmitLane(win + i * bw, cfi[i]);
 }
 
 bool IntelCommandSetFlash::ProgramInto(uint32_t addr, uint32_t value, uint32_t width) {
     if (block_locked_[BlockIndexChecked(addr)]) return false;   /* datasheet p20: locked block aborts */
-    if (uint8_t* h = Host(addr))
+    if (uint8_t* h = Host(addr)) {
+        ArrayWillChange(addr, width);
         for (uint32_t i = 0; i < width; ++i) h[i] &= uint8_t(value >> (8u * i));
+        ArrayStored(addr, width);
+    }
     return true;
 }
 
@@ -99,10 +125,40 @@ void IntelCommandSetFlash::CommitProgram(uint32_t addr, uint32_t value, uint32_t
         PresentStatus(addr);
 }
 
+void IntelCommandSetFlash::LockSetupCommand(uint32_t addr, uint8_t cmd) {
+    if (cmd == 0x01u) {
+        block_locked_[BlockIndexChecked(addr)] = 1u;
+        PresentStatus(addr);
+    } else if (cmd == 0xD0u) {
+        block_locked_.assign(block_locked_.size(), 0u);
+        PresentStatus(addr);
+    } else {
+        PresentStatus(addr, kSrReady | kSrEraseErr | kSrProgErr);
+    }
+}
+
+void IntelCommandSetFlash::ConfirmBufferedWrite(uint32_t addr, uint32_t value) {
+    RestoreArray();
+    if ((value & 0xFFu) != 0xD0u) {
+        PresentStatus(addr, kSrReady | kSrEraseErr | kSrProgErr);
+    } else if (buf_locked_) {
+        PresentStatus(addr, kSrReady | kSrProgErr | kSrLockAbort);
+    } else {
+        for (const BufferedWrite& w : buffer_) ProgramInto(w.addr, w.value, w.width);
+        PresentStatus(addr);
+    }
+    buffer_.clear();
+}
+
 void IntelCommandSetFlash::EraseBlock(uint32_t addr) {
+    RestoreArray();
     const uint32_t blk   = EraseBlockBytes();
     const uint32_t bbase = addr & ~(blk - 1u);
-    if (uint8_t* h = Host(bbase)) std::memset(h, 0xFF, blk);
+    if (uint8_t* h = Host(bbase)) {
+        ArrayWillChange(bbase, blk);
+        std::memset(h, 0xFF, blk);
+        ArrayStored(bbase, blk);
+    }
 }
 
 void IntelCommandSetFlash::Command(uint32_t addr, uint32_t value, uint32_t width) {
@@ -112,40 +168,39 @@ void IntelCommandSetFlash::Command(uint32_t addr, uint32_t value, uint32_t width
         mode_ = Mode::kArray;
         return;
     case Mode::kEraseSetup:
-        if ((value & 0xFFu) == 0xD0u) {
-            if (block_locked_[BlockIndexChecked(addr)])
-                PresentStatus(addr, kSrReady | kSrEraseErr | kSrLockAbort);
-            else { EraseBlock(addr); PresentStatus(addr); }
-        }
+        if ((value & 0xFFu) != 0xD0u)
+            PresentStatus(addr, kSrReady | kSrEraseErr | kSrProgErr);
+        else if (block_locked_[BlockIndexChecked(addr)])
+            PresentStatus(addr, kSrReady | kSrEraseErr | kSrLockAbort);
+        else { EraseBlock(addr); PresentStatus(addr); }
         mode_ = Mode::kArray;
         return;
-    case Mode::kLockSetup: {
-        const uint32_t cmd = value & 0xFFu;
-        if (cmd == 0x01u) {                        /* Set Block Lock-Bit (datasheet Table 4) */
-            block_locked_[BlockIndexChecked(addr)] = 1u;
-            PresentStatus(addr);
-        } else if (cmd == 0xD0u) {                 /* Clear Block Lock-Bits: clears ALL (note 15) */
-            block_locked_.assign(block_locked_.size(), 0u);
-            PresentStatus(addr);
-        } else {
-            RestoreArray();
-        }
+    case Mode::kLockSetup:
+        LockSetupCommand(addr, uint8_t(value & 0xFFu));
         mode_ = Mode::kArray;
         return;
-    }
     case Mode::kWriteBufCount:                      /* MMCRestore.exe sub_131F8 writes 0x0F = 16 words */
-        buf_remaining_ = (value & 0xFFu) + 1u;
-        RestoreArray();
+        buf_remaining_ = WriteBufferWords(addr, value);
+        buf_block_     = BlockIndexChecked(addr);
+        buf_locked_    = block_locked_[buf_block_] != 0u;
+        buffer_.clear();
+        PresentStatus(addr);
         mode_ = Mode::kWriteBufData;
         return;
     case Mode::kWriteBufData:
-        if (!ProgramInto(addr, value, width))
-            HaltUnsupportedAccess("flash write-buffer to locked block", addr, value);
+        if (BlockIndex(addr) != buf_block_) {
+            buffer_.clear();
+            PresentStatus(addr, kSrReady | kSrEraseErr | kSrProgErr);
+            mode_ = Mode::kArray;
+            return;
+        }
+        buffer_.push_back(BufferedWrite{addr, value, width});
+        PresentStatus(addr);
         if (--buf_remaining_ == 0u) mode_ = Mode::kWriteBufConfirm;
         return;
     case Mode::kWriteBufConfirm:
-        if ((value & 0xFFu) == 0xD0u) { PresentStatus(addr); mode_ = Mode::kArray; }
-        else HaltUnsupportedAccess("flash write-buffer confirm", addr, value);
+        ConfirmBufferedWrite(addr, value);
+        mode_ = Mode::kArray;
         return;
     case Mode::kArray:
         break;
@@ -153,17 +208,23 @@ void IntelCommandSetFlash::Command(uint32_t addr, uint32_t value, uint32_t width
 
     const uint8_t cmd = DecodeCommand(value, width);
     if (!CommandEnabled(cmd)) HaltUnsupportedAccess("flash command", addr, value);
+    if (PartCommand(addr, cmd)) return;
     switch (cmd) {
         case 0xFF: RestoreArray();               break;
         case 0x90: PresentIdentifier(addr);      break;
         case 0x98: PresentCfi();                 break;
         case 0x70: PresentStatus(addr);          break;
-        case 0x50:                               break;
+        case 0x50: ClearStatus();                break;
         case 0x40:
         case 0x10: mode_ = Mode::kProgramSetup;  break;
         case 0x20: mode_ = Mode::kEraseSetup;    break;
-        case 0xE8: mode_ = Mode::kWriteBufCount;          /* MMCRestore.exe sub_131F8 */
-                   PresentStatus(addr);          break;
+        case 0xE8: {
+            const bool refused = WriteBufferRefused();
+            if (WriteBufferUsesXsr()) PresentRegister(addr, refused ? 0x00u : kXsrBufferAvailable);
+            else PresentStatus(addr);
+            if (!refused) mode_ = Mode::kWriteBufCount;
+            break;
+        }
         case 0x60: mode_ = Mode::kLockSetup;
                    PresentStatus(addr);          break;
         case 0xB0:
@@ -187,10 +248,20 @@ uint8_t IntelCommandSetFlash::DecodeCommand(uint32_t value, uint32_t /*width*/) 
 void IntelCommandSetFlash::SaveState(StateWriter& w) {
     w.Write("mode", mode_);
     w.Write("buf_remaining", buf_remaining_);
+    w.Write("buf_locked", buf_locked_);
+    w.Write("buf_block", buf_block_);
+    w.Write("status_errors", status_errors_);
+    w.Write<uint64_t>("buffer_count", buffer_.size());
+    for (const BufferedWrite& b : buffer_) {
+        w.Write("buffer_address", b.addr);
+        w.Write("buffer_value", b.value);
+        w.Write("buffer_width", b.width);
+    }
     w.Write<uint64_t>("shadow_count", shadow_.size());
     for (const auto& pr : shadow_) {
         w.Write("shadow_address", pr.first);
         w.Write("shadow_original_byte", pr.second);
+        w.Write("shadow_presented_byte", *Host(pr.first));
     }
     w.WriteBytes("block_locked", block_locked_.data(), block_locked_.size());
 }
@@ -198,14 +269,30 @@ void IntelCommandSetFlash::SaveState(StateWriter& w) {
 void IntelCommandSetFlash::RestoreState(StateReader& r) {
     r.Read("mode", mode_);
     r.Read("buf_remaining", buf_remaining_);
+    r.Read("buf_locked", buf_locked_);
+    r.Read("buf_block", buf_block_);
+    r.Read("status_errors", status_errors_);
+    uint64_t count = 0; r.Read("buffer_count", count);
+    buffer_.clear();
+    for (uint64_t i = 0; i < count; ++i) {
+        BufferedWrite b;
+        r.Read("buffer_address", b.addr); r.Read("buffer_value", b.value); r.Read("buffer_width", b.width);
+        buffer_.push_back(b);
+    }
+    const bool live = ArrayIsStorage();
     uint64_t n = 0; r.Read("shadow_count", n);
-    shadow_.clear();
+    std::vector<std::pair<uint32_t, uint8_t>> shadow;
+    std::vector<uint8_t>                      presented;
     for (uint64_t i = 0; i < n; ++i) {
-        uint32_t a = 0; uint8_t b = 0;
+        uint32_t a = 0; uint8_t b = 0; uint8_t p = 0;
         r.Read("shadow_address", a); r.Read("shadow_original_byte", b);
-        shadow_.push_back({a, b});
+        r.Read("shadow_presented_byte", p);
+        shadow.push_back({a, live ? *Host(a) : b});
+        presented.push_back(p);
     }
     r.ReadBytes("block_locked", block_locked_.data(), block_locked_.size());
+    shadow_ = std::move(shadow);
+    for (size_t i = 0; i < shadow_.size(); ++i) *Host(shadow_[i].first) = presented[i];
 }
 
 }

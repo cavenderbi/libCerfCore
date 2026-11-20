@@ -160,6 +160,11 @@ void ParseModulesAndFiles(std::span<const uint8_t> flat,
                           const ParsedROMHDR&      romhdr,
                           ParsedTOC&               toc);
 
+bool ParseXipAtEcec(std::span<const uint8_t> flat,
+                    const EcecRecord&        ecec,
+                    uint32_t                 flat_base_va,
+                    ParsedXipRegion&         out);
+
 struct ImgfsSuperblock {
     size_t   off             = 0;
     uint32_t dirent_size     = 0;

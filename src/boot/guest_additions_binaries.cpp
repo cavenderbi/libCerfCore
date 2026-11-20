@@ -9,8 +9,8 @@
 #include "../cpu/arm_processor_config.h"
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/peripherals/cerf_virt/cerf_virt_addr_map.h>
+#include "guest_xip_image.h"
 #include "pe_image.h"
-#include <cerfcore/boot/rom_parser_service.h>
 
 namespace cerfcore {
 
@@ -24,8 +24,9 @@ constexpr const char* kStubDll = "cerf_guest_stub.dll";
 std::string GuestAdditionsBinaries::ArchDir() {
     const CpuArch arch = emu_.Get<BoardContext>().GetCpuArch();
     if (arch == CpuArch::kMips) {
-        const ParsedRom& rom = emu_.Get<RomParserService>().Primary();
-        const uint16_t cpu = rom.xips.empty() ? 0 : rom.xips[0].toc.romhdr.usCPUType;
+        auto*                  image = emu_.TryGet<GuestXipImage>();
+        const ParsedXipRegion* xip   = image ? image->Primary() : nullptr;
+        const uint16_t cpu = xip ? xip->toc.romhdr.usCPUType : 0;
         return cpu == PeImage::kMachineMipsFpu ? "mips4" : "mips1";
     }
     if (arch == CpuArch::kArm) return emu_.Get<ArmProcessorConfig>().HasThumb() ? "arm_thumb" : "arm";

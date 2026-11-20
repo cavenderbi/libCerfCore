@@ -54,8 +54,13 @@ void Omap3530I2c1::DispatchWriteLocked(uint32_t guest_addr_for_diag,
     }
     twl_->TxnStart(slave_addr);
     while (!tx_fifo_.empty()) {
-        twl_->TxnWriteByte(slave_addr, tx_fifo_.front());
+        const bool acked = twl_->TxnWriteByte(slave_addr, tx_fifo_.front());
         tx_fifo_.pop_front();
+        if (!acked) {
+            tx_fifo_.clear();
+            RaiseNackLocked();
+            return;
+        }
     }
 }
 

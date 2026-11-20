@@ -17,6 +17,7 @@ struct DeviceFileType {
     std::vector<std::string> formats;
     std::string              note;
     bool                     optional;
+    bool                     required;
     std::vector<std::string> optional_for_storage_ids;
     std::vector<std::string> board_ids;
     std::vector<std::string> board_family_ids;

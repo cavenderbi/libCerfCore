@@ -27,12 +27,12 @@ void Eeprom24cxx::TxnStart(uint8_t) {
     addr_pending_ = true;
 }
 
-void Eeprom24cxx::TxnWriteByte(uint8_t, uint8_t byte) {
+bool Eeprom24cxx::TxnWriteByte(uint8_t, uint8_t byte) {
     if (addr_pending_) {
         addr_         = byte;
         addr_valid_   = true;
         addr_pending_ = false;
-        return;
+        return true;
     }
     const uint16_t page_bytes = PageBytes();
     if (page_bytes == 0u) Refuse("data write to a part whose page size is not established");
@@ -41,6 +41,7 @@ void Eeprom24cxx::TxnWriteByte(uint8_t, uint8_t byte) {
     page_[slot] = byte;
     page_dirty_ = static_cast<uint16_t>(page_dirty_ | (1u << slot));
     addr_       = static_cast<uint16_t>((addr_ & ~in_page) | ((addr_ + 1u) & in_page));
+    return true;
 }
 
 uint8_t Eeprom24cxx::TxnReadByte(uint8_t) {

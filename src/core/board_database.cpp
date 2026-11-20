@@ -67,6 +67,7 @@ constexpr std::pair<std::string_view, SupportLevel> kSupportLevels[] = {
 constexpr std::pair<std::string_view, RomPlacingMode> kRomPlacingModes[] = {
     {"flat_container", RomPlacingMode::FlatContainer},
     {"imx51_nand", RomPlacingMode::Imx51Nand},
+    {"reset_vector", RomPlacingMode::ResetVector},
 };
 
 bool InWordList(std::string_view list, std::string_view word) {

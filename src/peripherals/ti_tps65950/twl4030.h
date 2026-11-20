@@ -21,7 +21,7 @@ public:
     bool MatchesAddress(uint8_t slave_addr) const override;
 
     void    TxnStart    (uint8_t slave_addr) override;
-    void    TxnWriteByte(uint8_t slave_addr, uint8_t byte) override;
+    bool    TxnWriteByte(uint8_t slave_addr, uint8_t byte) override;
     uint8_t TxnReadByte (uint8_t slave_addr) override;
 
     uint8_t AudioReg(uint8_t sub_addr) const;

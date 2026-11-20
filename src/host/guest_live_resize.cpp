@@ -1,6 +1,6 @@
 #include <cerfcore/host/guest_live_resize.h>
 
-#include <cerfcore/boot/rom_parser_queries.h>
+#include "../boot/guest_xip_image.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/device_config.h>
 #include <cerfcore/core/log.h>
@@ -18,8 +18,8 @@ bool GuestLiveResize::ShouldRegister() { return emu_.Get<DeviceConfig>().guest_a
 
 bool GuestLiveResize::Supported() const {
     uint16_t major = 0, minor = 0;
-    auto*    rom   = emu_.TryGet<RomParserQueries>();
-    if (!rom || !rom->KernelSubsystemVersion(major, minor)) return true;
+    auto*    image = emu_.TryGet<GuestXipImage>();
+    if (!image || !image->KernelSubsystemVersion(major, minor)) return true;
     return major > 3;
 }
 

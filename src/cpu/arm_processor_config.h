@@ -94,6 +94,10 @@ public:
     uint32_t Mvfr0()   const { return mvfr0_; }
     uint32_t Mvfr1()   const { return mvfr1_; }
 
+    bool     HasXscaleAccumulator() const { return xscale_accumulator_; }
+    bool     HasIwmmxt()            const { return iwmmxt_; }
+    uint32_t Wcid()                 const { return wcid_; }
+
 private:
     uint32_t pc_store_offset_ = 0;
     uint32_t midr_            = 0;
@@ -105,6 +109,9 @@ private:
     uint32_t fpsid_           = 0;
     uint32_t mvfr0_           = 0;
     uint32_t mvfr1_           = 0;
+    uint32_t wcid_            = 0;
+    bool     xscale_accumulator_ = false;
+    bool     iwmmxt_             = false;
 
     ArmSupersectionFormat supersection_format_ = ArmSupersectionFormat::kNone;
 

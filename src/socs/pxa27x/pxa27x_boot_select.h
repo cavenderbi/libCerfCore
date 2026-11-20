@@ -2,15 +2,13 @@
 
 #include <cerfcore/core/service.h>
 
-#include <cstdint>
-
 namespace cerfcore {
 
-class SymbolHamptonsDisplay : public Service {
+class Pxa27xBootSelect : public Service {
 public:
     using Service::Service;
 
-    virtual uint32_t DisplayId() const = 0;
+    virtual bool BootsFrom16BitMemory() const = 0;
 };
 
 }

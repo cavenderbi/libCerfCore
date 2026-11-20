@@ -411,6 +411,7 @@ void Imx51Nfc::SaveState(StateWriter& w) {
     w.Write("addr_idx", addr_idx_);
     w.Write("seq_data_off", seq_data_off_);
     w.Write("seq_cache_off", seq_cache_off_);
+    emu_.Get<Imx51NandStore>().SaveState(w);
 }
 
 void Imx51Nfc::RestoreState(StateReader& r) {
@@ -437,6 +438,7 @@ void Imx51Nfc::RestoreState(StateReader& r) {
     r.Read("addr_idx", addr_idx_);
     r.Read("seq_data_off", seq_data_off_);
     r.Read("seq_cache_off", seq_cache_off_);
+    emu_.Get<Imx51NandStore>().RestoreState(r);
 }
 
 }

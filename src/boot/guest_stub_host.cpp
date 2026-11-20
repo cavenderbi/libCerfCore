@@ -1,7 +1,7 @@
 #include "guest_stub_host.h"
 
 #include "cerf_injection_region.h"
-#include <cerfcore/boot/rom_parser_service.h>
+#include "guest_xip_image.h"
 #include "rom_record_layout.h"
 
 #include "../boards/page_table_builder.h"
@@ -22,7 +22,7 @@ bool GuestStubHost::ShouldRegister() {
 bool GuestStubHost::LargestVictimSection(uint32_t o32_pa, uint16_t objcnt,
                                          uint32_t& out_va, uint32_t& out_size) {
     auto& mem = emu_.Get<EmulatedMemory>();
-    const auto& romhdr = emu_.Get<RomParserService>().Primary().xips[0].toc.romhdr;
+    const auto& romhdr = emu_.Get<GuestXipImage>().Primary()->toc.romhdr;
     out_va   = 0;
     out_size = 0;
     for (uint32_t i = 0; i < objcnt; ++i) {

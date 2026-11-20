@@ -133,17 +133,19 @@ private:
 
     void MasterWriteData(uint8_t value) {
         i2dr_ = value;
+        bool acked = false;
         if (addr_phase_) {
             cur_addr_ = static_cast<uint8_t>(value >> 1);
             addr_phase_ = false;
             I2cSlave* s = WiredSlave();
             matched_ = s && s->MatchesAddress(cur_addr_);
             if (matched_) s->TxnStart(cur_addr_);
+            acked = matched_;
         } else if (matched_) {
-            WiredSlave()->TxnWriteByte(cur_addr_, value);
+            acked = WiredSlave()->TxnWriteByte(cur_addr_, value);
         }
-        if (matched_) i2sr_ &= ~kI2srRxak;         /* ACK */
-        else          i2sr_ |= kI2srRxak;          /* no slave -> NACK */
+        if (acked) i2sr_ &= ~kI2srRxak;
+        else       i2sr_ |= kI2srRxak;
         CompleteByte();
     }
 

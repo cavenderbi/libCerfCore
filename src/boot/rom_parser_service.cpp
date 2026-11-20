@@ -5,7 +5,6 @@
 #include "ce1_rom_parse.h"
 #include "ce_imgfs_walker.h"
 #include "rom_image_parse.h"
-#include "rom_symbol_flash_parse.h"
 #include "rom_wmstore_parse.h"
 
 #include <cerfcore/boards/board_context.h>
@@ -37,13 +36,11 @@ using cerf::rom_image_parse::ImgfsSuperblock;
 using cerf::rom_image_parse::IpaqNbfLocateOsXip;
 using cerf::rom_image_parse::IpaqNbfOsXip;
 using cerf::rom_image_parse::ParseModulesAndFiles;
+using cerf::rom_image_parse::ParseXipAtEcec;
 using cerf::rom_image_parse::NosajLocateOsXip;
 using cerf::rom_image_parse::NosajOsXip;
 using cerf::rom_image_parse::ResolveNextStructuralXip;
-using cerf::rom_image_parse::ResolveRomhdrAtEcec;
 using cerf::rom_image_parse::ResolveRomhdrStructural;
-using cerf::rom_image_parse::SymbolFlashLocateOsXip;
-using cerf::rom_image_parse::SymbolFlashOsXip;
 using cerf::rom_image_parse::WmstoreLocateOsXip;
 using cerf::rom_image_parse::WmstoreOsXip;
 using cerf::le::U32;
@@ -170,25 +167,10 @@ bool RomParserService::ParseOne(ParsedRom& rom) {
             rom.filename.c_str(), wm.data_off, wm.base_va,
             double(wm.flat_size) / 1024.0 / 1024.0);
     } else {
-        SymbolFlashOsXip sym;
-        if (SymbolFlashLocateOsXip(rom.raw, sym)) {
-            rom.is_symbol_flash = true;
-            rom.flat            = std::span<const uint8_t>(rom.raw)
-                                      .subspan(sym.data_off, sym.flat_size);
-            rom.flat_base_va    = sym.base_va;
-            rom.whole_flash_va  = sym.flash_va;
-            LOG(Boot, "RomParser %s: Symbol whole-flash dump - part table @ "
-                      "file 0x%zX, OS XIP @ file 0x%zX (%u blocks) base=0x%08X "
-                      "flash kva=0x%08X span=%.1f MB\n",
-                rom.filename.c_str(), sym.table_off, sym.data_off,
-                sym.part_blocks, sym.base_va, sym.flash_va,
-                double(sym.flat_size) / 1024.0 / 1024.0);
-        } else {
-            rom.flat = std::span<const uint8_t>(rom.raw);
-            rom.flat_base_va = 0;
-            LOG(Boot, "RomParser %s: NB0 flat %zu KB\n",
-                rom.filename.c_str(), rom.flat.size() / 1024);
-        }
+        rom.flat = std::span<const uint8_t>(rom.raw);
+        rom.flat_base_va = 0;
+        LOG(Boot, "RomParser %s: NB0 flat %zu KB\n",
+            rom.filename.c_str(), rom.flat.size() / 1024);
     }
 
     const auto ececs = FindAllEcec(rom.flat);
@@ -238,16 +220,12 @@ bool RomParserService::ParseOne(ParsedRom& rom) {
         for (const auto& ecec : ececs) {
             const size_t    e = ecec.off;
             ParsedXipRegion xip;
-            size_t          romhdr_off = 0;
-            if (!ResolveRomhdrAtEcec(rom.flat, ecec, rom.flat_base_va,
-                                     xip, romhdr_off)) {
+            if (!ParseXipAtEcec(rom.flat, ecec, rom.flat_base_va, xip)) {
                 LOG(Boot, "RomParser %s: ECEC @ 0x%zX did not resolve to a "
                           "valid ROMHDR; skipping this XIP region\n",
                     rom.filename.c_str(), e);
                 continue;
             }
-            ParseModulesAndFiles(rom.flat, romhdr_off, xip.load_offset,
-                                 xip.toc.romhdr, xip.toc);
             const auto& h = xip.toc.romhdr;
             LOG(Boot, "RomParser %s: XIP[%zu] ECEC @ 0x%zX  load_offset=0x%08X  "
                       "romhdr_va=0x%08X  physfirst=0x%08X..physlast=0x%08X  "

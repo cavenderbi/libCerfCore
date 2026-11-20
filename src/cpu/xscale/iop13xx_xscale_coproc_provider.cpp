@@ -1,5 +1,6 @@
 #include "xscale_coproc_provider_base.h"
 
+#include "../arm/arm_page_walker.h"
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../socs/iop13xx/iop13xx_cp6.h"
@@ -30,6 +31,7 @@ protected:
             const bool clean_invalidate = a.crm == 15u && a.opc2 == 2u;
             if (invalidate_mva || clean || clean_invalidate) return {.action = A::kNoOp};
         }
+        if (a.cp_num == 15u && a.crn == 9u && (a.crm == 5u || a.crm == 6u)) return CacheLockdownL2(a);
         if (a.cp_num == 6u) return emu_.Get<Iop13xxCp6>().Decide(a);
         if (a.cp_num == 7u) return {.action = A::kUnimplemented};
         return XscaleCoprocProviderBase::RegisterTransfer(a);
@@ -49,6 +51,41 @@ protected:
             return {.action = A::kUnimplemented};
         }
         return {.action = A::kUndefined};
+    }
+
+    bool LockChecksAccess() const override { return false; }
+
+private:
+    ArmCoprocDecision CacheLockdownL2(const ArmCoprocAccess& a) {
+        if (a.opc1 == 0u && a.crm == 6u && a.opc2 == 0u) return DataCacheLockRegister();
+        if (a.read) return {.action = A::kUnimplemented};
+        if (a.opc1 == 0u && a.crm == 5u && a.opc2 == 0u) {
+            return LockByMva(&XscaleCoprocProviderBase::LockInstructionLine);
+        }
+        if (a.opc1 == 0u && a.opc2 == 1u) {
+            return CacheUnlock(a.crm == 5u ? &XscaleCoprocProviderBase::UnlockInstructionCache
+                                           : &XscaleCoprocProviderBase::UnlockDataCache);
+        }
+        if (a.opc1 == 1u && a.crm == 5u && a.opc2 == 1u) return CacheUnlock(&UnlockL2Cache);
+        if (a.opc1 == 1u && a.crm == 5u && (a.opc2 == 0u || a.opc2 == 2u)) {
+            return LockByMva(&Iop13xxXscaleCoprocProvider::LockL2Line);
+        }
+        return {.action = A::kUnimplemented};
+    }
+
+    static constexpr uint32_t kSctlrL2Cache = 1u << 26;
+
+    static void CERFENGINE_FASTCALL UnlockL2Cache(void* self, uint32_t) {
+        static_cast<Iop13xxXscaleCoprocProvider*>(self)->RequireCacheEnabled(kSctlrL2Cache,
+                                                                             "L2 cache unlock");
+    }
+
+    static uint32_t CERFENGINE_FASTCALL LockL2Line(void* self, uint32_t mva) {
+        auto* provider = static_cast<Iop13xxXscaleCoprocProvider*>(self);
+        provider->RequireCacheEnabled(kSctlrL2Cache, "L2 cache lock");
+        const bool translated = provider->emu_.Get<ArmPageWalker>().TranslatesForLock(
+            mva, cerfengine::ArmMmuAccess::kRead, false, false, provider->MmuControlWord());
+        return translated ? 0u : 1u;
     }
 };
 

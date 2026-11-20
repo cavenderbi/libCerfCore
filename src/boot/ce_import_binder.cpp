@@ -1,9 +1,8 @@
 #include "ce_import_binder.h"
 
+#include "guest_xip_image.h"
 #include "pe_image.h"
-#include <cerfcore/boot/rom_parser_service.h>
 
-#include "../core/ascii_case.h"
 #include "../core/ascii_z.h"
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
@@ -40,14 +39,6 @@ constexpr uint32_t kNoFileOff = PeImage::kNoFileOff;
 
 using cerf::le::Put32;
 using cerf::le::U32;
-
-
-const ParsedTOCentry* FindRomModule(const ParsedRom& rom, const char* name) {
-    for (const auto& xip : rom.xips)
-        for (const auto& m : xip.toc.modules)
-            if (cerf::AsciiEqualIgnoreCase(m.lpszFileName, name)) return &m;
-    return nullptr;
-}
 
 }  /* namespace */
 
@@ -109,8 +100,7 @@ void CeImportBinder::BindImports(std::vector<uint8_t>& bytes, const PeImage& pe,
 
 CeImportBinder::GuestExportDir
 CeImportBinder::LocateModuleExports(const char* dll, const E32RomLayout& layout) {
-    const ParsedTOCentry* m =
-        FindRomModule(emu_.Get<RomParserService>().Primary(), dll);
+    const ParsedTOCentry* m = emu_.Get<GuestXipImage>().FindModule(dll);
     if (!m) {
         emu_.Get<Fatal>().Die("CeImportBinder: imported DLL '%s' not in ROM TOC", dll);
     }

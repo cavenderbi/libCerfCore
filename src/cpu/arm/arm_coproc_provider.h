@@ -17,8 +17,6 @@ public:
 
     cerfengine::ArmCoprocDecision Decide(const cerfengine::ArmCoprocAccess& a);
 
-    uint64_t& Accumulator() { return acc0_; }
-
 protected:
     virtual cerfengine::ArmCoprocDecision RegisterTransfer(
         const cerfengine::ArmCoprocAccess& a) = 0;
@@ -29,8 +27,6 @@ protected:
         const cerfengine::ArmCoprocAccess& a);
 
     const ArmCp15Decisions& Cp15() const { return *cp15_; }
-
-    uint64_t acc0_ = 0;
 
 private:
     ArmCp15Decisions* cp15_ = nullptr;

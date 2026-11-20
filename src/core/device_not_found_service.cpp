@@ -9,6 +9,7 @@
 #include <cerfcore/host/configuration_problem.h>
 #include <cerfcore/platform/host_file.h>
 #include "../socs/imx51/imx51_nand_store.h"
+#include "../storage/nor_flash_store.h"
 
 #include <string>
 
@@ -24,6 +25,7 @@ bool DeviceNotFoundService::IsDevicePresent() {
         host_platform::HostFileExists(ResolveDeviceFile(cfg.device_name, cfg.rom_primary)))
         return true;
     if (auto* sf = emu_.TryGet<SecFlash>(); sf && sf->IsPresent()) return true;
+    if (emu_.TryGet<NorFlashStore>()) return true;
     return emu_.TryGet<Imx51NandStore>() != nullptr;
 }
 
