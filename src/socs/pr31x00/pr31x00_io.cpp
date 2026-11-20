@@ -56,10 +56,7 @@ void Pr31x00Io::OnReady() {
         regs_         = kResetRegs;
         powered_down_ = false;
     });
-    reset_line.RegisterReleaseListener([this] {
-        NotifyMfioOut();
-        NotifyIoOut();
-    });
+    reset_line.RegisterReleaseListener([this] { NotifyPins(); });
     auto& sleep = emu_.Get<GuestDeepSleep>();
     sleep.RegisterSleepEntryListener([this] { SetPoweredDown(true); });
     sleep.RegisterPowerUpListener([this] { SetPoweredDown(false); });
@@ -82,8 +79,17 @@ Pr31x00Pins Pr31x00Io::IoPins() const {
     return PinsOf(IoDout(), IoOutputs(), regs_.io_pd & kIoPinMask);
 }
 
+void Pr31x00Io::PresetRegisters(const Regs& regs) {
+    regs_ = regs;
+    NotifyPins();
+}
+
 void Pr31x00Io::SetPoweredDown(bool powered_down) {
     powered_down_ = powered_down;
+    NotifyPins();
+}
+
+void Pr31x00Io::NotifyPins() {
     NotifyMfioOut();
     NotifyIoOut();
 }

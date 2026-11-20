@@ -4,6 +4,7 @@
 #include "../../socs/pr31x00/pr31x00_biu.h"
 #include "../../socs/pr31x00/pr31x00_clock.h"
 #include "../../socs/pr31x00/pr31x00_intc.h"
+#include "../../socs/pr31x00/pr31x00_io.h"
 #include <cerfcore/boards/board_context.h>
 #include "sharp_mobilon_hc_family_id.h"
 #include "sharp_mobilon_hc_memory.h"
@@ -18,6 +19,15 @@ namespace {
    Baud Rate = f_UARTCLK / ((BAUDRATE + 1) * 16) (TMPR3911 §16.5.2); UARTACLK 3.6864 MHz at
    CSERDIV 011 with a 9.216 MHz crystal (TMPR3911 Table 6.3.1, p.6-9). */
 constexpr uint32_t kCserDiv = 3u;
+
+constexpr Pr31x00Io::Regs kBootIoRegs = {
+    .io_ctl     = 0x57280000u,
+    .mfio_dout  = 0x04020000u,
+    .mfio_direc = 0x4402D022u,
+    .mfio_sel   = 0xFC02F06Fu,
+    .io_pd      = 0x00000028u,
+    .mfio_pd    = 0x9877FFFCu,
+};
 
 class SharpMobilonHcBootloader : public Service {
 public:
@@ -38,6 +48,7 @@ private:
         intc.DisableAllSources();
         intc.ClearAllPending();
         intc.SetGlobalEnable();
+        emu_.Get<Pr31x00Io>().PresetRegisters(kBootIoRegs);
         emu_.Get<Pr31x00Clock>().PresetSerialClock(kCserDiv);
         emu_.Get<Pr31x00Biu>().PresetBanks(emu_.Get<SharpMobilonHcMemory>().MemConfig0Banks());
     }

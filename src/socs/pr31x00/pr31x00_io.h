@@ -40,6 +40,17 @@ public:
     void RegisterMfioOutObserver(PinObserver cb);
     void RegisterIoOutObserver(PinObserver cb);
 
+    struct Regs {
+        uint32_t io_ctl     = 0;
+        uint32_t mfio_dout  = 0;
+        uint32_t mfio_direc = 0;
+        uint32_t mfio_sel   = 0;
+        uint32_t io_pd      = 0;
+        uint32_t mfio_pd    = 0;
+    };
+
+    void PresetRegisters(const Regs& regs);
+
     uint8_t  ReadByte(uint32_t addr) override { HaltUnsupportedAccess("PR31x00 IO ReadByte", addr, 0); }
     uint16_t ReadHalf(uint32_t addr) override { HaltUnsupportedAccess("PR31x00 IO ReadHalf", addr, 0); }
     void WriteByte(uint32_t addr, uint8_t  v) override { HaltUnsupportedAccess("PR31x00 IO WriteByte", addr, v); }
@@ -49,15 +60,6 @@ public:
     void RestoreState(StateReader& r) override;
 
 private:
-    struct Regs {
-        uint32_t io_ctl;
-        uint32_t mfio_dout;
-        uint32_t mfio_direc;
-        uint32_t mfio_sel;
-        uint32_t io_pd;
-        uint32_t mfio_pd;
-    };
-
     /* Reset values, §9.3.1-§9.3.7. IODIREC and MFIODIREC reset to 0 (all pins
        inputs); IODEBSEL, IODOUT and MFIODOUT reset undefined and are taken as 0. */
     static constexpr Regs kResetRegs = {0x00000000u, 0x00000000u, 0x00000000u,
@@ -81,6 +83,7 @@ private:
     void SetPoweredDown(bool powered_down);
     void NotifyMfioOut();
     void NotifyIoOut();
+    void NotifyPins();
 
     CallbackList<const Pr31x00Pins&> mfio_out_observers_;
     CallbackList<const Pr31x00Pins&> io_out_observers_;
