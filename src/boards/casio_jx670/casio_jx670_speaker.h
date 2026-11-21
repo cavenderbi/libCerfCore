@@ -1,13 +1,13 @@
 #pragma once
 
 #include <cerfcore/core/service.h>
+#include "../../host/host_pcm_queue.h"
 #include "../../host/paced_wave_out.h"
 
 #include <cstdint>
 
 namespace cerfcore {
 
-class AudioActivity;
 class EmulatedMemory;
 
 class CasioJx670Speaker : public Service {
@@ -25,9 +25,9 @@ public:
     void QueueBlock(uint32_t va, uint32_t length);
 
 private:
-    PacedWaveOut         paced_;
-    EmulatedMemory*      mem_      = nullptr;
-    AudioActivity* activity_ = nullptr;
+    PacedWaveOut    paced_;
+    HostPcmQueue    out_;
+    EmulatedMemory* mem_ = nullptr;
 };
 
 }

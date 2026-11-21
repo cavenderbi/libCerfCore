@@ -9,6 +9,7 @@
 #include "../../execution/engine_bridge.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "sh77xx_dma_address_map.h"
+#include "sh77xx_port_wiring.h"
 #include "sh77xx_intc.h"
 #include "sh77xx_standby_entry.h"
 
@@ -26,6 +27,7 @@ constexpr uint32_t kChcrDe        = 0x00000001u;
 constexpr uint32_t kChcrTe        = 0x00000002u;
 constexpr uint32_t kChcrIe        = 0x00000004u;
 constexpr uint32_t kChcrTm        = 0x00000020u;
+constexpr uint32_t kChcrDs        = 0x00000040u;
 constexpr uint32_t kChcrRo        = 0x00080000u;
 constexpr uint32_t kChcrDi        = 0x00100000u;
 constexpr uint32_t kChcrReserved  = 0xFFE00000u;
@@ -38,6 +40,8 @@ constexpr uint32_t kFieldMask     = 3u;
 constexpr uint32_t kIllegalField  = 3u;
 
 constexpr uint32_t kRsExternal    = 0x0u;
+constexpr uint32_t kRsSingleFirst = 0x2u;
+constexpr uint32_t kRsSingleLast  = 0x3u;
 constexpr uint32_t kRsAuto        = 0x4u;
 constexpr uint32_t kRsModuleFirst = 0xAu;
 constexpr uint32_t kRsSerialLast  = kRsModuleFirst + static_cast<uint32_t>(Sh77xxDmaRequest::kScifRx);
@@ -83,6 +87,7 @@ void Sh77xxDmac::OnReady() {
     bus_       = &emu_.Get<PhysicalBus>();
     addresses_ = &emu_.Get<Sh77xxDmaAddressMap>();
     coherence_ = &emu_.Get<EngineBridge>().Engine().Get<cerfengine::ShBusMasterCoherence>();
+    external_.Attach(&emu_.Get<Sh77xxPortWiring>());
     stbcr2_->RegisterChangeListener([this](uint8_t from, uint8_t to) {
         const uint8_t stop = Stbcr2ModuleStop();
         if ((from & stop) != 0u && (to & stop) == 0u) Service();
@@ -180,7 +185,10 @@ void Sh77xxDmac::WriteChcr(Channel& ch, uint32_t value) {
     const bool te    = (ch.chcr & kChcrTe) != 0u && ((value & kChcrTe) != 0u || !ch.te_read);
     ch.chcr          = (value & ChcrStored(i) & ~kChcrTe) | (te ? kChcrTe : 0u);
     if (!te) ch.te_read = false;
-    if (enabled && (ch.chcr & kChcrDe) == 0u) AbortReload(ch);
+    if (enabled && (ch.chcr & kChcrDe) == 0u) {
+        AbortReload(ch);
+        DropExternalRequest(ch);
+    }
     if (Armed(ch)) {
         ValidateFields(ch);
         if (!armed) ValidateStart(ch);
@@ -200,7 +208,10 @@ void Sh77xxDmac::WriteDmaor(uint16_t value) {
     const bool enabled = (dmaor_ & kDmaorDme) != 0u;
     dmaor_             = static_cast<uint16_t>(value & kDmaorStored);
     if (enabled && (dmaor_ & kDmaorDme) == 0u) {
-        for (Channel& ch : ch_) AbortReload(ch);
+        for (Channel& ch : ch_) {
+            AbortReload(ch);
+            DropExternalRequest(ch);
+        }
     }
     for (const Channel& ch : ch_) {
         if (armed[Index(ch)] || !Armed(ch)) continue;
@@ -215,6 +226,17 @@ void Sh77xxDmac::AbortReload(Channel& ch) {
     ch.stale        = kStaleAll;
 }
 
+void Sh77xxDmac::DropExternalRequest(const Channel& ch) {
+    const uint32_t i = Index(ch);
+    if (i < Sh77xxDmaExternalRequests::kChannels) external_.Drop(i);
+}
+
+void Sh77xxDmac::DreqChanged(uint32_t channel) {
+    const Channel& ch        = ch_[channel];
+    const bool     accepting = Enabled(ch) && RequestSelect(ch.chcr) == kRsExternal;
+    if (external_.Sample(channel, accepting)) Service();
+}
+
 bool Sh77xxDmac::ClockStopped() const { return stbcr2_->ModuleStopped(Stbcr2ModuleStop()); }
 
 bool Sh77xxDmac::Armed(const Channel& ch) const {
@@ -226,6 +248,7 @@ bool Sh77xxDmac::Enabled(const Channel& ch) const { return Armed(ch) && !ClockSt
 bool Sh77xxDmac::Requested(const Channel& ch) const {
     const uint32_t rs = RequestSelect(ch.chcr);
     if (rs == kRsAuto) return true;
+    if (rs == kRsExternal) return external_.Requested(Index(ch), (ch.chcr & kChcrDs) != 0u);
     return (pending_ & ModuleBit(rs)) != 0u;
 }
 
@@ -233,10 +256,15 @@ void Sh77xxDmac::ValidateFields(const Channel& ch) {
     const uint32_t i  = Index(ch);
     const uint32_t rs = RequestSelect(ch.chcr);
     Fatal&         fatal = emu_.Get<Fatal>();
-    if (rs == kRsExternal && i < 2u) {
-        fatal.Die("Sh77xxDmac: channel %u enabled for an external DREQ%u request, which is not modeled", i, i);
+    const bool dreq_channel = i < Sh77xxDmaExternalRequests::kChannels;
+    if (dreq_channel && rs >= kRsSingleFirst && rs <= kRsSingleLast) {
+        fatal.Die("Sh77xxDmac: channel %u enabled for a single address external request RS 0x%X, which is not modeled", i,
+                  rs);
     }
-    if (rs != kRsAuto && rs < kRsModuleFirst) {
+    if (dreq_channel && rs == kRsExternal && !external_.Wired(i)) {
+        fatal.Die("Sh77xxDmac: channel %u enabled for an external request, and this board wires nothing to DREQ%u", i, i);
+    }
+    if (rs != kRsAuto && rs < kRsModuleFirst && !(dreq_channel && rs == kRsExternal)) {
         fatal.Die("Sh77xxDmac: channel %u enabled with the illegal RS setting 0x%X", i, rs);
     }
     if (ChcrField(ch.chcr, kChcrTsShift) == kIllegalField || ChcrField(ch.chcr, kChcrSmShift) == kIllegalField ||
@@ -340,6 +368,7 @@ void Sh77xxDmac::TransferUnit(Channel& ch) {
     ch.tcr            = (ch.tcr - 1u) & kTcrMask;
     const bool done = ch.tcr == 0u;
     if (rs >= kRsModuleFirst && (done || (ch.chcr & kChcrTm) == 0u)) ClearModuleRequest(rs);
+    if (rs == kRsExternal) external_.Consume(i, (ch.chcr & kChcrDs) != 0u, (ch.chcr & kChcrTm) != 0u, done);
     if (((dmaor_ >> kDmaorPrShift) & kFieldMask) == kRoundRobin) {
         rr_first_ = static_cast<uint8_t>((i + 1u) % kChannels);
     }
@@ -389,6 +418,7 @@ void Sh77xxDmac::Initialize() {
         ch.stale        = kStaleAll;
         ch.tcr_armed    = true;
         ch.te_read      = false;
+        DropExternalRequest(ch);
         Drive(ch);
     }
     dmaor_   = 0u;
@@ -408,6 +438,7 @@ void Sh77xxDmac::SaveState(StateWriter& w) {
         w.Write(Name(i, "tcr_armed").c_str(), ch.tcr_armed);
         w.Write(Name(i, "te_read").c_str(), ch.te_read);
     }
+    external_.Save(w);
     w.Write("dmaor", dmaor_);
     w.Write("pending", pending_);
     w.Write("rr_first", rr_first_);
@@ -426,12 +457,14 @@ void Sh77xxDmac::RestoreState(StateReader& r) {
         r.Read(Name(i, "tcr_armed").c_str(), ch.tcr_armed);
         r.Read(Name(i, "te_read").c_str(), ch.te_read);
     }
+    external_.Restore(r);
     r.Read("dmaor", dmaor_);
     r.Read("pending", pending_);
     r.Read("rr_first", rr_first_);
 }
 
 void Sh77xxDmac::PostRestore() {
+    external_.Resample();
     for (const Channel& ch : ch_) Drive(ch);
 }
 

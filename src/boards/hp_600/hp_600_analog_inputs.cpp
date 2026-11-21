@@ -5,8 +5,8 @@
 #include <cerfcore/core/fatal.h>
 #include "hp_600_audio_switches.h"
 #include "hp_600_family_id.h"
+#include "../sh77xx_adc_microphone.h"
 #include "hp_600_battery.h"
-#include "hp_600_microphone.h"
 #include "hp_600_touch_panel.h"
 
 namespace cerfcore {
@@ -31,7 +31,7 @@ public:
     void OnReady() override {
         battery_    = &emu_.Get<Hp600Battery>();
         touch_      = &emu_.Get<Hp600TouchPanel>();
-        microphone_ = &emu_.Get<Hp600Microphone>();
+        microphone_ = &emu_.Get<Sh77xxAdcMicrophone>();
         switches_   = &emu_.Get<Hp600AudioSwitches>();
     }
 
@@ -52,7 +52,7 @@ public:
 private:
     Hp600Battery*     battery_    = nullptr;
     Hp600TouchPanel*  touch_      = nullptr;
-    Hp600Microphone*  microphone_ = nullptr;
+    Sh77xxAdcMicrophone* microphone_ = nullptr;
     Hp600AudioSwitches* switches_ = nullptr;
 };
 

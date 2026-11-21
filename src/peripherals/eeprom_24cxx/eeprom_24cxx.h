@@ -2,9 +2,12 @@
 
 #include "../../socs/i2c_slave.h"
 
+#include <cerfcore/platform/host_file.h>
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 namespace cerfcore {
 
@@ -30,6 +33,7 @@ protected:
     virtual uint8_t     DeviceAddress() const = 0;
     virtual uint16_t    PageBytes() const = 0;
     virtual const char* PartName() const = 0;
+    virtual std::string StoragePath() const { return {}; }
 
     std::array<uint8_t, kBlockBytes>& Cells() { return cells_; }
 
@@ -37,7 +41,11 @@ private:
     static constexpr uint16_t kMaxPageBytes = 16u;
 
     [[noreturn]] void Refuse(const char* what) const;
+    void              OpenStorage(const std::string& path);
+    void              StoreCells(uint16_t first, uint16_t count);
 
+    host_platform::HostFile            file_;
+    std::string                        path_;
     std::array<uint8_t, kBlockBytes>   cells_{};
     std::array<uint8_t, kMaxPageBytes> page_{};
     uint16_t page_dirty_   = 0;

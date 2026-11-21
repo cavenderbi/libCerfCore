@@ -1,6 +1,5 @@
 #include "vr4101_aiu_output.h"
 
-#include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/instance_threads.h>
@@ -41,11 +40,12 @@ void Vr4101AiuOutput::AddSquare(uint64_t origin, uint64_t half, uint16_t volume,
 }
 
 void Vr4101AiuOutput::Attach(CerfEmulator& emu, GuestCycleClock::Rate tick_rate) {
-    emu_    = &emu;
     window_ = tick_rate.num;
     scale_  = static_cast<uint64_t>(kHostRate) * tick_rate.den;
     paced_.Start(emu.Get<Fatal>(), emu.Get<InstanceThreads>(), emu.TryGet<AudioOutputs>(), "Vr4101Aiu", kHostRate, 1, 16);
-    emu.Get<AudioActivity>().NotePresent();
+    AudioActivity& activity = emu.Get<AudioActivity>();
+    activity.NotePresent();
+    pcm_.Attach(paced_, activity);
 }
 
 void Vr4101AiuOutput::Stop() { paced_.Stop(); }
@@ -53,7 +53,7 @@ void Vr4101AiuOutput::Stop() { paced_.Stop(); }
 void Vr4101AiuOutput::Begin() {
     filled_ = 0u;
     area_   = 0;
-    pcm_.clear();
+    pcm_.Drop();
     paced_.SetFormat(kHostRate, 1, 16);
     paced_.BeginAudioOut();
 }
@@ -74,26 +74,19 @@ void Vr4101AiuOutput::Add(int32_t level, uint64_t ticks) {
 }
 
 void Vr4101AiuOutput::Emit(int64_t sample) {
-    cerf::le::Append16(pcm_, static_cast<uint16_t>(static_cast<int16_t>(std::clamp<int64_t>(sample, -32767, 32767))));
+    pcm_.Append16(static_cast<uint16_t>(static_cast<int16_t>(std::clamp<int64_t>(sample, -32767, 32767))));
 }
 
-void Vr4101AiuOutput::Flush() {
-    if (pcm_.empty()) return;
-    emu_->Get<AudioActivity>().MarkTx();
-    paced_.QueueOutputInHostBlocks(pcm_.data(), static_cast<uint32_t>(pcm_.size()));
-    pcm_.clear();
-}
+void Vr4101AiuOutput::Flush() { pcm_.Push(); }
 
 void Vr4101AiuOutput::Finish() {
-    Flush();
-    paced_.FinishAudioOut();
+    pcm_.Finish();
     filled_ = 0u;
     area_   = 0;
 }
 
 void Vr4101AiuOutput::Resume(bool running) {
-    paced_.StopAudioOut();
-    pcm_.clear();
+    pcm_.Abort();
     if (!running) return;
     paced_.SetFormat(kHostRate, 1, 16);
     paced_.BeginAudioOut();

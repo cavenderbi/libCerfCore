@@ -2,7 +2,7 @@
 
 #include <cerfcore/core/service.h>
 
-#include "../../host/wave_in_fifo.h"
+#include "../host/wave_in_fifo.h"
 
 #include <cstdint>
 
@@ -10,11 +10,11 @@ namespace cerfcore {
 
 class AudioActivity;
 
-class Hp600Microphone : public Service {
+class Sh77xxAdcMicrophone : public Service {
 public:
     using Service::Service;
 
-    bool ShouldRegister() override;
+    bool ShouldRegister() override = 0;
     void OnReady() override;
     void OnShutdown() override;
 
@@ -22,7 +22,7 @@ public:
     uint16_t Convert();
 
 private:
-    WaveInFifo           mic_;
+    WaveInFifo     mic_;
     AudioActivity* activity_ = nullptr;
 };
 

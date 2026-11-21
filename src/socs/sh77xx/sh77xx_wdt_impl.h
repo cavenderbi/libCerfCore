@@ -15,7 +15,7 @@
 #include "../reg_window_impl.h"
 #include "sh77xx_frqcr.h"
 #include "sh77xx_intc.h"
-#include "sh77xx_peripheral_clock_ticks.h"
+#include "sh77xx_clock_ticks.h"
 #include "sh77xx_wdt.h"
 
 namespace cerfcore {
@@ -263,7 +263,7 @@ private:
     cerfengine::ShCpu*         cpu_   = nullptr;
     Sh77xxIntc*                intc_  = nullptr;
     Sh77xxFrqcr*               frqcr_ = nullptr;
-    Sh77xxPeripheralClockTicks pclk_{this->emu_};
+    Sh77xxClockTicks           pclk_{this->emu_, Sh77xxTickedClock::kPeripheral};
     TickAnchoredCounter        counter_;
     uint16_t                   restored_count_ = 0u;
     Count                      count_          = Count::kNone;

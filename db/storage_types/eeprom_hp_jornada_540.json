@@ -1,0 +1,6 @@
+{
+  "id": "eeprom",
+  "name": "Configuration EEPROM",
+  "board_family_ids": ["hp_jornada_540"],
+  "formats": ["img"]
+}

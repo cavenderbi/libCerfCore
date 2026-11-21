@@ -5,7 +5,7 @@
 #include "../../execution/guest_cycle_clock.h"
 #include "sh77xx_dmac.h"
 #include "sh77xx_intc.h"
-#include "sh77xx_peripheral_clock_ticks.h"
+#include "sh77xx_clock_ticks.h"
 #include "sh77xx_standby_control.h"
 
 #include <cstdint>
@@ -17,6 +17,7 @@ inline constexpr uint32_t kSh77xxAdcDataBytes   = 0x10u;
 inline constexpr uint32_t kSh77xxAdcWindowBytes = 0x14u;
 
 class Sh77xxAnalogInputs;
+class Sh77xxPfc;
 
 class Sh77xxAdc : public Peripheral {
 public:
@@ -34,7 +35,7 @@ public:
     void RestoreState(StateReader& r) override;
     void PostRestore() override;
 
-    void ExternalTrigger();
+    bool ExternalTrigger();
 
 protected:
     struct ControlModel {
@@ -45,8 +46,14 @@ protected:
         bool    multi_scans;
     };
 
+    struct TriggerPin {
+        uint32_t port;
+        uint32_t pin;
+    };
+
     virtual ControlModel Control() const          = 0;
     virtual uint8_t      Stbcr2ModuleStop() const = 0;
+    virtual TriggerPin   AdTriggerPin() const     = 0;
 
 private:
     static constexpr uint32_t kDataRegisters = 4u;
@@ -69,11 +76,12 @@ private:
 
     Sh77xxIntc*                intc_   = nullptr;
     Sh77xxDmac*                dmac_   = nullptr;
+    Sh77xxPfc*                 pfc_    = nullptr;
     Sh77xxStbcr2*              stbcr2_ = nullptr;
     Sh77xxAnalogInputs*        inputs_ = nullptr;
     GuestCycleClock*           clock_  = nullptr;
     GuestCycleClock::Event*    event_  = nullptr;
-    Sh77xxPeripheralClockTicks pclk_{emu_};
+    Sh77xxClockTicks           pclk_{emu_, Sh77xxTickedClock::kPeripheral};
     uint16_t                   data_[kDataRegisters]{};
     uint8_t                    control_     = 0u;
     uint8_t                    adcr_        = 0u;

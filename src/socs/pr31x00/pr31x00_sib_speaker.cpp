@@ -1,7 +1,6 @@
 #include "pr31x00_sib_speaker.h"
 
 #include <cerfcore/boards/board_context.h>
-#include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/instance_threads.h>
@@ -20,7 +19,9 @@ bool Pr31x00SibSpeaker::ShouldRegister() {
 void Pr31x00SibSpeaker::OnReady() {
     codec_ = &emu_.Get<Pr31x00SibCodec>();
     paced_.Start(emu_.Get<Fatal>(), emu_.Get<InstanceThreads>(), emu_.TryGet<AudioOutputs>(), "SibAudio", 0, 1, 16);
-    emu_.Get<AudioActivity>().NotePresent();
+    AudioActivity& activity = emu_.Get<AudioActivity>();
+    activity.NotePresent();
+    buf_.Attach(paced_, activity);
 }
 
 void Pr31x00SibSpeaker::OnShutdown() { paced_.Stop(); }
@@ -42,15 +43,11 @@ void Pr31x00SibSpeaker::AddWord(uint32_t hold, bool sixteen_bit) {
     for (uint32_t i = 0; i < parts; ++i) {
         const uint32_t field  = (hold >> (32u - width * (i + 1u))) & ((1u << width) - 1u);
         const uint32_t sample = !audible ? 0u : sixteen_bit ? field : field << 8;
-        cerf::le::Append16(buf_, static_cast<uint16_t>(sample));
+        buf_.Append16(static_cast<uint16_t>(sample));
     }
 }
 
-void Pr31x00SibSpeaker::Flush() {
-    emu_.Get<AudioActivity>().MarkTx();
-    paced_.QueueOutputInHostBlocks(buf_.data(), static_cast<uint32_t>(buf_.size()));
-    buf_.clear();
-}
+void Pr31x00SibSpeaker::Flush() { buf_.Push(); }
 
 REGISTER_SERVICE(Pr31x00SibSpeaker);
 

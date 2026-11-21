@@ -1,10 +1,10 @@
 #pragma once
 
 #include <cerfcore/core/service.h>
+#include "../../host/host_pcm_queue.h"
 #include "../../host/paced_wave_out.h"
 
 #include <cstdint>
-#include <vector>
 
 namespace cerfcore {
 
@@ -26,9 +26,9 @@ public:
     void Flush();
 
 private:
-    Pr31x00SibCodec*     codec_ = nullptr;
-    PacedWaveOut         paced_;
-    std::vector<uint8_t> buf_;
+    Pr31x00SibCodec* codec_ = nullptr;
+    PacedWaveOut     paced_;
+    HostPcmQueue     buf_;
 };
 
 }

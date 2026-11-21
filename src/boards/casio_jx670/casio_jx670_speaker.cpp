@@ -19,10 +19,11 @@ bool CasioJx670Speaker::ShouldRegister() {
 }
 
 void CasioJx670Speaker::OnReady() {
-    mem_      = &emu_.Get<EmulatedMemory>();
-    activity_ = &emu_.Get<AudioActivity>();
+    mem_                    = &emu_.Get<EmulatedMemory>();
+    AudioActivity& activity = emu_.Get<AudioActivity>();
     paced_.Start(emu_.Get<Fatal>(), emu_.Get<InstanceThreads>(), emu_.TryGet<AudioOutputs>(), "Em500Audio", 0, 0, 0);
-    activity_->NotePresent();
+    activity.NotePresent();
+    out_.Attach(paced_, activity);
 }
 
 void CasioJx670Speaker::OnShutdown() { paced_.Stop(); }
@@ -42,8 +43,7 @@ void CasioJx670Speaker::QueueBlock(uint32_t va, uint32_t length) {
     /* VR4102 UM ch.5 p131 "(3) kseg1": references are not mapped through TLB and the
        physical address is the virtual address minus 0xA0000000. */
     mem_->CopyOut(cerfengine::MipsSeg::UnmappedPa(va), block.data(), length);
-    activity_->MarkTx();
-    paced_.QueueOutputInHostBlocks(block.data(), length);
+    out_.PushBlock(block.data(), length);
 }
 
 REGISTER_SERVICE(CasioJx670Speaker);

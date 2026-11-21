@@ -1,6 +1,5 @@
 #include "sh77xx_dac_speaker.h"
 
-#include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/instance_threads.h>
@@ -16,19 +15,19 @@ constexpr uint32_t              kRenderHz       = 44100u;
 constexpr GuestCycleClock::Rate kRenderRate{kRenderHz, 1u};
 constexpr uint16_t              kRenderChannels = 1u;
 constexpr uint16_t              kRenderBits     = 16u;
-constexpr GuestCycleClock::Rate kFlushRate{100u, 1u};
 constexpr int                   kDacMidpoint    = 0x80;
 constexpr int                   kDacToPcm16     = 256;
 
 }
 
 void Sh77xxDacSpeaker::OnReady() {
-    clock_    = &emu_.Get<GuestCycleClock>();
-    dac_      = &emu_.Get<Sh77xxDac>();
-    activity_ = &emu_.Get<AudioActivity>();
-    activity_->NotePresent();
+    clock_                  = &emu_.Get<GuestCycleClock>();
+    dac_                    = &emu_.Get<Sh77xxDac>();
+    AudioActivity& activity = emu_.Get<AudioActivity>();
+    activity.NotePresent();
     paced_.Start(emu_.Get<Fatal>(), emu_.Get<InstanceThreads>(), emu_.TryGet<AudioOutputs>(), "Sh77xxDacSpeaker", kRenderHz,
                  kRenderChannels, kRenderBits);
+    out_.Attach(paced_, activity);
     samples_.SetRate(clock_->ClockRate(), kRenderRate);
     clock_->RegisterRateListener([this] { samples_.Rescale(clock_->Cycles(), clock_->ClockRate(), kRenderRate); });
     flush_.Attach([this] { Flush(); });
@@ -51,36 +50,27 @@ void Sh77xxDacSpeaker::Update() {
         samples_.Start(clock_->Cycles());
         rendered_ = 0u;
         paced_.BeginAudioOut();
-        flush_.Start(kFlushRate);
+        flush_.Start(kHostPcmFlushRate);
         return;
     }
-    Push();
     flush_.Stop();
-    paced_.FinishAudioOut();
+    out_.Finish();
 }
 
 void Sh77xxDacSpeaker::Render() {
     if (!audible_) return;
     const uint64_t now = samples_.TicksAt(clock_->Cycles());
-    for (; rendered_ < now; ++rendered_) cerf::le::Append16(out_, static_cast<uint16_t>(level_));
+    for (; rendered_ < now; ++rendered_) out_.Append16(static_cast<uint16_t>(level_));
 }
 
 void Sh77xxDacSpeaker::Flush() {
     Render();
-    Push();
-}
-
-void Sh77xxDacSpeaker::Push() {
-    if (out_.empty()) return;
-    activity_->MarkTx();
-    paced_.QueueOutputInHostBlocks(out_.data(), static_cast<uint32_t>(out_.size()));
-    out_.clear();
+    out_.Push();
 }
 
 void Sh77xxDacSpeaker::EndStream() {
     flush_.Stop();
-    paced_.StopAudioOut();
-    out_.clear();
+    out_.Abort();
     audible_ = false;
 }
 

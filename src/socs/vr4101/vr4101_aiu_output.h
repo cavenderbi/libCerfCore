@@ -1,10 +1,10 @@
 #pragma once
 
 #include "../../execution/guest_cycle_clock.h"
+#include "../../host/host_pcm_queue.h"
 #include "../../host/paced_wave_out.h"
 
 #include <cstdint>
-#include <vector>
 
 namespace cerfcore {
 
@@ -33,13 +33,12 @@ private:
 
     static constexpr uint32_t kHostRate = 44100u;
 
-    CerfEmulator*        emu_    = nullptr;
-    PacedWaveOut         paced_;
-    std::vector<uint8_t> pcm_;
-    uint64_t             window_ = 1u;
-    uint64_t             scale_  = 1u;
-    uint64_t             filled_ = 0u;
-    int64_t              area_   = 0;
+    PacedWaveOut paced_;
+    HostPcmQueue pcm_;
+    uint64_t     window_ = 1u;
+    uint64_t     scale_  = 1u;
+    uint64_t     filled_ = 0u;
+    int64_t      area_   = 0;
 };
 
 }

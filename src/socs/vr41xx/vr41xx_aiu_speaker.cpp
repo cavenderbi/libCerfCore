@@ -1,6 +1,5 @@
 #include "vr41xx_aiu_speaker.h"
 
-#include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/instance_threads.h>
@@ -35,7 +34,9 @@ void Vr41xxAiuSpeaker::AttachHost() {
     switch_    = &emu_.Get<Vr41xxAudioSwitch>();
     switch_on_ = switch_->SpeakerOn();
     paced_.Start(emu_.Get<Fatal>(), emu_.Get<InstanceThreads>(), emu_.TryGet<AudioOutputs>(), "Vr41xxAiu", 0, 1, 16);
-    emu_.Get<AudioActivity>().NotePresent();
+    AudioActivity& activity = emu_.Get<AudioActivity>();
+    activity.NotePresent();
+    out_.Attach(paced_, activity);
 }
 
 void Vr41xxAiuSpeaker::StopHost() { paced_.Stop(); }
@@ -67,7 +68,7 @@ void Vr41xxAiuSpeaker::Convert() {
     } else if (primed_) {
         host_.RaiseAiuInt(kSidleIntr);
     }
-    cerf::le::Append16(out_, static_cast<uint16_t>(static_cast<int16_t>(sample)));
+    out_.Append16(static_cast<uint16_t>(static_cast<int16_t>(sample)));
     if (sdmav_) {
         sodat_  = sdmadat_;
         sodatv_ = true;
@@ -103,7 +104,7 @@ void Vr41xxAiuSpeaker::ClearPipeline() {
     sodatv_  = false;
     sdmav_   = false;
     primed_  = false;
-    out_.clear();
+    out_.Drop();
 }
 
 void Vr41xxAiuSpeaker::OnStart() {
@@ -111,24 +112,14 @@ void Vr41xxAiuSpeaker::OnStart() {
     paced_.BeginAudioOut();
 }
 
-void Vr41xxAiuSpeaker::OnStop() {
-    FlushHost();
-    paced_.FinishAudioOut();
-}
+void Vr41xxAiuSpeaker::OnStop() { out_.Finish(); }
 
 void Vr41xxAiuSpeaker::OnRateChanged(uint32_t hz) {
-    FlushHost();
+    out_.Push();
     paced_.SetFormat(hz, 1, 16);
 }
 
-void Vr41xxAiuSpeaker::FinishCatchUp() { FlushHost(); }
-
-void Vr41xxAiuSpeaker::FlushHost() {
-    if (out_.empty()) return;
-    emu_.Get<AudioActivity>().MarkTx();
-    paced_.QueueOutputInHostBlocks(out_.data(), static_cast<uint32_t>(out_.size()));
-    out_.clear();
-}
+void Vr41xxAiuSpeaker::FinishCatchUp() { out_.Push(); }
 
 void Vr41xxAiuSpeaker::SavePipeline(StateWriter& w) {
     w.Write("spk_sodat", sodat_);
@@ -151,12 +142,11 @@ void Vr41xxAiuSpeaker::RestorePipeline(StateReader& r) {
     sdmav_     = sdmav != 0u;
     primed_    = primed != 0u;
     switch_on_ = switch_on != 0u;
-    out_.clear();
+    out_.Drop();
 }
 
 void Vr41xxAiuSpeaker::ResumeHost() {
-    paced_.StopAudioOut();
-    out_.clear();
+    out_.Abort();
     if (!Enabled()) return;
     paced_.SetFormat(RateHz(), 1, 16);
     paced_.BeginAudioOut();

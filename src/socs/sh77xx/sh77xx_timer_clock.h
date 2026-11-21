@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../execution/guest_cycle_clock.h"
-#include "sh77xx_peripheral_clock_ticks.h"
+#include "sh77xx_clock_ticks.h"
 
 #include <cstdint>
 #include <functional>
@@ -18,7 +18,7 @@ public:
     static constexpr uint16_t kTpscPclkLast = 3u;
     static constexpr uint16_t kTpscRtcclk   = 4u;
 
-    explicit Sh77xxTimerClock(CerfEmulator& emu) : emu_(emu), pclk_(emu) {}
+    explicit Sh77xxTimerClock(CerfEmulator& emu) : emu_(emu), pclk_(emu, Sh77xxTickedClock::kPeripheral) {}
 
     void Attach(std::function<void()> on_pclk_retime, std::function<void()> on_rtcclk_change);
 
@@ -36,10 +36,10 @@ public:
 private:
     static uint32_t PclkShift(uint16_t tpsc);
 
-    CerfEmulator&              emu_;
-    GuestCycleClock*           clock_ = nullptr;
-    Sh77xxRtcOscillator*       rtc_   = nullptr;
-    Sh77xxPeripheralClockTicks pclk_;
+    CerfEmulator&        emu_;
+    GuestCycleClock*     clock_ = nullptr;
+    Sh77xxRtcOscillator* rtc_   = nullptr;
+    Sh77xxClockTicks     pclk_;
 };
 
 }

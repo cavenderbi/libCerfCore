@@ -6,6 +6,7 @@
 #include "../reg_window_impl.h"
 #include "sh77xx_area0_bus_width.h"
 #include "sh77xx_bsc.h"
+#include "sh77xx_refresh_timer.h"
 
 namespace cerfcore {
 
@@ -125,6 +126,10 @@ constexpr RegSpec StoredWithFatalRead(uint16_t writable, uint16_t write_zero) {
     return RegSpec{ReadKind::kFatal, WriteKind::kStored, writable, 0u, write_zero, OtherReset::kRetain};
 }
 
+constexpr RegSpec StoredWithSampledRead(uint16_t writable) {
+    return RegSpec{ReadKind::kSampled, WriteKind::kStored, writable, 0u, 0u, OtherReset::kRetain};
+}
+
 constexpr RegWindowModel WindowOf(const Model& m) {
     const uint32_t regs = m.bcr3 ? kRegs : kRegsBeforeBcr3;
     RegWindowModel w{kBase, regs * 2u, regs, false, {}};
@@ -138,7 +143,7 @@ constexpr RegWindowModel WindowOf(const Model& m) {
     w.reg[kOffRtcsr / 2u] = StoredWithFatalRead(kRtcsrStored, kRtcsrInterruptEnables);
     w.reg[kOffRtcnt / 2u] = StoredWithFatalRead(kRefreshData, 0u);
     w.reg[kOffRtcor / 2u] = Stored(kRtcorStored, 0u, 0u);
-    w.reg[kOffRfcr / 2u]  = StoredWithFatalRead(kRfcrData, 0u);
+    w.reg[kOffRfcr / 2u]  = StoredWithSampledRead(kRfcrData);
     if (m.bcr3) w.reg[kOffBcr3 / 2u] = Stored(kBcr3Writable, 0u, kBcr3WriteZero);
     return w;
 }
@@ -153,21 +158,29 @@ public:
     void OnReady() override {
         Base::OnReady();
         area0_bus_ = this->emu_.template TryGet<Sh77xxArea0BusWidth>();
+        refresh_.Attach();
         this->emu_.template Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
             std::lock_guard lk(this->lock_);
-            if (this->IsPowerOnReset(kind)) programmed_ = 0u;
+            if (this->IsPowerOnReset(kind)) {
+                programmed_ = 0u;
+                refresh_.PowerOnReset();
+            }
         });
     }
 
     void SaveState(StateWriter& w) override {
         Base::SaveState(w);
         w.Write("programmed", programmed_);
+        refresh_.Save(w);
     }
 
     void RestoreState(StateReader& r) override {
         Base::RestoreState(r);
         r.Read("programmed", programmed_);
+        refresh_.Restore(r);
     }
+
+    void PostRestore() override { refresh_.PostRestore(); }
 
     bool HasSdramModeRegister() const override { return M.sdram || M.sdram_mode_register; }
 
@@ -202,7 +215,16 @@ public:
     }
 
 protected:
+    uint16_t SampleRegister(uint32_t i, uint32_t addr) override {
+        if (i == kOffRfcr / 2u) return refresh_.RefreshCount();
+        return Base::SampleRegister(i, addr);
+    }
+
     void AfterStore(uint32_t i) override {
+        if (i == kOffRtcsr / 2u) refresh_.WriteControl(this->StoredReg(i));
+        if (i == kOffRtcnt / 2u) refresh_.WriteCount(this->StoredReg(i));
+        if (i == kOffRtcor / 2u) refresh_.WriteConstant(this->StoredReg(i));
+        if (i == kOffRfcr / 2u) refresh_.WriteRefreshCount(this->StoredReg(i));
         programmed_        = static_cast<uint8_t>(programmed_ | ProgrammedBit(i * 2u));
         bool width_changed = i == kOffBcr2 / 2u;
         if constexpr (M.mcr_dram_longword != 0u) {
@@ -368,6 +390,7 @@ private:
 
     const Sh77xxArea0BusWidth* area0_bus_  = nullptr;
     uint8_t                    programmed_ = 0u;
+    Sh77xxRefreshTimer         refresh_{this->emu_};
 };
 
 }

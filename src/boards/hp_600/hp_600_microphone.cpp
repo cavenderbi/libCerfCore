@@ -1,48 +1,22 @@
-#include "hp_600_microphone.h"
+#include "../sh77xx_adc_microphone.h"
 
 #include <cerfcore/boards/board_context.h>
-#include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/core/instance_threads.h>
-#include <cerfcore/state/hibernation.h>
-#include "../../host/audio_activity.h"
 #include "hp_600_family_id.h"
 
 namespace cerfcore {
 
-REGISTER_SERVICE(Hp600Microphone);
-
 namespace {
 
-constexpr size_t   kMicFifoBytes   = 65536u;
-constexpr uint16_t kMicChannels    = 1u;
-constexpr uint16_t kMicBits        = 16u;
-constexpr int32_t  kPcm16Midpoint  = 0x8000;
-constexpr uint32_t kPcm16ToAdShift = 6u;
+class Hp600Microphone : public Sh77xxAdcMicrophone {
+public:
+    using Sh77xxAdcMicrophone::Sh77xxAdcMicrophone;
+
+    bool ShouldRegister() override { return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600; }
+};
 
 }
 
-bool Hp600Microphone::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
-}
-
-void Hp600Microphone::OnReady() {
-    activity_ = &emu_.Get<AudioActivity>();
-    activity_->NotePresent();
-    mic_.Start(emu_.Get<InstanceThreads>(), emu_.TryGet<AudioInputs>(), "Hp600Microphone", kMicFifoBytes);
-    emu_.Get<Hibernation>().RegisterPostRestoreListener([this] { mic_.Clear(); });
-}
-
-void Hp600Microphone::OnShutdown() { mic_.Stop(); }
-
-void Hp600Microphone::SetRate(uint32_t rate_hz) { mic_.Request(rate_hz, kMicChannels, kMicBits); }
-
-uint16_t Hp600Microphone::Convert() {
-    uint8_t pcm[2];
-    if (mic_.Take(pcm, sizeof(pcm)) != sizeof(pcm)) return static_cast<uint16_t>(kPcm16Midpoint >> kPcm16ToAdShift);
-    activity_->MarkRx();
-    const int32_t sample = static_cast<int16_t>(cerf::le::U16(pcm, 0u));
-    return static_cast<uint16_t>((sample + kPcm16Midpoint) >> kPcm16ToAdShift);
-}
+REGISTER_SERVICE_AS(Hp600Microphone, Sh77xxAdcMicrophone);
 
 }

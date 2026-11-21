@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cerfcore/peripherals/peripheral_base.h>
+#include "sh77xx_dma_external_requests.h"
 #include "sh77xx_standby_control.h"
 
 #include <cstdint>
@@ -41,6 +42,7 @@ public:
 
     void Request(Sh77xxDmaRequest source);
     void Withdraw(Sh77xxDmaRequest source);
+    void DreqChanged(uint32_t channel);
     bool TakesRequest(Sh77xxDmaRequest source) const;
     bool Transferring(Sh77xxDmaRequest source) const;
     bool ClockStopped() const;
@@ -91,6 +93,7 @@ private:
     void     ValidateStart(const Channel& ch);
     void     ValidateRequestRegister(const Channel& ch, uint32_t rs);
     void     AbortReload(Channel& ch);
+    void     DropExternalRequest(const Channel& ch);
     void     ClearModuleRequest(uint32_t rs);
     int      Pick();
     void     Service();
@@ -112,6 +115,7 @@ private:
     uint8_t       rr_first_        = 0u;
     uint8_t       transferring_rs_ = 0u;
     bool          servicing_       = false;
+    Sh77xxDmaExternalRequests external_;
 };
 
 }

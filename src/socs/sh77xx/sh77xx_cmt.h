@@ -5,7 +5,7 @@
 #include "../../execution/guest_cycle_clock.h"
 #include "../cycle_anchored_counter.h"
 #include "sh77xx_dmac.h"
-#include "sh77xx_peripheral_clock_ticks.h"
+#include "sh77xx_clock_ticks.h"
 #include "sh77xx_standby_control.h"
 
 #include <cstdint>
@@ -47,7 +47,7 @@ private:
     GuestCycleClock*           clock_  = nullptr;
     GuestCycleClock::Event*    event_  = nullptr;
     Sh77xxDmac*                dmac_   = nullptr;
-    Sh77xxPeripheralClockTicks pclk_{emu_};
+    Sh77xxClockTicks           pclk_{emu_, Sh77xxTickedClock::kPeripheral};
     uint16_t                   cmstr_        = 0u;
     uint16_t                   cmcsr_        = 0u;
     uint16_t                   cmcor_        = 0xFFFFu;

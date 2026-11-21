@@ -1,4 +1,5 @@
 #include "../sh77xx/sh77xx_adc.h"
+#include "../sh77xx/sh77xx_pfc.h"
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
@@ -17,6 +18,7 @@ public:
 protected:
     ControlModel Control() const override { return ControlModel{0xE0u, 0x07u, 0x18u, 0x20u, false}; }
     uint8_t      Stbcr2ModuleStop() const override { return kStbcr2Mstp5; }
+    TriggerPin   AdTriggerPin() const override { return TriggerPin{kSh77xxPortH, 5u}; }
 
 private:
     static constexpr uint8_t kStbcr2Mstp5 = 0x04u;

@@ -1,10 +1,10 @@
 #pragma once
 
+#include "../../host/host_pcm_queue.h"
 #include "../../host/paced_wave_out.h"
 #include "vr41xx_aiu_path.h"
 
 #include <cstdint>
-#include <vector>
 
 namespace cerfcore {
 
@@ -41,12 +41,11 @@ protected:
     void     ResumeHost() override;
 
 private:
-    void FlushHost();
     bool Audible() const { return switch_on_ && host_.ConverterEnabled(Vr41xxAiuChannel::Out); }
 
     Vr41xxAudioSwitch*   switch_    = nullptr;
     PacedWaveOut         paced_;
-    std::vector<uint8_t> out_;
+    HostPcmQueue         out_;
     uint16_t             sodat_     = 0x200u;
     uint16_t             sdmadat_   = 0x200u;
     bool                 sodatv_    = false;

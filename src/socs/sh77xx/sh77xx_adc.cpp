@@ -6,6 +6,7 @@
 #include <cerfcore/state/state_stream.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "sh77xx_analog_inputs.h"
+#include "sh77xx_pfc.h"
 #include "sh77xx_standby_entry.h"
 
 namespace cerfcore {
@@ -42,6 +43,7 @@ constexpr const char* kDataNames[4] = {"addra", "addrb", "addrc", "addrd"};
 void Sh77xxAdc::OnReady() {
     intc_   = &emu_.Get<Sh77xxIntc>();
     dmac_   = &emu_.Get<Sh77xxDmac>();
+    pfc_    = &emu_.Get<Sh77xxPfc>();
     stbcr2_ = &emu_.Get<Sh77xxStbcr2>();
     inputs_ = &emu_.Get<Sh77xxAnalogInputs>();
     clock_  = &emu_.Get<GuestCycleClock>();
@@ -126,10 +128,13 @@ void Sh77xxAdc::WriteControlStatus(uint8_t value) {
     Drive();
 }
 
-void Sh77xxAdc::ExternalTrigger() {
-    if ((adcr_ & kTriggerEnable) != kTriggerEnable || scanning_) return;
+bool Sh77xxAdc::ExternalTrigger() {
+    const TriggerPin pin = AdTriggerPin();
+    if (pfc_->PinMode(pin.port, pin.pin) != kSh77xxPinModeOther) return false;
+    if ((adcr_ & kTriggerEnable) != kTriggerEnable || scanning_) return false;
     Start();
     Drive();
+    return true;
 }
 
 void Sh77xxAdc::Start() {

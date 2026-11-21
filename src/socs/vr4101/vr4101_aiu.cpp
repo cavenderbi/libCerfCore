@@ -9,6 +9,7 @@
 #include <cerfcore/state/state_stream.h>
 #include "../../cpu/mips/mips_core_clock.h"
 #include "../../execution/guest_cycle_clock.h"
+#include "../../host/host_pcm_queue.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../guest_sample_clock.h"
 #include "../oscillator_ticks.h"
@@ -59,7 +60,6 @@ constexpr uint16_t kIntBits   = kIntStart | kIntIdle | kIntPage | kIntEnd;
 constexpr uint16_t kIntWrite  = 0x00FFu;
 constexpr uint64_t kNever     = UINT64_MAX;
 
-constexpr GuestCycleClock::Rate   kFlushRate{100u, 1u};
 constexpr Vr41xxDmaPageInterrupts kPages{kIntPage, kIntEnd};
 constexpr Vr4101DmaChannel        kChannel = Vr4101DmaChannel::kAiu;
 constexpr uint16_t kDrqAiu = static_cast<uint16_t>(1u << static_cast<uint32_t>(kChannel));
@@ -269,7 +269,7 @@ void Vr4101Aiu::SetSequencer(bool on) {
     idle_      = false;
     buzz_done_ = false;
     out_.Begin();
-    flush_.Start(kFlushRate);
+    flush_.Start(kHostPcmFlushRate);
 }
 
 bool Vr4101Aiu::StartSegment() {
@@ -477,7 +477,7 @@ void Vr4101Aiu::RestoreState(StateReader& r) {
 
 void Vr4101Aiu::PostRestore() {
     out_.Resume(seqen_ != 0u);
-    if (seqen_) flush_.Start(kFlushRate);
+    if (seqen_) flush_.Start(kHostPcmFlushRate);
     else        flush_.Stop();
     gate_.Refresh();
     ints_.Publish();
