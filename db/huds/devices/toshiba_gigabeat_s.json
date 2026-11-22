@@ -1,6 +1,5 @@
 {
   "name": "Toshiba Gigabeat S",
   "board_family_ids": ["toshiba_gigabeat_s"],
-  "gap": 0.02,
   "panels": [{ "side": "bottom", "align": "center", "width": 1.0, "height": 0.5, "content": "gigabeat_keys" }]
 }

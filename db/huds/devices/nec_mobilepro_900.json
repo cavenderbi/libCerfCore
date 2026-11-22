@@ -1,0 +1,14 @@
+{
+  "name": "NEC MobilePro 900",
+  "board_family_ids": ["nec_mobilepro_900_series"],
+  "panels": [
+    {
+      "side": "top",
+      "align": "end",
+      "width": 0.04,
+      "height": 0.025,
+      "content": {},
+      "indicators": [{ "lamp": { "object": ["notification_led"] }, "x": 0.5, "y": 0.5, "size": 0.7 }]
+    }
+  ]
+}

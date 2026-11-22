@@ -15,6 +15,8 @@
 
 namespace cerfcore {
 
+class InstanceThreads;
+
 enum class NotificationKind : uint8_t { Warning, Error, Success };
 
 enum class NotificationId : uint32_t {
@@ -23,6 +25,7 @@ enum class NotificationId : uint32_t {
     LoadingState     = 3,
     GuestSleeping    = 4,
     SavingCrashState = 5,
+    DeviceVibrating  = 6,
 };
 
 struct NotificationCard {
@@ -39,6 +42,7 @@ public:
 
     void Show(NotificationId id, NotificationKind kind, std::string text);
     void Close(NotificationId id);
+    void CloseAfter(NotificationId id, std::chrono::milliseconds delay);
     void Post(NotificationKind kind, std::string text, std::chrono::milliseconds timeout = {});
     void PostError(std::string text);
     void Dismiss(uint32_t id);
@@ -57,6 +61,8 @@ private:
     };
 
     bool Remove(uint32_t id, const char* how);
+    void DropExpiriesLocked(uint32_t id);
+    void ArmExpiryLocked(uint32_t id, Clock::time_point at, InstanceThreads& threads);
     void NotifyChanged();
     void ExpireLoop();
 

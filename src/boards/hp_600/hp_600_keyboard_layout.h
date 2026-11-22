@@ -6,7 +6,6 @@
 
 #include <array>
 #include <cstdint>
-#include <optional>
 #include <span>
 
 namespace cerfcore {
@@ -28,8 +27,7 @@ public:
     virtual std::span<const Hp600HostAlias> HostAliases() const = 0;
     virtual std::span<const jornada_kbd::LayerKey> AltGrLayer() const = 0;
 
-    bool                    Scanned(uint32_t cell) const;
-    std::optional<uint32_t> ScannedCellOf(uint8_t vk) const;
+    bool Scanned(uint32_t cell) const;
 };
 
 }

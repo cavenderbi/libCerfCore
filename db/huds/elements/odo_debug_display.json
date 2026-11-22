@@ -1,0 +1,13 @@
+{
+  "row": [
+    { "grow": 4, "display": { "object": ["debug_display"] } },
+    { "lamp": { "object": ["debug_display", "led7"] } },
+    { "lamp": { "object": ["debug_display", "led6"] } },
+    { "lamp": { "object": ["debug_display", "led5"] } },
+    { "lamp": { "object": ["debug_display", "led4"] } },
+    { "lamp": { "object": ["debug_display", "led3"] } },
+    { "lamp": { "object": ["debug_display", "led2"] } },
+    { "lamp": { "object": ["debug_display", "led1"] } },
+    { "lamp": { "object": ["debug_display", "led0"] } }
+  ]
+}

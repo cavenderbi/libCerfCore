@@ -1,9 +1,15 @@
 {
   "name": "PocketPostPet",
   "board_family_ids": ["casio_pocketpostpet"],
-  "gap": 0.02,
   "panels": [
-    { "side": "left", "align": "center", "width": 0.4, "height": 1.0, "content": "pocketpostpet_keys" },
+    {
+      "side": "left",
+      "align": "center",
+      "width": 0.4,
+      "height": 1.0,
+      "content": "pocketpostpet_keys",
+      "indicators": [{ "lamp": { "object": ["notification_led"] }, "x": 0.1, "y": 0.97, "size": 0.12 }]
+    },
     { "side": "right", "align": "center", "width": 0.25, "height": 1.0, "content": "pocketpostpet_bezel" }
   ]
 }

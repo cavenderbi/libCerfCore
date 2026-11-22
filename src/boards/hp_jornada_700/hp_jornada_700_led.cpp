@@ -1,8 +1,10 @@
 #include "hp_jornada_700_led.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/core/log.h>
 #include <cerfcore/host/machine_object_tree.h>
 #include <cerfcore/state/emulation_freeze.h>
+#include <cerfcore/state/hibernation.h>
 #include "../../socs/sa11xx/sa11xx_gpio.h"
 #include <cerfcore/boards/board_context.h>
 #include "hp_jornada_700_family_id.h"
@@ -14,6 +16,7 @@ REGISTER_SERVICE(HpJornada700Led);
 namespace {
 constexpr uint32_t  kBlinkHalfMs = 500;
 constexpr ObjectRgb kLedColor{120, 255, 140};
+constexpr uint32_t  kButtonPin   = 13;
 }
 
 bool HpJornada700Led::ShouldRegister() {
@@ -22,8 +25,8 @@ bool HpJornada700Led::ShouldRegister() {
 }
 
 void HpJornada700Led::OnReady() {
-    /* Button line idles high; a press pulls it low (falling edge, GFER13). */
-    emu_.Get<Sa11xxGpio>().DriveInputPin(13, /*level=*/true);
+    DriveButtonLine(false);
+    emu_.Get<Hibernation>().RegisterPostRestoreListener([this] { DriveButtonLine(false); });
     auto& tree = emu_.Get<MachineObjectTree>();
     tree.Add(this);
     tree.Add(&button_, this);
@@ -50,12 +53,14 @@ HpJornada700Led::State HpJornada700Led::CurrentState() const {
     return state_;
 }
 
-void HpJornada700Led::PressButton() {
-    auto  frozen = emu_.Get<EmulationFreeze>().WorkerSection();
-    auto& gpio   = emu_.Get<Sa11xxGpio>();
-    gpio.DriveInputPin(13, false);
-    gpio.DriveInputPin(13, true);
+void HpJornada700Led::DriveButton(bool pressed) {
+    auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
+    DriveButtonLine(pressed);
+    LOG(Periph, "[J720LED] button %s, GPIO edges 0x%08X\n", pressed ? "down" : "up",
+        emu_.Get<Sa11xxGpio>().InputEdges());
 }
+
+void HpJornada700Led::DriveButtonLine(bool pressed) { emu_.Get<Sa11xxGpio>().DriveInputPin(kButtonPin, !pressed); }
 
 LampState HpJornada700Led::Lamp() const {
     const State s     = CurrentState();

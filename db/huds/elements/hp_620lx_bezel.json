@@ -1,8 +1,8 @@
 {
   "column": [
     "bezel_settings",
-    { "button": { "action": "mail", "icon": "mail" } },
-    { "button": { "action": "fax", "icon": "fax" } },
-    { "button": { "action": "find", "icon": "search" } }
+    { "button": { "action": ["mail"], "icon": "mail" } },
+    { "button": { "action": ["fax"], "icon": "fax" } },
+    { "button": { "action": ["find"], "icon": "search" } }
   ]
 }

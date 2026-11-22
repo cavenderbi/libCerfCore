@@ -1,6 +1,6 @@
 {
   "column": [
-    { "row": [{ "button": { "action": "on_key", "label": "ON" } }, "jornada_power", { "grow": 11 }] },
+    { "row": [{ "button": { "action": ["on_key"], "label": "ON" } }, "jornada_power", { "grow": 11 }] },
     {
       "row": [
         { "button": { "keys": ["VK_ESCAPE"] } },

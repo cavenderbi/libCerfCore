@@ -38,6 +38,7 @@ void NotificationStack::Show(NotificationId id, NotificationKind kind, std::stri
     LOG(Cerf, "[NOTIFY] show id=%u '%s'\n", key, text.c_str());
     {
         std::lock_guard<std::mutex> lk(mtx_);
+        DropExpiriesLocked(key);
         auto it = std::find_if(cards_.begin(), cards_.end(),
                                [key](const NotificationCard& c) { return c.id == key; });
         if (it != cards_.end()) {
@@ -62,13 +63,25 @@ void NotificationStack::Post(NotificationKind kind, std::string text, std::chron
             static_cast<long long>(timeout.count()), text.c_str());
         cards_.push_back({key, kind, std::move(text)});
         gen_.fetch_add(1, std::memory_order_acq_rel);
-        if (timed && !stop_) {
-            expiries_.push_back({key, Clock::now() + timeout});
-            if (!expiry_worker_.joinable()) expiry_worker_ = threads->Start([this] { ExpireLoop(); });
-            wake_.notify_all();
-        }
+        if (timed && !stop_) ArmExpiryLocked(key, Clock::now() + timeout, *threads);
     }
     NotifyChanged();
+}
+
+void NotificationStack::CloseAfter(NotificationId id, std::chrono::milliseconds delay) {
+    InstanceThreads&            threads = emu_.Get<InstanceThreads>();
+    const uint32_t              key     = static_cast<uint32_t>(id);
+    std::lock_guard<std::mutex> lk(mtx_);
+    if (stop_ || std::none_of(cards_.begin(), cards_.end(), [key](const NotificationCard& c) { return c.id == key; }))
+        return;
+    ArmExpiryLocked(key, Clock::now() + delay, threads);
+}
+
+void NotificationStack::ArmExpiryLocked(uint32_t id, Clock::time_point at, InstanceThreads& threads) {
+    DropExpiriesLocked(id);
+    expiries_.push_back({id, at});
+    if (!expiry_worker_.joinable()) expiry_worker_ = threads.Start([this] { ExpireLoop(); });
+    wake_.notify_all();
 }
 
 void NotificationStack::PostError(std::string text) { Post(NotificationKind::Error, std::move(text)); }
@@ -91,9 +104,13 @@ void NotificationStack::Dismiss(uint32_t id) {
     if (removed) NotifyChanged();
 }
 
-bool NotificationStack::Remove(uint32_t id, const char* how) {
+void NotificationStack::DropExpiriesLocked(uint32_t id) {
     expiries_.erase(std::remove_if(expiries_.begin(), expiries_.end(), [id](const Expiry& e) { return e.id == id; }),
                     expiries_.end());
+}
+
+bool NotificationStack::Remove(uint32_t id, const char* how) {
+    DropExpiriesLocked(id);
     auto it = std::find_if(cards_.begin(), cards_.end(),
                            [id](const NotificationCard& c) { return c.id == id; });
     if (it == cards_.end()) return false;

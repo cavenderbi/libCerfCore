@@ -10,9 +10,18 @@
 
 namespace cerfcore {
 
+enum class HudLampShape : uint8_t { kCircle };
+
+struct HudLamp {
+    std::vector<std::string> object;
+    HudLampShape             shape = HudLampShape::kCircle;
+};
+
 struct HudFace {
-    std::string label;
-    std::string icon;
+    std::string              label;
+    std::string              icon;
+    HudLamp                  lamp;
+    std::vector<std::string> display;
 };
 
 struct HudLayerFace {
@@ -22,7 +31,7 @@ struct HudLayerFace {
 
 struct HudButton {
     std::vector<uint8_t>      keys;
-    std::string               action;
+    std::vector<std::string>  action;
     HudFace                   face;
     std::vector<HudLayerFace> layer_faces;
 };
@@ -39,7 +48,7 @@ struct HudDpad {
 };
 
 struct HudNode {
-    enum class Kind : uint8_t { kRow, kColumn, kButton, kDpad, kSticker, kSpace };
+    enum class Kind : uint8_t { kRow, kColumn, kButton, kDpad, kSticker, kSpace, kIndicator };
 
     Kind                 kind = Kind::kSpace;
     double               grow = 1.0;
@@ -52,12 +61,20 @@ struct HudNode {
 enum class HudSide : uint8_t { kTop, kBottom, kLeft, kRight };
 enum class HudAlign : uint8_t { kStart, kCenter, kEnd };
 
+struct HudIndicator {
+    HudNode node;
+    double  x    = 0.5;
+    double  y    = 0.5;
+    double  size = 0.5;
+};
+
 struct HudPanel {
-    HudSide  side   = HudSide::kBottom;
-    HudAlign align  = HudAlign::kCenter;
-    double   width  = 1.0;
-    double   height = 1.0;
-    HudNode  root;
+    HudSide                   side   = HudSide::kBottom;
+    HudAlign                  align  = HudAlign::kCenter;
+    double                    width  = 1.0;
+    double                    height = 1.0;
+    HudNode                   root;
+    std::vector<HudIndicator> indicators;
 };
 
 struct DbHud {
@@ -66,7 +83,6 @@ struct DbHud {
     std::vector<std::string>    board_ids;
     std::vector<std::string>    board_family_ids;
     std::vector<DbLcdPanelSize> screens;
-    double                      gap = 0.0;
     std::vector<HudPanel>       panels;
 
     const DbLcdPanelSize& ScreenFor(double width, double height) const;

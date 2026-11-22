@@ -1,10 +1,17 @@
 {
   "name": "HP Jornada 680",
   "board_family_ids": ["hp_600"],
-  "gap": 0.01,
   "panels": [
     { "side": "left", "align": "center", "width": 0.25, "height": 0.75, "content": "jornada_680_audio" },
     { "side": "right", "align": "center", "width": 0.25, "height": 1.0, "content": "jornada_680_bezel" },
+    {
+      "side": "bottom",
+      "align": "center",
+      "width": 0.1,
+      "height": 0.03,
+      "content": {},
+      "indicators": [{ "lamp": { "object": ["led"] }, "x": 0.5, "y": 0.5, "size": 0.7 }]
+    },
     { "side": "bottom", "align": "center", "width": 1.0, "height": 0.42, "content": "jornada_680_keyboard" }
   ]
 }

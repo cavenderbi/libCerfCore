@@ -1,0 +1,108 @@
+{
+  "column": [
+    {
+      "row": [
+        { "button": { "keys": ["VK_ESCAPE"] } },
+        { "button": { "keys": ["VK_F1"] } },
+        { "button": { "keys": ["VK_F2"] } },
+        { "button": { "keys": ["VK_F3"] } },
+        { "button": { "keys": ["VK_F4"] } },
+        { "button": { "keys": ["VK_F5"] } },
+        { "button": { "keys": ["VK_F6"] } },
+        { "button": { "keys": ["VK_F7"] } },
+        { "button": { "keys": ["VK_F8"] } },
+        { "button": { "keys": ["VK_F9"] } },
+        { "button": { "keys": ["VK_F10"] } },
+        { "button": { "keys": ["VK_F11"] } },
+        { "button": { "keys": ["VK_F12"] } },
+        { "button": { "keys": ["VK_INSERT"] } },
+        { "button": { "keys": ["VK_DELETE"] } }
+      ]
+    },
+    {
+      "row": [
+        { "button": { "keys": ["VK_OEM_3"] } },
+        { "button": { "keys": ["VK_1"] } },
+        { "button": { "keys": ["VK_2"] } },
+        { "button": { "keys": ["VK_3"] } },
+        { "button": { "keys": ["VK_4"] } },
+        { "button": { "keys": ["VK_5"] } },
+        { "button": { "keys": ["VK_6"] } },
+        { "button": { "keys": ["VK_7"] } },
+        { "button": { "keys": ["VK_8"] } },
+        { "button": { "keys": ["VK_9"] } },
+        { "button": { "keys": ["VK_0"] } },
+        { "button": { "keys": ["VK_OEM_MINUS"] } },
+        { "button": { "keys": ["VK_OEM_PLUS"] } },
+        { "grow": 2, "column": ["jornada_backspace"] }
+      ]
+    },
+    {
+      "row": [
+        { "grow": 1.5, "column": ["tab_key"] },
+        { "button": { "keys": ["VK_Q"] } },
+        { "button": { "keys": ["VK_W"] } },
+        { "button": { "keys": ["VK_E"] } },
+        { "button": { "keys": ["VK_R"] } },
+        { "button": { "keys": ["VK_T"] } },
+        { "button": { "keys": ["VK_Y"] } },
+        { "button": { "keys": ["VK_U"] } },
+        { "button": { "keys": ["VK_I"] } },
+        { "button": { "keys": ["VK_O"] } },
+        { "button": { "keys": ["VK_P"] } },
+        { "button": { "keys": ["VK_OEM_4"] } },
+        { "button": { "keys": ["VK_OEM_6"] } },
+        { "grow": 1.5, "button": { "keys": ["VK_OEM_5"] } }
+      ]
+    },
+    {
+      "row": [
+        { "grow": 1.75, "button": { "keys": ["VK_CAPITAL"], "icon": "keyboard_capslock" } },
+        { "button": { "keys": ["VK_A"] } },
+        { "button": { "keys": ["VK_S"] } },
+        { "button": { "keys": ["VK_D"] } },
+        { "button": { "keys": ["VK_F"] } },
+        { "button": { "keys": ["VK_G"] } },
+        { "button": { "keys": ["VK_H"] } },
+        { "button": { "keys": ["VK_J"] } },
+        { "button": { "keys": ["VK_K"] } },
+        { "button": { "keys": ["VK_L"] } },
+        { "button": { "keys": ["VK_OEM_1"] } },
+        { "button": { "keys": ["VK_OEM_7"] } },
+        { "grow": 2.25, "column": ["jornada_enter"] }
+      ]
+    },
+    {
+      "row": [
+        { "grow": 2, "column": ["shift_key"] },
+        { "button": { "keys": ["VK_Z"] } },
+        { "button": { "keys": ["VK_X"] } },
+        { "button": { "keys": ["VK_C"] } },
+        { "button": { "keys": ["VK_V"] } },
+        { "button": { "keys": ["VK_B"] } },
+        { "button": { "keys": ["VK_N"] } },
+        { "button": { "keys": ["VK_M"] } },
+        { "button": { "keys": ["VK_OEM_COMMA"] } },
+        { "button": { "keys": ["VK_OEM_PERIOD"] } },
+        { "button": { "keys": ["VK_OEM_2"] } },
+        { "button": { "keys": ["VK_PRIOR"] } },
+        { "button": { "keys": ["VK_UP"], "icon": "arrow_upward" } },
+        { "button": { "keys": ["VK_NEXT"] } }
+      ]
+    },
+    {
+      "row": [
+        { "button": { "keys": ["VK_CONTROL"] } },
+        { "button": { "keys": ["VK_MENU"] } },
+        { "grow": 6, "column": ["space_key"] },
+        { "button": { "keys": ["VK_MENU"] } },
+        { "button": { "keys": ["VK_CONTROL"] } },
+        { "button": { "keys": ["VK_HOME"] } },
+        { "button": { "keys": ["VK_END"] } },
+        { "button": { "keys": ["VK_LEFT"], "icon": "arrow_back" } },
+        { "button": { "keys": ["VK_DOWN"], "icon": "arrow_downward" } },
+        { "button": { "keys": ["VK_RIGHT"], "icon": "arrow_forward" } }
+      ]
+    }
+  ]
+}

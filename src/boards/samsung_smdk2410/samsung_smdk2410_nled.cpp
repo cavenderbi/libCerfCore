@@ -80,7 +80,7 @@ public:
 private:
     class Vibrator final : public MachineVibrator {
     public:
-        explicit Vibrator(SamsungSmdk2410NotificationLed& owner) : owner_(owner) {}
+        Vibrator(SamsungSmdk2410NotificationLed& owner, CerfEmulator& emu) : MachineVibrator(emu), owner_(owner) {}
         std::string ObjectId() const override { return "vibrator"; }
         static constexpr char kObjectName[] = "Vibrator";
         std::string ObjectName() const override { return kObjectName; }
@@ -98,7 +98,7 @@ private:
 
     mutable std::mutex                            state_mutex_;
     std::array<uint8_t, kNumLeds * kBytesPerLed>  regs_{};
-    Vibrator                                      vibrator_{*this};
+    Vibrator                                      vibrator_{*this, emu_};
 };
 
 uint8_t SamsungSmdk2410NotificationLed::Mode(uint32_t led) const {

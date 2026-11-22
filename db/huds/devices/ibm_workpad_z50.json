@@ -1,6 +1,14 @@
 {
   "name": "IBM WorkPad z50",
   "board_family_ids": ["ibm_workpad_z50"],
-  "gap": 0.01,
-  "panels": [{ "side": "bottom", "align": "center", "width": 1.0, "height": 0.42, "content": "workpad_z50_keyboard" }]
+  "panels": [
+    {
+      "side": "bottom",
+      "align": "center",
+      "width": 1.0,
+      "height": 0.42,
+      "content": "workpad_z50_keyboard",
+      "indicators": [{ "lamp": { "object": ["notification_led"] }, "x": 0.969, "y": 0.035, "size": 0.037 }]
+    }
+  ]
 }

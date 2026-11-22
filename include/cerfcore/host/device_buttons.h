@@ -21,8 +21,6 @@ public:
 
     void OnReady() override;
 
-    std::vector<MachineButton*> Buttons() const;
-
 protected:
     struct ButtonSpec {
         std::string           id;
@@ -47,9 +45,11 @@ private:
         WiredButton(CerfEmulator& emu, ButtonSpec spec) : MachineButton(emu), spec_(std::move(spec)) {}
         std::string ObjectId() const override { return spec_.id; }
         std::string ObjectName() const override { return spec_.name; }
+        bool        Momentary() const override { return true; }
 
     private:
         bool Pressed() override;
+        void Released() override {}
 
         ButtonSpec spec_;
     };

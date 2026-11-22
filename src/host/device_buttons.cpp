@@ -18,12 +18,6 @@ void DeviceButtons::OnReady() {
     }
 }
 
-std::vector<MachineButton*> DeviceButtons::Buttons() const {
-    std::vector<MachineButton*> out;
-    for (const auto& button : buttons_) out.push_back(button.get());
-    return out;
-}
-
 std::vector<DeviceButtons::ButtonSpec> DeviceButtons::RawTapColumn(std::span<const RawTapButton> buttons,
                                                                    uint16_t adc_x,
                                                                    std::function<void(uint16_t, uint16_t)> tap) const {

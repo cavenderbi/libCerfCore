@@ -1,6 +1,14 @@
 {
   "name": "Casio Cassiopeia A-51",
   "board_ids": ["casio_cassiopeia_a50", "casio_cassiopeia_a51", "casio_cassiopeia_pa_2000"],
-  "gap": 0.01,
-  "panels": [{ "side": "bottom", "align": "center", "width": 1.0, "height": 0.45, "content": "casio_a51_keyboard" }]
+  "panels": [
+    {
+      "side": "bottom",
+      "align": "center",
+      "width": 1.0,
+      "height": 0.45,
+      "content": "casio_a51_keyboard",
+      "indicators": [{ "lamp": { "object": ["notification_led"] }, "x": 0.76, "y": 0.08, "size": 0.05 }]
+    }
+  ]
 }

@@ -1,9 +1,16 @@
 {
   "name": "Compaq Aero 1500",
   "board_family_ids": ["compaq_aero_1500"],
-  "gap": 0.02,
   "panels": [
     { "side": "bottom", "align": "center", "width": 1.0, "height": 0.24, "content": "aero_app_keys" },
+    {
+      "side": "top",
+      "align": "center",
+      "width": 0.1,
+      "height": 0.06,
+      "content": {},
+      "indicators": [{ "lamp": { "object": ["notification_led"] }, "x": 0.5, "y": 0.5, "size": 0.7 }]
+    },
     { "side": "left", "align": "start", "width": 0.2, "height": 0.75, "content": "aero_side_keys" }
   ]
 }

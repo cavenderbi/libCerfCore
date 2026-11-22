@@ -4,6 +4,7 @@
 #include "service.h"
 #include <cerfengine/isa.h>
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -93,7 +94,8 @@ struct DbBoard {
     RomPlacingMode                rom_placing_mode;
     bool                          configurable_screen;
     uint32_t                      device_year;
-    std::vector<std::string>          notes;
+    std::optional<std::array<uint8_t, 3>> led_color;
+    std::vector<std::string>              notes;
     std::vector<DbDeviceSpec>         specs;
     std::vector<DbBoardConfigSetting> config;
 };

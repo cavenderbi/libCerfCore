@@ -1,1 +1,1 @@
-{ "button": { "action": "settings", "icon": "settings" } }
+{ "button": { "action": ["settings"], "icon": "settings" } }

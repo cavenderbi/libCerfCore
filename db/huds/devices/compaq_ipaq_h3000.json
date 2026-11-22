@@ -1,9 +1,15 @@
 {
   "name": "Compaq iPAQ H3000",
   "board_family_ids": ["compaq_ipaq_h3000"],
-  "gap": 0.02,
   "panels": [
-    { "side": "top", "align": "center", "width": 0.5, "height": 0.24, "content": "ipaq_h3000_top" },
+    {
+      "side": "top",
+      "align": "center",
+      "width": 0.5,
+      "height": 0.24,
+      "content": "ipaq_h3000_top",
+      "indicators": [{ "lamp": { "object": ["alarm_charge_led"] }, "x": 0.95, "y": 0.13, "size": 0.15 }]
+    },
     { "side": "bottom", "align": "center", "width": 1.0, "height": 0.48, "content": "ipaq_h3000_keys" }
   ]
 }

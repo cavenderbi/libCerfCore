@@ -3,6 +3,7 @@
 #include <cerfcore/peripherals/peripheral_base.h>
 
 #include <cerfcore/boards/board_context.h>
+#include <cerfcore/core/board_database.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
@@ -108,6 +109,8 @@ public:
         });
         blink_.Anchor(rtcx_.Now(), 0u);
         second_ = emu_.TryGet<Vr41xxLedSecondElement>();
+        const DbBoard& board = *emu_.Get<BoardDatabase>().FindBoard(emu_.Get<BoardContext>().GetBoardId());
+        if (board.led_color) color_ = ObjectRgb{(*board.led_color)[0], (*board.led_color)[1], (*board.led_color)[2]};
         emu_.Get<PeripheralDispatcher>().Register(this);
         auto& tree = emu_.Get<MachineObjectTree>();
         tree.Add(this);
@@ -204,8 +207,8 @@ public:
     LampState   Lamp() const override {
         uint16_t cnt, hts, lts;
         { std::lock_guard<std::mutex> lk(state_mutex_); cnt = cnt_; hts = hts_; lts = lts_; }
-        if ((cnt & kCntEnable) == 0u) return LampState{false, false, kLedColor};
-        return LampState{true, true, kLedColor, UnitsToMs(hts), UnitsToMs(lts)};
+        if ((cnt & kCntEnable) == 0u) return LampState{false, false, color_};
+        return LampState{true, true, color_, UnitsToMs(hts), UnitsToMs(lts)};
     }
 
 private:
@@ -369,6 +372,7 @@ private:
     WideTickAnchoredCounter blink_;
 
     Vr41xxLedSecondElement* second_ = nullptr;
+    ObjectRgb               color_  = kLedColor;
 };
 
 }  /* namespace cerf_vr41xx_led_detail */

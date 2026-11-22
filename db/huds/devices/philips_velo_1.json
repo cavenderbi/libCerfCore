@@ -1,6 +1,5 @@
 {
   "name": "Philips Velo 1",
   "board_family_ids": ["philips_velo_1"],
-  "gap": 0.01,
   "panels": [{ "side": "bottom", "align": "center", "width": 1.0, "height": 0.38, "content": "velo_keyboard" }]
 }

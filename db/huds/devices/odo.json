@@ -1,0 +1,8 @@
+{
+  "name": "Microsoft Hardware Reference Platform",
+  "board_family_ids": ["odo"],
+  "panels": [
+    { "side": "bottom", "align": "center", "width": 1.0, "height": 0.4, "content": "ps2_keyboard" },
+    { "side": "top", "align": "end", "width": 0.5, "height": 0.05, "content": "odo_debug_display" }
+  ]
+}

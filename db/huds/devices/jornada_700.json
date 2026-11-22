@@ -1,9 +1,9 @@
 {
   "name": "HP Jornada 700",
   "board_family_ids": ["hp_jornada_700"],
-  "gap": 0.01,
   "panels": [
     { "side": "right", "align": "center", "width": 0.25, "height": 1.0, "content": "jornada_bezel" },
+    { "side": "bottom", "align": "center", "width": 0.1, "height": 0.05, "content": "jornada_notification_button" },
     { "side": "bottom", "align": "center", "width": 1.0, "height": 0.42, "content": "jornada_keyboard" }
   ]
 }

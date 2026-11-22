@@ -3,7 +3,9 @@
 #include "machine_object.h"
 #include "published_state.h"
 
+#include <atomic>
 #include <cstdint>
+#include <mutex>
 #include <optional>
 #include <string>
 
@@ -52,11 +54,14 @@ public:
     virtual bool Vibrating() const = 0;
 
 protected:
+    explicit MachineVibrator(CerfEmulator& emu) : emu_(emu) {}
+
     void Refresh();
 
 private:
     void Republish() override { Refresh(); }
 
+    CerfEmulator&        emu_;
     PublishedState<bool> published_;
 };
 
@@ -64,14 +69,28 @@ class MachineButton : public MachineObject {
 public:
     MachineObjectKind ObjectKind() const override { return MachineObjectKind::kButton; }
 
-    void Press();
+    void Down();
+    void Up();
+
+    virtual bool Momentary() const { return false; }
+
+    void RestoreObjectState(StateReader&) final;
 
 protected:
     explicit MachineButton(CerfEmulator& emu) : emu_(emu) {}
 
-    virtual bool Pressed() = 0;
+    virtual bool Pressed()  = 0;
+    virtual void Released() = 0;
 
     CerfEmulator& emu_;
+
+private:
+    void ForgetHoldsAfterRestoreLocked();
+
+    std::mutex            mtx_;
+    uint32_t              holders_       = 0;
+    uint64_t              seen_restores_ = 0;
+    std::atomic<uint64_t> restores_{0};
 };
 
 class MachineCharacterDisplay : public MachineObject {

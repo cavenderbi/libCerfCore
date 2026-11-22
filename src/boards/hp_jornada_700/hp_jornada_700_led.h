@@ -34,14 +34,16 @@ private:
 
     private:
         bool Pressed() override {
-            owner_.PressButton();
+            owner_.DriveButton(true);
             return true;
         }
+        void Released() override { owner_.DriveButton(false); }
 
         HpJornada700Led& owner_;
     };
 
-    void  PressButton();
+    void  DriveButton(bool pressed);
+    void  DriveButtonLine(bool pressed);
     State CurrentState() const;
 
     mutable std::mutex state_mutex_;

@@ -5,6 +5,14 @@
     "casio_cassiopeia_a11j", "compaq_pc_companion_c120", "compaq_pc_companion_c120_plus_2",
     "compaq_pc_companion_c120_plus_4", "compaq_pc_companion_c140"
   ],
-  "gap": 0.01,
-  "panels": [{ "side": "bottom", "align": "center", "width": 1.0, "height": 0.45, "content": "casio_a11_keyboard" }]
+  "panels": [
+    {
+      "side": "bottom",
+      "align": "center",
+      "width": 1.0,
+      "height": 0.45,
+      "content": "casio_a11_keyboard",
+      "indicators": [{ "lamp": { "object": ["notification_led"] }, "x": 0.2, "y": 0.08, "size": 0.05 }]
+    }
+  ]
 }

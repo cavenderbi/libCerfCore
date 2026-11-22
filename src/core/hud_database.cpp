@@ -28,7 +28,6 @@ constexpr char kId[]             = "id";
 constexpr char kName[]           = "name";
 constexpr char kBoardIds[]       = "board_ids";
 constexpr char kBoardFamilyIds[] = "board_family_ids";
-constexpr char kGap[]            = "gap";
 constexpr char kPanels[]         = "panels";
 constexpr char kSide[]           = "side";
 constexpr char kAlign[]          = "align";
@@ -53,6 +52,13 @@ constexpr char kLeft[]           = "left";
 constexpr char kRight[]          = "right";
 constexpr char kCenter[]         = "center";
 constexpr char kShape[]          = "shape";
+constexpr char kLamp[]           = "lamp";
+constexpr char kDisplay[]        = "display";
+constexpr char kObject[]         = "object";
+constexpr char kIndicators[]     = "indicators";
+constexpr char kX[]              = "x";
+constexpr char kY[]              = "y";
+constexpr char kSize[]           = "size";
 
 constexpr std::pair<std::string_view, HudSide> kSides[] = {
     {"top", HudSide::kTop}, {"bottom", HudSide::kBottom}, {"left", HudSide::kLeft}, {"right", HudSide::kRight}};
@@ -62,6 +68,8 @@ constexpr std::pair<std::string_view, HudAlign> kAligns[] = {
 
 constexpr std::pair<std::string_view, HudDpadShape> kShapes[] = {
     {"rounded", HudDpadShape::kRounded}, {"circle", HudDpadShape::kCircle}};
+
+constexpr std::pair<std::string_view, HudLampShape> kLampShapes[] = {{"circle", HudLampShape::kCircle}};
 
 std::vector<uint8_t> Keys(const json& list) {
     std::vector<uint8_t> out;
@@ -74,8 +82,30 @@ std::vector<uint8_t> OptKeys(const json& object, const char* key) {
     return it == object.end() ? std::vector<uint8_t>() : Keys(*it);
 }
 
+std::vector<std::string> ObjectPath(const json& object) { return object.at(kObject).get<std::vector<std::string>>(); }
+
+HudLamp Lamp(const json& object) {
+    HudLamp lamp;
+    lamp.object = ObjectPath(object);
+    lamp.shape  = ValueByName(kLampShapes, object.value(kShape, std::string("circle")));
+    return lamp;
+}
+
+HudIndicator Indicator(const json& object) {
+    HudIndicator indicator;
+    indicator.node.kind         = HudNode::Kind::kIndicator;
+    indicator.node.sticker.lamp = Lamp(object.at(kLamp));
+    indicator.x                 = object.at(kX).get<double>();
+    indicator.y                 = object.at(kY).get<double>();
+    indicator.size              = object.at(kSize).get<double>();
+    return indicator;
+}
+
 HudFace Face(const json& object) {
-    return HudFace{object.value(kLabel, std::string()), object.value(kIcon, std::string())};
+    HudFace face;
+    face.label = object.value(kLabel, std::string());
+    face.icon  = object.value(kIcon, std::string());
+    return face;
 }
 
 std::vector<HudLayerFace> LayerFaces(const json& object) {
@@ -89,9 +119,10 @@ std::vector<HudLayerFace> LayerFaces(const json& object) {
 HudButton Button(const json& object) {
     HudButton button;
     button.keys        = OptKeys(object, kKeys);
-    button.action      = object.value(kAction, std::string());
+    button.action      = object.value(kAction, std::vector<std::string>());
     button.face        = Face(object);
     button.layer_faces = LayerFaces(object);
+    if (const auto lamp = object.find(kLamp); lamp != object.end()) button.face.lamp = Lamp(*lamp);
     return button;
 }
 
@@ -137,6 +168,12 @@ public:
         } else if (const auto sticker = value.find(kSticker); sticker != value.end()) {
             node.kind    = HudNode::Kind::kSticker;
             node.sticker = Face(*sticker);
+        } else if (const auto lamp = value.find(kLamp); lamp != value.end()) {
+            node.kind         = HudNode::Kind::kSticker;
+            node.sticker.lamp = Lamp(*lamp);
+        } else if (const auto display = value.find(kDisplay); display != value.end()) {
+            node.kind            = HudNode::Kind::kSticker;
+            node.sticker.display = ObjectPath(*display);
         } else {
             node.kind = HudNode::Kind::kSpace;
         }
@@ -150,6 +187,8 @@ public:
         panel.width  = object.at(kWidth).get<double>();
         panel.height = object.at(kHeight).get<double>();
         panel.root   = Node(object.at(kContent));
+        if (const auto list = object.find(kIndicators); list != object.end())
+            for (const json& item : *list) panel.indicators.push_back(Indicator(item));
         return panel;
     }
 
@@ -184,7 +223,6 @@ void HudDatabase::OnReady() {
             if (!Contains(hud.board_ids, board.id) && !Contains(hud.board_family_ids, board.family_id)) continue;
             hud.screens.push_back(*board.lcd_panel_size);
         }
-        hud.gap = h.value(kGap, 0.0);
         for (const json& panel : h.at(kPanels)) hud.panels.push_back(reader.Panel(panel));
         huds_.push_back(std::move(hud));
     }

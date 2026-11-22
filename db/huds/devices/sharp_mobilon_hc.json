@@ -1,6 +1,5 @@
 {
   "name": "Sharp Mobilon HC",
   "board_family_ids": ["sharp_mobilon_hc"],
-  "gap": 0.01,
   "panels": [{ "side": "bottom", "align": "center", "width": 1.0, "height": 0.4, "content": "mobilon_keyboard" }]
 }

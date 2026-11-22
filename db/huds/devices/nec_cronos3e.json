@@ -1,6 +1,15 @@
 {
   "name": "NEC CRONOS3E",
   "board_family_ids": ["nec_cronos3e"],
-  "gap": 0.01,
-  "panels": [{ "side": "bottom", "align": "center", "width": 1.0, "height": 0.4, "content": "cronos3e_keyboard" }]
+  "panels": [
+    { "side": "bottom", "align": "center", "width": 1.0, "height": 0.4, "content": "cronos3e_keyboard" },
+    {
+      "side": "top",
+      "align": "end",
+      "width": 0.04,
+      "height": 0.025,
+      "content": {},
+      "indicators": [{ "lamp": { "object": ["notification_led"] }, "x": 0.5, "y": 0.5, "size": 0.7 }]
+    }
+  ]
 }

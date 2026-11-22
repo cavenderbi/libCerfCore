@@ -1,0 +1,14 @@
+{
+  "name": "HP Jornada 540",
+  "board_family_ids": ["hp_jornada_540"],
+  "panels": [
+    {
+      "side": "top",
+      "align": "end",
+      "width": 0.1,
+      "height": 0.06,
+      "content": {},
+      "indicators": [{ "lamp": { "object": ["notification_led"] }, "x": 0.5, "y": 0.5, "size": 0.7 }]
+    }
+  ]
+}
