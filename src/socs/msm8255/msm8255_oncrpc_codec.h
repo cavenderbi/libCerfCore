@@ -31,6 +31,16 @@ public:
                                 uint32_t peer_pid, uint32_t peer_cid,
                                 uint32_t xid, const uint32_t* results,
                                 uint32_t result_words);
+    uint32_t WriteProcUnavailReply(uint32_t out_pa, uint32_t out_cap,
+                                   uint32_t self_pid, uint32_t src_cid,
+                                   uint32_t peer_pid, uint32_t peer_cid,
+                                   uint32_t xid);
+
+private:
+    uint32_t WriteReply(uint32_t out_pa, uint32_t out_cap, uint32_t self_pid,
+                        uint32_t src_cid, uint32_t peer_pid, uint32_t peer_cid,
+                        uint32_t xid, uint32_t accept_stat,
+                        const uint32_t* results, uint32_t result_words);
 };
 
 }

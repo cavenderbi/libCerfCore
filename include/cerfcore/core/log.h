@@ -39,6 +39,7 @@ namespace Log {
         X(SocSpi,      "SOC_SPI",     "any SoC SPI interface")                      \
         X(SocGpu,      "SOC_GPU",     "any SoC GPU / graphics core")                \
         X(SocReset,    "SOC_RESET",   "any SoC reset controller")                   \
+        X(SocModem,    "SOC_MODEM",   "any SoC modem processor peer")               \
         X(UsbOtg,      "USB_OTG",     "USB OTG host/device controller")             \
         X(Lcd,         "LCD",         "host display window + per-SoC LCD ctrl")     \
         X(Pcmcia,      "PCMCIA",      "board-level PCMCIA bus controller (PD6710)") \

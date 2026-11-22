@@ -117,6 +117,21 @@ uint32_t Msm8255OncrpcCodec::WriteAcceptedReply(
     uint32_t out_pa, uint32_t out_cap, uint32_t self_pid, uint32_t src_cid,
     uint32_t peer_pid, uint32_t peer_cid, uint32_t xid,
     const uint32_t* results, uint32_t result_words) {
+    return WriteReply(out_pa, out_cap, self_pid, src_cid, peer_pid, peer_cid,
+                      xid, kAcceptSuccess, results, result_words);
+}
+
+uint32_t Msm8255OncrpcCodec::WriteProcUnavailReply(
+    uint32_t out_pa, uint32_t out_cap, uint32_t self_pid, uint32_t src_cid,
+    uint32_t peer_pid, uint32_t peer_cid, uint32_t xid) {
+    return WriteReply(out_pa, out_cap, self_pid, src_cid, peer_pid, peer_cid,
+                      xid, kAcceptProcUnavail, nullptr, 0u);
+}
+
+uint32_t Msm8255OncrpcCodec::WriteReply(
+    uint32_t out_pa, uint32_t out_cap, uint32_t self_pid, uint32_t src_cid,
+    uint32_t peer_pid, uint32_t peer_cid, uint32_t xid, uint32_t accept_stat,
+    const uint32_t* results, uint32_t result_words) {
     auto& mem    = emu_.Get<EmulatedMemory>();
     auto& router = emu_.Get<Msm8255RpcRouterPeer>();
 
@@ -137,7 +152,7 @@ uint32_t Msm8255OncrpcCodec::WriteAcceptedReply(
     mem.WriteWord(out + kReplyStatOff,       Be32(kMsgAccepted));
     mem.WriteWord(out + kReplyVerfFlavorOff, Be32(kAuthNone));
     mem.WriteWord(out + kReplyVerfLenOff,    Be32(0u));
-    mem.WriteWord(out + kReplyAcceptStatOff, Be32(kAcceptSuccess));
+    mem.WriteWord(out + kReplyAcceptStatOff, Be32(accept_stat));
     for (uint32_t i = 0; i < result_words; ++i) {
         mem.WriteWord(out + kReplyResultsOff + 4u * i, Be32(results[i]));
     }

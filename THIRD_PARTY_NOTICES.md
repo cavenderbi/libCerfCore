@@ -26,6 +26,7 @@
 - **[Polynomial Interpolators for High-Quality Resampling of Oversampled Audio](http://yehar.com/blog/wp-content/uploads/2009/08/deip.pdf)** - Olli Niemitalo
 - **[qemu-neo1973](https://github.com/jvesely/qemu-neo1973)** - Openmoko
 - **[libqmi](https://gitlab.freedesktop.org/mobile-broadband/libqmi)**
+- **[ModemManager libqcdm](https://gitlab.freedesktop.org/mobile-broadband/ModemManager)**
 - **[Rockbox](https://www.rockbox.org/)**
 - **[Das U-Boot](https://github.com/u-boot/u-boot)**
 - **[handhelds.org bootldr](https://ftp.gwdg.de/pub/linux/handhelds/feeds/bootldr/)**

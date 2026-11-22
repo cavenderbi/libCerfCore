@@ -55,7 +55,11 @@ inline constexpr uint32_t kOncrpcReply   = 1u;
 inline constexpr uint32_t kOncrpcVersion = 2u;
 inline constexpr uint32_t kMsgAccepted   = 0u;
 inline constexpr uint32_t kAcceptSuccess = 0u;
+inline constexpr uint32_t kAcceptProcUnavail = 3u;
 inline constexpr uint32_t kAuthNone      = 0u;
+
+inline constexpr uint32_t kXdrTrue  = 1u;
+inline constexpr uint32_t kXdrFalse = 0u;
 
 /* RFC 5531 section 9: a call body is xid, msg_type, rpcvers, prog, vers, proc,
    then the cred and verf opaque_auth pairs, then the procedure arguments. */

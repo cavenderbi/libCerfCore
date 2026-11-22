@@ -32,11 +32,6 @@ constexpr uint32_t kProcDefineResource = 22u;
 
 constexpr uint32_t kClientTypeMax = 9u;
 
-/* RFC 4506 section 4.4: bool is enum { FALSE = 0, TRUE = 1 }. Section 4.19
-   makes an optional-data field a union whose discriminant is such a bool. */
-constexpr uint32_t kXdrTrue  = 1u;
-constexpr uint32_t kXdrFalse = 0u;
-
 constexpr uint32_t kDefineResultWords       = 1u;
 constexpr uint32_t kCreateClientResultWords = 3u;
 constexpr uint32_t kIssueRequestResultWords = 2u;

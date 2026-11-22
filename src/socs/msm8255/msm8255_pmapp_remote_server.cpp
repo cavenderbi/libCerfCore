@@ -37,9 +37,6 @@ constexpr uint32_t kSwitchDatumOff = kCallArgsOff + 8u;
 
 constexpr uint32_t kQueryWantDatumOff = kCallArgsOff + 4u;
 
-constexpr uint32_t kXdrTrue  = 1u;
-constexpr uint32_t kXdrFalse = 0u;
-
 /* Linux arch/arm/mach-msm rpc_pmapp.c: modem_to_linux_err answers success for a
    zero reply word and maps every PM_ERR_FLAG_* bit to a failure. */
 constexpr uint32_t kErrFlagNone = 0u;

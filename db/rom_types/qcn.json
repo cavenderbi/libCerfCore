@@ -1,0 +1,7 @@
+{
+  "id": "qcn",
+  "name": "NV Baseline",
+  "optional": true,
+  "board_family_ids": ["nokia_sea_ray"],
+  "formats": ["qcn"]
+}

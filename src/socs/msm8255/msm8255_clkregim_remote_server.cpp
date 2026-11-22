@@ -56,9 +56,6 @@ constexpr uint32_t kThreeArgPayloadBytes =
 
 constexpr uint32_t kResultWords = 1u;
 
-constexpr uint32_t kXdrTrue  = 1u;
-constexpr uint32_t kXdrFalse = 0u;
-
 constexpr uint32_t kCountAmbiguous = 0xFFFFFFFFu;
 
 constexpr uint32_t kClockIdCount   = 375u;
