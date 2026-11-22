@@ -21,6 +21,7 @@ constexpr sh77xx_bsc::Model kSh7729Bsc{
     .mcr_amx                  = 0x0038u,
     .mcr_amx_dram_codes       = 0x07u,
     .mcr_amx_sdram_codes      = 0xBFu,
+    .mcr_longword_read        = true,
 };
 
 constexpr sh77xx_bsc::RegWindowModel kSh7729BscWindow = sh77xx_bsc::WindowOf(kSh7729Bsc);

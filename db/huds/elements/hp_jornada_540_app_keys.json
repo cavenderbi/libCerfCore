@@ -1,0 +1,8 @@
+{
+  "row": [
+    { "button": { "keys": ["VK_F1"], "icon": "home" } },
+    { "button": { "keys": ["VK_F2"], "icon": "contacts" } },
+    { "button": { "keys": ["VK_F3"], "icon": "calendar_month" } },
+    { "button": { "keys": ["VK_F4"], "icon": "checklist" } }
+  ]
+}

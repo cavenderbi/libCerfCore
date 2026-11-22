@@ -116,6 +116,7 @@ struct Model {
     uint8_t  mcr_amx_dram_codes          = 0xFFu;
     uint8_t  mcr_amx_sdram_codes         = 0xFFu;
     bool     sdram_mode_register         = false;
+    bool     mcr_longword_read           = false;
 };
 
 constexpr RegSpec Stored(uint16_t writable, uint16_t reset, uint16_t write_zero) {
@@ -212,6 +213,11 @@ public:
             this->HaltUnsupportedAccess(why, addr, value);
         }
         Base::WriteHalf(addr, value);
+    }
+
+    uint32_t ReadWord(uint32_t addr) override {
+        if (!M.mcr_longword_read || addr - W.base != kOffMcr) this->HaltUnsupportedAccess("ReadWord", addr, 0);
+        return this->ReadHalf(addr);
     }
 
 protected:

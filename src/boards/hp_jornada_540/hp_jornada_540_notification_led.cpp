@@ -3,8 +3,10 @@
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/host/machine_object_tree.h>
+#include <cerfcore/state/emulation_freeze.h>
 #include <cerfcore/state/state_stream.h>
 #include "hp_jornada_540_battery.h"
+#include "hp_jornada_540_buttons.h"
 #include "hp_jornada_540_family_id.h"
 
 #include <algorithm>
@@ -13,10 +15,13 @@ namespace cerfcore {
 
 namespace {
 
-constexpr int64_t   kBlinkPeriodNs = 1500000000;
-constexpr uint32_t  kBlinkHalfMs   = 750u;
+constexpr int64_t   kBlinkPeriodNs     = 1500000000;
+constexpr uint32_t  kBlinkHalfMs       = 750u;
+constexpr uint32_t  kDisplayOffFlashMs = 200u;
+constexpr uint32_t  kDisplayOffDarkMs  = 2800u;
 constexpr ObjectRgb kGreen{60, 230, 90};
 constexpr ObjectRgb kAmber{255, 176, 0};
+constexpr ObjectRgb kRed{235, 40, 30};
 
 }
 
@@ -35,7 +40,15 @@ void HpJornada540NotificationLed::OnReady() {
         std::lock_guard<std::mutex> lk(mtx_);
         if (blinking_) ArmEndLocked();
     });
-    emu_.Get<MachineObjectTree>().Add(this);
+    buttons_ = &emu_.Get<HpJornada540Buttons>();
+    auto& tree = emu_.Get<MachineObjectTree>();
+    tree.Add(this);
+    tree.Add(&button_, this);
+}
+
+void HpJornada540NotificationLed::DriveButton(bool pressed) {
+    auto frozen = emu_.Get<EmulationFreeze>().WorkerSection();
+    buttons_->SetPressed(HpJornada540Button::kNotification, pressed);
 }
 
 void HpJornada540NotificationLed::Start() {
@@ -74,6 +87,15 @@ uint16_t HpJornada540NotificationLed::BlinkCount() const {
 bool HpJornada540NotificationLed::Blinking() const {
     std::lock_guard<std::mutex> lk(mtx_);
     return blinking_;
+}
+
+void HpJornada540NotificationLed::SetDisplayOff(bool off) {
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        if (display_off_ == off) return;
+        display_off_ = off;
+    }
+    Refresh();
 }
 
 void HpJornada540NotificationLed::ArmEndLocked() {
@@ -124,14 +146,20 @@ std::optional<ObjectRgb> HpJornada540NotificationLed::ChargeColor() const {
 }
 
 LampState HpJornada540NotificationLed::Lamp() const {
-    bool blinking = false;
+    bool blinking    = false;
+    bool display_off = false;
     {
         std::lock_guard<std::mutex> lk(mtx_);
-        blinking = blinking_;
+        blinking    = blinking_;
+        display_off = display_off_;
     }
     const std::optional<ObjectRgb> charge = ChargeColor();
-    if (!blinking) return charge ? LampState{true, false, *charge} : LampState{};
-    return LampState{true, true, kGreen, kBlinkHalfMs, kBlinkHalfMs, charge};
+    if (display_off) {
+        const std::optional<ObjectRgb> between = blinking ? std::optional<ObjectRgb>(kGreen) : charge;
+        return LampState{true, true, kRed, kDisplayOffFlashMs, kDisplayOffDarkMs, between};
+    }
+    if (blinking) return LampState{true, true, kGreen, kBlinkHalfMs, kBlinkHalfMs, charge};
+    return charge ? LampState{true, false, *charge} : LampState{};
 }
 
 }

@@ -8,13 +8,17 @@
 #include "../sh77xx_adc_microphone.h"
 #include "hp_jornada_540_battery.h"
 #include "hp_jornada_540_family_id.h"
+#include "hp_jornada_540_touch_panel.h"
 
 namespace cerfcore {
 
 namespace {
 
-constexpr uint32_t kMicrophoneChannel  = 0u;
-constexpr uint32_t kMainBatteryChannel = 5u;
+constexpr uint32_t kMicrophoneChannel   = 0u;
+constexpr uint32_t kTouchYChannel       = 1u;
+constexpr uint32_t kTouchXChannel       = 2u;
+constexpr uint32_t kBatteryLevelChannel = 3u;
+constexpr uint32_t kBatteryTestChannel  = 5u;
 constexpr uint8_t  kPortDRecordEnable  = 0x20u;
 constexpr uint8_t  kPortERecordEnable  = 0x80u;
 
@@ -29,12 +33,15 @@ public:
     void OnReady() override {
         battery_    = &emu_.Get<HpJornada540Battery>();
         microphone_ = &emu_.Get<Sh77xxAdcMicrophone>();
+        touch_      = &emu_.Get<HpJornada540TouchPanel>();
         wiring_     = &emu_.Get<Sh77xxPortWiring>();
     }
 
     uint16_t Convert(uint32_t channel) override {
         if (channel == kMicrophoneChannel) return ConvertMicrophone();
-        if (channel == kMainBatteryChannel) return battery_->MainBatteryCode();
+        if (channel == kTouchYChannel) return touch_->ReadPlate(HostPenTarget::Plate::kY);
+        if (channel == kTouchXChannel) return touch_->ReadPlate(HostPenTarget::Plate::kX);
+        if (channel == kBatteryLevelChannel || channel == kBatteryTestChannel) return battery_->MainBatteryCode();
         emu_.Get<Fatal>().Die("HpJornada540AnalogInputs: A/D conversion of AN%u", channel);
     }
 
@@ -50,9 +57,10 @@ private:
         return microphone_->Convert();
     }
 
-    HpJornada540Battery* battery_    = nullptr;
-    Sh77xxAdcMicrophone* microphone_ = nullptr;
-    Sh77xxPortWiring*    wiring_     = nullptr;
+    HpJornada540Battery*    battery_    = nullptr;
+    Sh77xxAdcMicrophone*    microphone_ = nullptr;
+    HpJornada540TouchPanel* touch_      = nullptr;
+    Sh77xxPortWiring*       wiring_     = nullptr;
 };
 
 }

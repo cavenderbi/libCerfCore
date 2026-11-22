@@ -2,13 +2,9 @@
   "name": "HP Jornada 540",
   "board_family_ids": ["hp_jornada_540"],
   "panels": [
-    {
-      "side": "top",
-      "align": "end",
-      "width": 0.1,
-      "height": 0.06,
-      "content": {},
-      "indicators": [{ "lamp": { "object": ["notification_led"] }, "x": 0.5, "y": 0.5, "size": 0.7 }]
-    }
+    { "side": "top", "align": "center", "width": 0.15, "height": 0.08, "content": "jornada_notification_button" },
+    { "side": "bottom", "align": "center", "width": 1.0, "height": 0.24, "content": "hp_jornada_540_app_keys" },
+    { "side": "bottom", "align": "center", "width": 0.25, "height": 0.12, "content": "jornada_power" },
+    { "side": "left", "align": "start", "width": 0.2, "height": 0.45, "content": "hp_jornada_540_side_keys" }
   ]
 }

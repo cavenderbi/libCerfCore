@@ -9,6 +9,7 @@
 #include "hp_jornada_540_battery.h"
 #include "hp_jornada_540_capture_timer.h"
 #include "hp_jornada_540_family_id.h"
+#include "hp_jornada_540_key_wake.h"
 #include "hp_jornada_540_lcd_clock.h"
 #include "hp_jornada_540_notification_led.h"
 
@@ -25,17 +26,21 @@ constexpr uint32_t kAsicBytes = 0x1000u;
 struct OutputLatchPorts {
     uint32_t set;
     uint32_t clear;
+    bool     clear_reads_complement;
 };
 
 constexpr std::array<OutputLatchPorts, 3> kLatches{{
-    {0x24u, 0x34u},
-    {0x6Cu, 0x68u},
-    {0x30u, 0x00u},
+    {0x24u, 0x34u, false},
+    {0x6Cu, 0x68u, true},
+    {0x30u, 0x00u, true},
 }};
 
 constexpr size_t   kAudioLatch          = 1u;
-constexpr size_t   kComplementReadLatch = 2u;
 constexpr uint16_t kFifoReset           = 0x0080u;
+constexpr size_t   kRunningLatch        = 1u;
+constexpr uint16_t kRunning             = 0x0002u;
+constexpr size_t   kDisplayLatch        = 2u;
+constexpr uint16_t kDisplayPower        = 0x0002u;
 constexpr uint32_t kCommandOffset    = 0x04u;
 constexpr uint32_t kStatusOffset     = 0x08u;
 constexpr uint32_t kCaptureDivisorOffset = 0x10u;
@@ -53,8 +58,9 @@ constexpr uint32_t kRegister9cOffset = 0x9Cu;
 constexpr uint16_t kLedStart         = 0x0010u;
 constexpr uint16_t kLedStop          = 0x0020u;
 constexpr uint16_t kComparatorStart  = 0x4000u;
-constexpr uint16_t kCommandPulses    = 0xAA8Au;
-constexpr uint16_t kCommandBits      = kLedStart | kLedStop | kComparatorStart | kCommandPulses;
+constexpr uint16_t kKeyWakeAck       = 0x2000u;
+constexpr uint16_t kCommandPulses    = 0x8A8Au;
+constexpr uint16_t kCommandBits      = kLedStart | kLedStop | kComparatorStart | kKeyWakeAck | kCommandPulses;
 constexpr uint16_t kCaptureControlBits = 0x0038u;
 constexpr uint16_t kLcdDividerBits     = 0x01C0u;
 constexpr uint16_t kClockBits          = kCaptureControlBits | kLcdDividerBits;
@@ -64,6 +70,7 @@ constexpr uint16_t kStatusCfAbsent   = 0x0001u;
 constexpr uint16_t kStatusLedIdle    = 0x0020u;
 constexpr uint16_t kStatusCharging   = 0x0100u;
 constexpr uint16_t kStatusAcAbsent   = 0x0400u;
+constexpr uint16_t kStatusKeyWake    = 0x0800u;
 
 class HpJornada540Asic : public Peripheral {
 public:
@@ -79,6 +86,7 @@ public:
         lcd_clock_ = &emu_.Get<HpJornada540LcdClock>();
         audio_out_ = &emu_.Get<HpJornada540AudioOut>();
         capture_   = &emu_.Get<HpJornada540CaptureTimer>();
+        key_wake_  = &emu_.Get<HpJornada540KeyWake>();
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
             if (emu_.Get<GuestCpuReset>().PowerOnReset(kind)) PowerOnReset();
         });
@@ -89,8 +97,13 @@ public:
     uint32_t MmioSize() const override { return kAsicBytes; }
 
     uint16_t ReadHalf(uint32_t addr) override {
-        switch (addr - kAsicPa) {
-            case kLatches[kComplementReadLatch].clear: return static_cast<uint16_t>(~levels_[kComplementReadLatch]);
+        const uint32_t off = addr - kAsicPa;
+        for (size_t i = 0; i < kLatches.size(); ++i) {
+            if (off == kLatches[i].clear && kLatches[i].clear_reads_complement) {
+                return static_cast<uint16_t>(~levels_[i]);
+            }
+        }
+        switch (off) {
             case kStatusOffset:     return Status();
             case kClockOffset:      return clock_;
             case kBlinkCountOffset: return led_->BlinkCount();
@@ -146,6 +159,7 @@ public:
         led_->SaveState(w);
         audio_out_->SaveState(w);
         capture_->SaveState(w);
+        key_wake_->SaveState(w);
     }
 
     void RestoreState(StateReader& r) override {
@@ -156,16 +170,23 @@ public:
         ApplyClock(clock);
         r.Read("audio_control", audio_control_);
         led_->RestoreState(r);
+        led_->SetDisplayOff(DisplayOffWhileRunning());
         audio_out_->RestoreState(r, (audio_control_ & kOutputEnable) != 0u, FifoResetHeld());
         capture_->RestoreState(r, static_cast<uint16_t>(clock & kCaptureControlBits));
+        key_wake_->RestoreState(r);
     }
 
 private:
     bool FifoResetHeld() const { return (levels_[kAudioLatch] & kFifoReset) != 0u; }
 
+    bool DisplayOffWhileRunning() const {
+        return (levels_[kDisplayLatch] & kDisplayPower) == 0u && (levels_[kRunningLatch] & kRunning) != 0u;
+    }
+
     void SetLatch(size_t i, uint16_t level) {
         levels_[i] = level;
         if (i == kAudioLatch) audio_out_->SetFifoReset(FifoResetHeld());
+        led_->SetDisplayOff(DisplayOffWhileRunning());
     }
 
     void PowerOnReset() {
@@ -175,8 +196,10 @@ private:
         ApplyClock(0u);
         led_->Stop();
         led_->WriteBlinkCount(0u);
+        led_->SetDisplayOff(DisplayOffWhileRunning());
         audio_out_->PowerOnReset();
         capture_->PowerOnReset();
+        key_wake_->Clear();
     }
 
     void SetClock(uint16_t value) {
@@ -211,6 +234,7 @@ private:
         if (!led_->Blinking()) v = static_cast<uint16_t>(v | kStatusLedIdle);
         if (battery_->Charging()) v = static_cast<uint16_t>(v | kStatusCharging);
         if (!battery_->OnExternalPower()) v = static_cast<uint16_t>(v | kStatusAcAbsent);
+        if (key_wake_->Pending()) v = static_cast<uint16_t>(v | kStatusKeyWake);
         return v;
     }
 
@@ -221,6 +245,7 @@ private:
         if (start && stop) HaltUnsupportedAccess("WriteHalf starts and stops the notification LED", addr, value);
         if (start) led_->Start();
         if (stop) led_->Stop();
+        if ((value & kKeyWakeAck) != 0u) key_wake_->Clear();
     }
 
     HpJornada540NotificationLed*          led_       = nullptr;
@@ -228,6 +253,7 @@ private:
     HpJornada540LcdClock*                 lcd_clock_ = nullptr;
     HpJornada540AudioOut*                 audio_out_ = nullptr;
     HpJornada540CaptureTimer*             capture_   = nullptr;
+    HpJornada540KeyWake*                  key_wake_  = nullptr;
     std::array<uint16_t, kLatches.size()> levels_{};
     uint16_t                              register94_    = 0u;
     uint16_t                              clock_         = 0u;
