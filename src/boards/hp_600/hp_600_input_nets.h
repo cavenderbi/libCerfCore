@@ -1,14 +1,11 @@
 #pragma once
 
-#include <cerfcore/core/callback_list.h>
 #include <cerfcore/core/service.h>
 #include "../../socs/sh77xx/sh77xx_intc.h"
 #include "hp_600_keyboard_layout.h"
 
-#include <array>
 #include <atomic>
 #include <cstdint>
-#include <functional>
 #include <mutex>
 #include <span>
 
@@ -35,7 +32,6 @@ public:
     void OnReady() override;
 
     void    Drive(Hp600InputNet net, bool high);
-    void    AddNetListener(Hp600InputNet net, std::function<void()> fn);
     bool    Wired(Hp600InputNet net) const;
     uint8_t WiredInputs(uint32_t port) const;
     uint8_t NetLevels(uint32_t port, uint8_t nets) const;
@@ -59,11 +55,10 @@ private:
     uint32_t Apply(Hp600InputNet net, bool high);
     void     ReleaseButtons();
 
-    Sh77xxIntc*                            intc_   = nullptr;
-    Sh77xxPortKeyMatrix*                   matrix_ = nullptr;
-    std::mutex                             buttons_mtx_;
-    std::atomic<uint32_t>                  high_{(1u << kNetCount) - 1u};
-    std::array<CallbackList<>, kNetCount>  listeners_;
+    Sh77xxIntc*           intc_   = nullptr;
+    Sh77xxPortKeyMatrix*  matrix_ = nullptr;
+    std::mutex            buttons_mtx_;
+    std::atomic<uint32_t> high_{(1u << kNetCount) - 1u};
 };
 
 }

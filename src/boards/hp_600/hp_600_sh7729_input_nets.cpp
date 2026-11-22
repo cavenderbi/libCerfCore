@@ -26,7 +26,7 @@ protected:
 
 private:
     static constexpr uint8_t  kPortScIrq5Pin       = 0x80u;
-    static constexpr uint16_t kPortC7SummaryColumn = 0x8000u;
+    static constexpr uint16_t kPortC7SummaryColumn = uint16_t{1u << kHp600PortC7Column};
 
     static constexpr Landing kLandings[] = {
         {Landing::Kind::kPortPin, Sh77xxIntcPin::kIrq0, kSh77xxPortJ, 0x10u},

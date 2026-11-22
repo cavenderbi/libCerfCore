@@ -1,18 +1,18 @@
+#include "hp_600_led.h"
+
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/host/machine_indicators.h>
+#include <cerfcore/core/log.h>
 #include <cerfcore/host/machine_object_tree.h>
-#include "../../socs/sh77xx/sh77xx_pfc.h"
-#include "../../socs/sh77xx/sh77xx_port_wiring.h"
-#include "hp_600_family_id.h"
+#include <cerfcore/state/state_stream.h>
 #include "hp_600_battery.h"
+#include "hp_600_family_id.h"
 #include "hp_600_input_nets.h"
-#include "hp_600_led_colors.h"
-#include "hp_600_notification_led_net.h"
+#include "hp_600_keyboard_layout.h"
+#include "../sh77xx_port_key_matrix.h"
 
 #include <cstdint>
 #include <optional>
-#include <string>
 
 namespace cerfcore {
 
@@ -33,55 +33,91 @@ ObjectRgb LedRgb(Hp600LedColor color) {
     }
 }
 
-class Hp600Led : public Service, public MachineLamp {
-public:
-    using Service::Service;
-
-    bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
-    }
-
-    void OnReady() override {
-        wiring_  = &emu_.Get<Sh77xxPortWiring>();
-        battery_ = &emu_.Get<Hp600Battery>();
-        battery_->AddChangeListener([this] { Refresh(); });
-        emu_.Get<Hp600InputNets>().AddNetListener(Hp600InputNet::kNotificationLedLoop, [this] { Refresh(); });
-        const Hp600LedColors& colors = emu_.Get<Hp600LedColors>();
-        charging_     = colors.ChargingColor();
-        notification_ = colors.NotificationColor();
-        emu_.Get<MachineObjectTree>().Add(this);
-    }
-
-    std::string ObjectId() const override { return "led"; }
-    static constexpr char kObjectName[] = "LED";
-    std::string ObjectName() const override { return kObjectName; }
-
-    LampState Lamp() const override {
-        const Charge    charge = CurrentCharge();
-        const ObjectRgb charge_color =
-            charge == Charge::kCharged ? LedRgb(Hp600LedColor::kGreen) : LedRgb(charging_);
-        if (!Flashing()) return LampState{charge != Charge::kDark, false, charge_color};
-        std::optional<ObjectRgb> between;
-        if (charge != Charge::kDark) between = charge_color;
-        return LampState{true, true, LedRgb(notification_), kFlashHalfMs, kFlashHalfMs, between};
-    }
-
-private:
-    Charge CurrentCharge() const {
-        if (battery_->Charging()) return Charge::kCharging;
-        return battery_->OnExternalPower() ? Charge::kCharged : Charge::kDark;
-    }
-
-    bool Flashing() const { return (wiring_->NetLevels(kSh77xxPortJ) & kHp600PortJNotificationLed) == 0u; }
-
-    Sh77xxPortWiring* wiring_       = nullptr;
-    Hp600Battery*     battery_      = nullptr;
-    Hp600LedColor     charging_     = Hp600LedColor::kOrange;
-    Hp600LedColor     notification_ = Hp600LedColor::kOrange;
-};
-
 }
 
 REGISTER_SERVICE(Hp600Led);
+
+bool Hp600Led::ShouldRegister() {
+    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
+}
+
+void Hp600Led::OnReady() {
+    battery_ = &emu_.Get<Hp600Battery>();
+    inputs_  = &emu_.Get<Hp600InputNets>();
+    matrix_  = &emu_.Get<Sh77xxPortKeyMatrix>();
+    battery_->AddChangeListener([this] { Refresh(); });
+    const Hp600LedColors& colors = emu_.Get<Hp600LedColors>();
+    charging_     = colors.ChargingColor();
+    notification_ = colors.NotificationColor();
+    cell_ = emu_.Get<Hp600KeyboardLayout>().LedButtonCell();
+    emu_.Get<MachineObjectTree>().Add(this);
+}
+
+void Hp600Led::TrackDrive(bool notification_drive_high) {
+    bool changed = false;
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        changed = drive_high_ != notification_drive_high;
+        if (changed && !notification_drive_high) dismissed_ = false;
+        drive_high_ = notification_drive_high;
+        DriveLoopLocked();
+    }
+    if (changed) Refresh();
+}
+
+void Hp600Led::PressButton(bool pressed) {
+    if (cell_) matrix_->SetKey(*cell_, pressed);
+    bool changed = false;
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        const bool released = button_down_ && !pressed;
+        button_down_        = pressed;
+        changed             = released && !dismissed_;
+        if (changed) dismissed_ = true;
+        if (changed) DriveLoopLocked();
+        LOG(Periph, "[HP600LED] button %s, PJ1 %s, latch %s\n", pressed ? "down" : "up", drive_high_ ? "high" : "low",
+            dismissed_ ? "cleared" : "armed");
+    }
+    if (changed) Refresh();
+}
+
+void Hp600Led::DriveLoopLocked() { inputs_->Drive(Hp600InputNet::kNotificationLedLoop, drive_high_ || dismissed_); }
+
+void Hp600Led::SaveObjectState(StateWriter& w) const {
+    std::lock_guard<std::mutex> lk(mtx_);
+    w.Write<uint8_t>("notification_drive_high", drive_high_ ? 1u : 0u);
+    w.Write<uint8_t>("notification_dismissed", dismissed_ ? 1u : 0u);
+}
+
+void Hp600Led::RestoreObjectState(StateReader& r) {
+    uint8_t drive_high = 0u;
+    uint8_t dismissed  = 0u;
+    r.Read("notification_drive_high", drive_high);
+    r.Read("notification_dismissed", dismissed);
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        drive_high_  = drive_high != 0u;
+        dismissed_   = dismissed != 0u;
+        button_down_ = false;
+        DriveLoopLocked();
+    }
+    Refresh();
+}
+
+LampState Hp600Led::Lamp() const {
+    bool flashing = false;
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        flashing = !drive_high_ && !dismissed_;
+    }
+    Charge charge = Charge::kDark;
+    if (battery_->Charging()) charge = Charge::kCharging;
+    else if (battery_->OnExternalPower()) charge = Charge::kCharged;
+    const ObjectRgb charge_color = charge == Charge::kCharged ? LedRgb(Hp600LedColor::kGreen) : LedRgb(charging_);
+    if (!flashing) return LampState{charge != Charge::kDark, false, charge_color};
+    std::optional<ObjectRgb> between;
+    if (charge != Charge::kDark) between = charge_color;
+    return LampState{true, true, LedRgb(notification_), kFlashHalfMs, kFlashHalfMs, between};
+}
 
 }

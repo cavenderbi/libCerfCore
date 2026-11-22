@@ -8,9 +8,8 @@
       "side": "bottom",
       "align": "center",
       "width": 0.1,
-      "height": 0.03,
-      "content": {},
-      "indicators": [{ "lamp": { "object": ["led"], "shape": "disc" }, "x": 0.5, "y": 0.5, "size": 0.86, "aspect": 3.8 }]
+      "height": 0.05,
+      "content": { "column": [{ "grow": 0.3 }, "jornada_680_led_button", { "grow": 0.3 }] }
     },
     { "side": "bottom", "align": "center", "width": 1.0, "height": 0.42, "content": "jornada_680_keyboard" }
   ]

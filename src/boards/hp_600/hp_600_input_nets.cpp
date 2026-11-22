@@ -4,8 +4,6 @@
 #include <cerfcore/state/hibernation.h>
 #include "../sh77xx_port_key_matrix.h"
 
-#include <utility>
-
 namespace cerfcore {
 
 namespace {
@@ -45,10 +43,6 @@ void Hp600InputNets::Drive(Hp600InputNet net, bool high) {
     matrix_->SetColumnPull(any_down ? ButtonSummaryColumns() : uint16_t{0u});
 }
 
-void Hp600InputNets::AddNetListener(Hp600InputNet net, std::function<void()> fn) {
-    listeners_[static_cast<uint32_t>(net)].Add(std::move(fn));
-}
-
 bool Hp600InputNets::Wired(Hp600InputNet net) const {
     return Landings()[static_cast<uint32_t>(net)].kind != Landing::Kind::kNone;
 }
@@ -60,7 +54,6 @@ uint32_t Hp600InputNets::Apply(Hp600InputNet net, bool high) {
                                  : high_.fetch_and(~bit, std::memory_order_acq_rel);
     const Landing& landing = Landings()[index];
     if (landing.kind == Landing::Kind::kIntcPin) intc_->SetPinLevel(landing.intc, high);
-    if (((before & bit) != 0u) != high) listeners_[index].Call();
     return high ? before | bit : before & ~bit;
 }
 

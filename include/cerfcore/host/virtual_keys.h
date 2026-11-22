@@ -25,6 +25,7 @@ inline constexpr uint8_t kVkF4       = 0x73;
 inline constexpr uint8_t kVkF5       = 0x74;
 inline constexpr uint8_t kVkF9       = 0x78;
 inline constexpr uint8_t kVkF10      = 0x79;
+inline constexpr uint8_t kVkF13      = 0x7C;
 inline constexpr uint8_t kVkLShift   = 0xA0;
 inline constexpr uint8_t kVkRShift   = 0xA1;
 inline constexpr uint8_t kVkLControl = 0xA2;

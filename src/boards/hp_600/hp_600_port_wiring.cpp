@@ -8,6 +8,7 @@
 #include "hp_600_family_id.h"
 #include "hp_600_input_nets.h"
 #include "hp_600_battery.h"
+#include "hp_600_led.h"
 #include "../sh77xx_port_key_matrix.h"
 #include "hp_600_notification_led_net.h"
 
@@ -49,13 +50,13 @@ public:
         matrix_  = &emu_.Get<Sh77xxPortKeyMatrix>();
         battery_ = &emu_.Get<Hp600Battery>();
         inputs_  = &emu_.Get<Hp600InputNets>();
+        led_     = &emu_.Get<Hp600Led>();
     }
 
     void TrackDrive(const Sh77xxPortData& ports) override {
         nets_.Track(ports);
         matrix_->TrackRows(ports);
-        inputs_->Drive(Hp600InputNet::kNotificationLedLoop,
-                       (nets_.Levels(kSh77xxPortJ) & kHp600PortJNotificationLed) != 0u);
+        led_->TrackDrive((nets_.Levels(kSh77xxPortJ) & kHp600PortJNotificationLed) != 0u);
     }
 
     uint8_t WiredInputs(uint32_t port) const override {
@@ -93,6 +94,7 @@ private:
     Sh77xxPortKeyMatrix*                          matrix_  = nullptr;
     Hp600Battery*                                 battery_ = nullptr;
     Hp600InputNets*                               inputs_  = nullptr;
+    Hp600Led*                                     led_     = nullptr;
     PinNetHold<kSh77xxPortCount, kSh77xxPortPins> nets_;
 };
 

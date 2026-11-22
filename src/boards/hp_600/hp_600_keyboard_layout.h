@@ -1,16 +1,20 @@
 #pragma once
 
 #include <cerfcore/core/service.h>
+#include <cerfcore/host/virtual_keys.h>
 #include "../jornada/jornada_keyboard_layers.h"
 #include "../sh77xx_port_key_matrix.h"
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <span>
 
 namespace cerfcore {
 
 inline constexpr uint32_t kHp600KeyCells = Sh77xxPortKeyMatrix::kCells;
+inline constexpr uint32_t kHp600PortC7Column    = 15u;
+inline constexpr uint8_t  kHp600LedButtonHostVk = kVkF13;
 
 struct Hp600HostAlias {
     uint8_t     host_vk;
@@ -27,7 +31,8 @@ public:
     virtual std::span<const Hp600HostAlias> HostAliases() const = 0;
     virtual std::span<const jornada_kbd::LayerKey> AltGrLayer() const = 0;
 
-    bool Scanned(uint32_t cell) const;
+    bool                    Scanned(uint32_t cell) const;
+    std::optional<uint32_t> LedButtonCell() const;
 };
 
 }

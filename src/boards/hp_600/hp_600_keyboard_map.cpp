@@ -8,6 +8,7 @@
 #include "hp_600_keyboard_layout.h"
 
 #include <cstdint>
+#include <optional>
 
 namespace cerfcore {
 
@@ -57,6 +58,8 @@ public:
                 if (a.guest_vk == vk) AddBinding({a.host_vk, cell, a.label, 0u, 0u});
             }
         }
+        const std::optional<uint32_t> led_cell = layout.LedButtonCell();
+        if (led_cell && layout.CellVk()[*led_cell] == 0u) AddBinding({kHp600LedButtonHostVk, *led_cell, nullptr, 0u, 0u});
         const Hp600InputNets& nets = emu_.Get<Hp600InputNets>();
         for (const ButtonKey& k : kButtonKeys) {
             if (!nets.Wired(k.net)) continue;
