@@ -59,6 +59,7 @@ constexpr char kIndicators[]     = "indicators";
 constexpr char kX[]              = "x";
 constexpr char kY[]              = "y";
 constexpr char kSize[]           = "size";
+constexpr char kAspect[]         = "aspect";
 
 constexpr std::pair<std::string_view, HudSide> kSides[] = {
     {"top", HudSide::kTop}, {"bottom", HudSide::kBottom}, {"left", HudSide::kLeft}, {"right", HudSide::kRight}};
@@ -69,7 +70,8 @@ constexpr std::pair<std::string_view, HudAlign> kAligns[] = {
 constexpr std::pair<std::string_view, HudDpadShape> kShapes[] = {
     {"rounded", HudDpadShape::kRounded}, {"circle", HudDpadShape::kCircle}};
 
-constexpr std::pair<std::string_view, HudLampShape> kLampShapes[] = {{"circle", HudLampShape::kCircle}};
+constexpr std::pair<std::string_view, HudLampShape> kLampShapes[] = {{"circle", HudLampShape::kCircle},
+                                                                     {"disc", HudLampShape::kDisc}};
 
 std::vector<uint8_t> Keys(const json& list) {
     std::vector<uint8_t> out;
@@ -98,6 +100,7 @@ HudIndicator Indicator(const json& object) {
     indicator.x                 = object.at(kX).get<double>();
     indicator.y                 = object.at(kY).get<double>();
     indicator.size              = object.at(kSize).get<double>();
+    indicator.aspect            = object.value(kAspect, 1.0);
     return indicator;
 }
 

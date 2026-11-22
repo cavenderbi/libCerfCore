@@ -10,7 +10,7 @@
 
 namespace cerfcore {
 
-enum class HudLampShape : uint8_t { kCircle };
+enum class HudLampShape : uint8_t { kCircle, kDisc };
 
 struct HudLamp {
     std::vector<std::string> object;
@@ -63,9 +63,10 @@ enum class HudAlign : uint8_t { kStart, kCenter, kEnd };
 
 struct HudIndicator {
     HudNode node;
-    double  x    = 0.5;
-    double  y    = 0.5;
-    double  size = 0.5;
+    double  x      = 0.5;
+    double  y      = 0.5;
+    double  size   = 0.5;
+    double  aspect = 1.0;
 };
 
 struct HudPanel {

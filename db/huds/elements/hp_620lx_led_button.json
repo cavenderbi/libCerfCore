@@ -1,1 +1,1 @@
-{ "button": { "keys": ["VK_F9"], "lamp": { "object": ["led"] } } }
+{ "button": { "keys": ["VK_F9"], "lamp": { "object": ["led"], "shape": "disc" } } }

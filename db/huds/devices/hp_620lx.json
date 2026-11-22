@@ -3,7 +3,13 @@
   "board_ids": ["hp_620lx", "hp_620lx_japan", "hp_660lx"],
   "panels": [
     { "side": "right", "align": "center", "width": 0.25, "height": 1.0, "content": "hp_620lx_bezel" },
-    { "side": "bottom", "align": "center", "width": 0.1, "height": 0.05, "content": "hp_620lx_led_button" },
+    {
+      "side": "bottom",
+      "align": "center",
+      "width": 0.1,
+      "height": 0.05,
+      "content": { "column": [{ "grow": 0.3 }, "hp_620lx_led_button", { "grow": 0.3 }] }
+    },
     { "side": "bottom", "align": "center", "width": 1.0, "height": 0.42, "content": "hp_620lx_keyboard" }
   ]
 }

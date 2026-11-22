@@ -10,7 +10,7 @@
       "width": 0.1,
       "height": 0.03,
       "content": {},
-      "indicators": [{ "lamp": { "object": ["led"] }, "x": 0.5, "y": 0.5, "size": 0.7 }]
+      "indicators": [{ "lamp": { "object": ["led"], "shape": "disc" }, "x": 0.5, "y": 0.5, "size": 0.86, "aspect": 3.8 }]
     },
     { "side": "bottom", "align": "center", "width": 1.0, "height": 0.42, "content": "jornada_680_keyboard" }
   ]

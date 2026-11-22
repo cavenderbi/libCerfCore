@@ -1,1 +1,3 @@
-{ "button": { "action": ["notification_led", "button"], "lamp": { "object": ["notification_led"] } } }
+{
+  "button": { "action": ["notification_led", "button"], "lamp": { "object": ["notification_led"], "shape": "disc" } }
+}
