@@ -1,5 +1,6 @@
 #include "i2c_bit_bang_target.h"
 
+#include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
 #include "../../socs/i2c_slave.h"
 
@@ -7,9 +8,11 @@
 
 namespace cerfcore {
 
-I2cBitBangTarget::I2cBitBangTarget(SdaDrive drive, std::vector<I2cSlave*> slaves,
+I2cBitBangTarget::I2cBitBangTarget(GuestCpuReset& reset, SdaDrive drive, std::vector<I2cSlave*> slaves,
                                    Unmatched unmatched)
-    : drive_(std::move(drive)), slaves_(std::move(slaves)), unmatched_(std::move(unmatched)) {}
+    : drive_(std::move(drive)), slaves_(std::move(slaves)), unmatched_(std::move(unmatched)) {
+    reset.RegisterResetListener([this](ResetLineKind kind) { OnResetLine(kind); });
+}
 
 void I2cBitBangTarget::OnLines(bool scl, bool sda) {
     const bool prev_scl = scl_;
@@ -42,6 +45,16 @@ void I2cBitBangTarget::Stop() {
     in_ack_ = false;
     drive_(true);
     for (I2cSlave* s : slaves_) s->BusStop();
+}
+
+void I2cBitBangTarget::OnResetLine(ResetLineKind kind) {
+    if (slave_ == nullptr || !slave_->ResetsWithLine(addr_, kind)) return;
+    phase_       = Phase::kIdle;
+    bit_         = 0;
+    in_ack_      = false;
+    master_nack_ = false;
+    slave_       = nullptr;
+    drive_(true);
 }
 
 void I2cBitBangTarget::ClockRise() {

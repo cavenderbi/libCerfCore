@@ -1,5 +1,6 @@
 #include "epson_lut.h"
 
+#include <cerfcore/lcd/lcd_pixel_expand.h>
 #include <cerfcore/state/state_stream.h>
 
 namespace cerfcore {
@@ -8,6 +9,13 @@ void EpsonLutTable::Rgb(uint32_t index, uint8_t& r4, uint8_t& g4, uint8_t& b4) c
     r4 = entries_[index & 0xFFu][0];
     g4 = entries_[index & 0xFFu][1];
     b4 = entries_[index & 0xFFu][2];
+}
+
+uint32_t EpsonLutTable::Xrgb(uint32_t index, bool color) const {
+    uint8_t r4, g4, b4;
+    Rgb(index, r4, g4, b4);
+    if (!color) r4 = b4 = g4;
+    return lcd_pixel::PackXrgb4(r4, g4, b4);
 }
 
 void EpsonLutTable::Store(uint8_t index, const uint8_t (&rgb)[3]) {

@@ -3,6 +3,7 @@
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
+#include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
 #include "hp_jornada_540_eeprom.h"
 #include "hp_jornada_540_family_id.h"
@@ -19,7 +20,8 @@ bool HpJornada540EepromBus::ShouldRegister() {
 
 void HpJornada540EepromBus::OnReady() {
     eeprom_ = &emu_.Get<HpJornada540Eeprom>();
-    target_.emplace([this](bool released) { sda_released_ = released; }, std::vector<I2cSlave*>{eeprom_},
+    target_.emplace(emu_.Get<GuestCpuReset>(), [this](bool released) { sda_released_ = released; },
+                    std::vector<I2cSlave*>{eeprom_},
                     [this](uint8_t addr, bool read) {
                         emu_.Get<Fatal>().Die("HpJornada540EepromBus: no device answers address 0x%02X (%s)", addr,
                                               read ? "read" : "write");

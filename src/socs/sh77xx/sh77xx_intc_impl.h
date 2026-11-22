@@ -104,28 +104,18 @@ public:
         return s.intevt;
     }
 
-    uint32_t StandbyWakeLevel() override {
-        {
-            std::lock_guard<std::mutex> lk(mtx_);
-            if (NmiOfferedLocked()) return kNmiLevel;
-        }
-        const Sh77xxRtcOscillator* rtc = this->emu_.template TryGet<Sh77xxRtcOscillator>();
-        if (rtc == nullptr) {
-            this->emu_.template Get<Fatal>().Die("Sh77xxIntc: a standby wake on %.*s needs the RTC oscillator, "
-                                                 "and no RTC model exists for it",
-                                                 static_cast<int>(Soc.size()), Soc.data());
-        }
-        if (!rtc->OscillatorRunning()) return 0u;
-        std::lock_guard<std::mutex> lk(mtx_);
-        HaltOnAbsentInputLocked("standby wake", ObservedAbsentInputs(Scope::kStandbyWake));
-        return SelectLocked(Scope::kStandbyWake).level;
-    }
+    uint32_t StandbyWakeLevel() override { return StandbyWakeLevelWith(0u, 0u); }
 
     bool WakesStandby(Sh77xxIntcSource source) override {
         std::lock_guard<std::mutex> lk(mtx_);
         if (((kStandbyWakeModules | standby_wake_sources_) & SourceBit(source)) == 0u) return false;
         if (AllMaskedLocked()) return false;
         return channel_->LevelEndsSleep(RowLevel(kModuleRows[static_cast<size_t>(source)]));
+    }
+
+    bool PintWakesStandby(uint32_t pint, bool high) override {
+        const uint32_t bit = 1u << pint;
+        return channel_->LevelEndsSleep(StandbyWakeLevelWith(bit, high ? bit : 0u));
     }
 
     void SetStandbyWake(Sh77xxIntcSource source, bool wakes) override {
@@ -386,7 +376,24 @@ private:
 
     bool AllMaskedLocked() const { return MaiLocked() && !nmi_->High(); }
 
-    Selection SelectLocked(Scope scope) const {
+    uint32_t StandbyWakeLevelWith(uint32_t pint_override, uint32_t pint_override_high) {
+        {
+            std::lock_guard<std::mutex> lk(mtx_);
+            if (NmiOfferedLocked()) return kNmiLevel;
+        }
+        const Sh77xxRtcOscillator* rtc = this->emu_.template TryGet<Sh77xxRtcOscillator>();
+        if (rtc == nullptr) {
+            this->emu_.template Get<Fatal>().Die("Sh77xxIntc: a standby wake on %.*s needs the RTC oscillator, "
+                                                 "and no RTC model exists for it",
+                                                 static_cast<int>(Soc.size()), Soc.data());
+        }
+        if (!rtc->OscillatorRunning()) return 0u;
+        std::lock_guard<std::mutex> lk(mtx_);
+        HaltOnAbsentInputLocked("standby wake", ObservedAbsentInputs(Scope::kStandbyWake));
+        return SelectLocked(Scope::kStandbyWake, pint_override, pint_override_high).level;
+    }
+
+    Selection SelectLocked(Scope scope, uint32_t pint_override = 0u, uint32_t pint_override_high = 0u) const {
         Selection best;
         if (AllMaskedLocked()) return best;
         if (NmiOfferedLocked()) best = Selection{kNmiLevel, kNmiIntevt, kNmiIntevt};
@@ -408,7 +415,7 @@ private:
             if (((irq_pins >> n) & 1u) != 0u && pins_->IrqRequest(icr1_, n)) OfferRow(best, kIrqRows[n]);
         }
         if (M.SelectsPint(scope)) {
-            const uint32_t pint = pins_->PintRequests(icr2_, pinter_);
+            const uint32_t pint = pins_->PintRequests(icr2_, pinter_, pint_override, pint_override_high);
             for (size_t g = 0; g < std::size(kPintRows); ++g) {
                 if ((pint & kPintGroupBits[g]) != 0u) OfferRow(best, kPintRows[g]);
             }

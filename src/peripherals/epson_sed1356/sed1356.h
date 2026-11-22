@@ -2,12 +2,12 @@
 
 #include "../../lcd/display_mode_latch.h"
 #include "../../socs/raster_scan_peripheral.h"
+#include "../epson_display_buffer/epson_display_buffer.h"
 #include "sed1356_bitblt.h"
 #include "sed1356_lut.h"
 
 #include <cstdint>
 #include <unordered_set>
-#include <vector>
 
 namespace cerfcore {
 
@@ -70,16 +70,8 @@ public:
     void PostRestore() override;
 
     /* --- BitBLT engine surface (regs §8.3.12, latched by Sed1356BitBlt). --- */
-    uint8_t  BltReg(uint32_t off) const { return Reg(off); }
-    uint8_t* VramData()       { return vram_.data(); }
-    uint32_t VramSize() const { return vram_size_; }
-    /* Fold a display-buffer offset into the populated buffer: the 2 MB
-       aperture aliases it (TM X25B-A-001 §10) - mask if power-of-2, else mod. */
-    uint32_t VramWrap(uint32_t off) const {
-        return vram_mask_ ? (off & vram_mask_) : (off % vram_size_);
-    }
-    uint32_t VramLoad(uint32_t off, uint32_t width) const;
-    void     VramStore(uint32_t off, uint32_t value, uint32_t width);
+    uint8_t                   BltReg(uint32_t off) const { return Reg(off); }
+    const EpsonDisplayBuffer& Buffer() const { return buffer_; }
 
 private:
     void HardwareReset();
@@ -120,12 +112,10 @@ private:
     Sed1356PanelPower*          panel_        = nullptr;
     uint64_t                    lcd_on_tick_  = 0;
 
-    uint8_t reg_[kRegWindow] = {};
-    std::vector<uint8_t> vram_;
+    uint8_t            reg_[kRegWindow] = {};
+    EpsonDisplayBuffer buffer_;
 
     uint32_t mmio_base_        = 0;
-    uint32_t vram_size_        = 0;
-    uint32_t vram_mask_        = 0;   /* size-1 if power-of-2, else 0 (use mod). */
     uint8_t  product_rev_code_ = 0;
 
     Sed1356Lut lut_;

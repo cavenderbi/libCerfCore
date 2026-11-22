@@ -11,6 +11,7 @@ class HitachiPccCardBus : public Sh77xxPcmciaCardBus {
 public:
     using Sh77xxPcmciaCardBus::Sh77xxPcmciaCardBus;
 
+    bool     ServesArea(uint32_t area) const override;
     uint32_t ReadCycles(uint32_t area, uint32_t offset, bool io, PcmciaIoWidth width, unsigned bytes) override;
     void     WriteCycles(uint32_t area, uint32_t offset, bool io, PcmciaIoWidth width, unsigned bytes,
                          uint32_t value) override;

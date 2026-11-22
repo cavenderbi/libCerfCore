@@ -6,16 +6,20 @@
 
 namespace cerfcore {
 
+class GuestCpuReset;
 class I2cSlave;
 class StateWriter;
 class StateReader;
+enum class ResetLineKind;
 
 class I2cBitBangTarget {
 public:
     using SdaDrive  = std::function<void(bool released)>;
     using Unmatched = std::function<void(uint8_t addr, bool read)>;
 
-    I2cBitBangTarget(SdaDrive drive, std::vector<I2cSlave*> slaves, Unmatched unmatched);
+    I2cBitBangTarget(GuestCpuReset& reset, SdaDrive drive, std::vector<I2cSlave*> slaves, Unmatched unmatched);
+    I2cBitBangTarget(const I2cBitBangTarget&)            = delete;
+    I2cBitBangTarget& operator=(const I2cBitBangTarget&) = delete;
 
     void OnLines(bool scl, bool sda);
 
@@ -28,6 +32,7 @@ private:
 
     void Start();
     void Stop();
+    void OnResetLine(ResetLineKind kind);
     void ClockRise();
     void ClockFall();
     bool AcknowledgeByte();

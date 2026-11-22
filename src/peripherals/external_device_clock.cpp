@@ -83,6 +83,11 @@ void ExternalDeviceClock::RestoreTimer(Timer& timer, StateReader& r, const char*
     clock_->Disarm(timer.event_);
 }
 
+int64_t ExternalDeviceClock::SleptNsAtDue(const Timer& timer) {
+    if (!timer.armed_) return GuestDeepSleep::kNoParkWake;
+    return ticks_.SleptNsAtTick(timer.due_);
+}
+
 void ExternalDeviceClock::ResumeTimer(Timer& timer) {
     if (timer.armed_) ArmEvent(timer);
 }

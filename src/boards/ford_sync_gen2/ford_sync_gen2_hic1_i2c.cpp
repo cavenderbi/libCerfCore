@@ -18,6 +18,8 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <optional>
+#include <vector>
 
 namespace cerfcore {
 
@@ -56,6 +58,9 @@ public:
            else it times out (0x102) every clock and the I2C crawls. */
         gpio_->SetInputPin(kScl, true);
         gpio_->SetInputPin(kSda, true);
+        target_.emplace(emu_.Get<GuestCpuReset>(), [this](bool released) { DriveSda(released); },
+                        std::vector<I2cSlave*>{ this },
+                        [this](uint8_t addr, bool read) { FatalUnmodelledSlave(addr, read); });
         gpio_->AddWriteObserver([this] { OnEdge(); });
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
             cs42448_.Reset();
@@ -70,6 +75,10 @@ public:
 
     bool MatchesAddress(uint8_t slave_addr) const override {
         return slave_addr == kCs42448Addr || slave_addr == kDmAddr || slave_addr == kTsc2003Addr;
+    }
+
+    bool ResetsWithLine(uint8_t slave_addr, ResetLineKind) const override {
+        return slave_addr == kCs42448Addr || slave_addr == kDmAddr;
     }
 
     void TxnStart(uint8_t) override {
@@ -104,7 +113,7 @@ private:
     void DriveSda(bool level) { gpio_->SetInputPin(kSda, level); }
 
     void SaveBus(StateWriter& w) {
-        target_.SaveState(w);
+        target_->SaveState(w);
         w.Write("hic1_map_set", static_cast<uint8_t>(map_set_));
         w.Write("hic1_auto_incr", static_cast<uint8_t>(auto_incr_));
         w.Write("hic1_dm_byte", dm_byte_);
@@ -115,7 +124,7 @@ private:
 
     void RestoreBus(StateReader& r) {
         uint8_t v = 0;
-        target_.RestoreState(r);
+        target_->RestoreState(r);
         r.Read("hic1_map_set", v);
         map_set_ = v != 0u;
         r.Read("hic1_auto_incr", v);
@@ -182,17 +191,13 @@ private:
                          gpio_->PinInputLevel(kScl);
         const bool sda = (!gpio_->PinIsOutput(kSda) || gpio_->PinOutLevel(kSda)) &&
                          gpio_->PinInputLevel(kSda);
-        target_.OnLines(scl, sda);
+        target_->OnLines(scl, sda);
     }
 
     Imx51Gpio4* gpio_ = nullptr;
     Tsc2003Touch* tsc2003_ = nullptr;
     Cs42448Codec cs42448_;
-    I2cBitBangTarget target_{
-        [this](bool released) { DriveSda(released); },
-        { this },
-        [this](uint8_t addr, bool read) { FatalUnmodelledSlave(addr, read); },
-    };
+    std::optional<I2cBitBangTarget> target_;
     bool map_set_ = false;
     bool auto_incr_ = false;
     uint8_t  dm_byte_ = 0;

@@ -11,10 +11,8 @@ std::vector<CursorPixel> GuestCursorPixels::Decode(const GuestCursorShape& s) {
         const uint8_t* and_row = s.bits.data() + static_cast<size_t>(row) * s.stride;
         const uint8_t* xor_row = s.bits.data() + static_cast<size_t>(s.cy + row) * s.stride;
         for (uint32_t col = 0; col < s.cx; ++col) {
-            const uint8_t mask =
-                static_cast<uint8_t>(1u << lcd_pixel::MsbFirstShift(col, 1u));
-            const bool and_bit = (and_row[col >> 3] & mask) != 0;
-            const bool xor_bit = (xor_row[col >> 3] & mask) != 0;
+            const bool and_bit = lcd_pixel::PackedIndexMsbFirst(and_row, col, 1u) != 0u;
+            const bool xor_bit = lcd_pixel::PackedIndexMsbFirst(xor_row, col, 1u) != 0u;
             CursorPixel& px    = out[static_cast<size_t>(row) * s.cx + col];
             if (and_bit) px = xor_bit ? CursorPixel::kInvert : CursorPixel::kTransparent;
             else         px = xor_bit ? CursorPixel::kWhite : CursorPixel::kBlack;

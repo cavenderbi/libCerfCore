@@ -1,7 +1,6 @@
 #include "s1d13705.h"
 
 #include "s1d13705_config.h"
-#include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
@@ -26,7 +25,7 @@ bool S1d13705::ShouldRegister() {
 void S1d13705::OnReady() {
     config_    = &emu_.Get<S1d13705Config>();
     mmio_base_ = config_->HostWindowBase();
-    vram_.assign(kDisplayBufferBytes, 0u);
+    buffer_.Allocate(kDisplayBufferBytes);
     AttachScanClock();
     config_->RegisterClkiListener([this] { OnClkiChange(); });
     emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) { HardwareReset(); });
@@ -218,14 +217,14 @@ bool S1d13705::IsBuffer(uint32_t off, uint32_t width) const {
 
 uint8_t S1d13705::ReadByte(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
-    if (IsBuffer(off, 1u)) return vram_[off];
+    if (IsBuffer(off, 1u)) return static_cast<uint8_t>(buffer_.Load(off, 1u));
     if (IsRegister(off, 1u)) return RegRead(off - kRegBase);
     HaltUnsupportedAccess("ReadByte", addr, 0u);
 }
 
 uint16_t S1d13705::ReadHalf(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
-    if (IsBuffer(off, 2u)) return static_cast<uint16_t>(cerf::le::UN(&vram_[off], 2u));
+    if (IsBuffer(off, 2u)) return static_cast<uint16_t>(buffer_.Load(off, 2u));
     if (IsRegister(off, 2u)) {
         const uint32_t r = off - kRegBase;
         return static_cast<uint16_t>(RegRead(r) | (RegRead(r + 1u) << 8));
@@ -235,7 +234,7 @@ uint16_t S1d13705::ReadHalf(uint32_t addr) {
 
 uint32_t S1d13705::ReadWord(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
-    if (IsBuffer(off, 4u)) return static_cast<uint32_t>(cerf::le::UN(&vram_[off], 4u));
+    if (IsBuffer(off, 4u)) return buffer_.Load(off, 4u);
     if (IsRegister(off, 4u)) {
         const uint32_t r = off - kRegBase;
         return uint32_t(RegRead(r)) | uint32_t(RegRead(r + 1u)) << 8 | uint32_t(RegRead(r + 2u)) << 16 |
@@ -247,7 +246,7 @@ uint32_t S1d13705::ReadWord(uint32_t addr) {
 void S1d13705::WriteByte(uint32_t addr, uint8_t value) {
     const uint32_t off = addr - MmioBase();
     if (IsBuffer(off, 1u)) {
-        vram_[off] = value;
+        buffer_.Store(off, value, 1u);
         return;
     }
     if (IsRegister(off, 1u)) {
@@ -260,7 +259,7 @@ void S1d13705::WriteByte(uint32_t addr, uint8_t value) {
 void S1d13705::WriteHalf(uint32_t addr, uint16_t value) {
     const uint32_t off = addr - MmioBase();
     if (IsBuffer(off, 2u)) {
-        cerf::le::PutN(&vram_[off], value, 2u);
+        buffer_.Store(off, value, 2u);
         return;
     }
     if (IsRegister(off, 2u)) {
@@ -275,7 +274,7 @@ void S1d13705::WriteHalf(uint32_t addr, uint16_t value) {
 void S1d13705::WriteWord(uint32_t addr, uint32_t value) {
     const uint32_t off = addr - MmioBase();
     if (IsBuffer(off, 4u)) {
-        cerf::le::PutN(&vram_[off], value, 4u);
+        buffer_.Store(off, value, 4u);
         return;
     }
     if (IsRegister(off, 4u)) {
@@ -289,7 +288,7 @@ void S1d13705::WriteWord(uint32_t addr, uint32_t value) {
 void S1d13705::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mtx_);
     w.WriteBytes("reg", reg_, sizeof(reg_));
-    w.WriteBytes("vram", vram_.data(), vram_.size());
+    buffer_.SaveState(w, "vram");
     lut_table_.SaveState(w, "lut");
     lut_port_.SaveState(w);
     mode_latch_.SaveState(w);
@@ -299,7 +298,7 @@ void S1d13705::SaveState(StateWriter& w) {
 void S1d13705::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mtx_);
     r.ReadBytes("reg", reg_, sizeof(reg_));
-    r.ReadBytes("vram", vram_.data(), vram_.size());
+    buffer_.RestoreState(r, "vram");
     lut_table_.RestoreState(r, "lut");
     lut_port_.RestoreState(r);
     mode_latch_.RestoreState(r);

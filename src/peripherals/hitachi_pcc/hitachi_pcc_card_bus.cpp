@@ -4,6 +4,15 @@
 
 namespace cerfcore {
 
+namespace {
+
+constexpr uint32_t kFirstPccArea = 5u;
+constexpr uint32_t kLastPccArea  = 6u;
+
+}
+
+bool HitachiPccCardBus::ServesArea(uint32_t area) const { return area >= kFirstPccArea && area <= kLastPccArea; }
+
 uint32_t HitachiPccCardBus::ReadCycles(uint32_t area, uint32_t offset, bool io, PcmciaIoWidth width, unsigned bytes) {
     const HitachiPccCardCycle c = Pcc().DecodeCycle(area, offset, io, false);
     if (io) return ReadCardIo(*c.slot, c.card_address, width, bytes);

@@ -2,6 +2,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/service.h>
+#include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
 #include "../../peripherals/i2c/i2c_bit_bang_target.h"
 #include "../../socs/vr41xx/vr41xx_giu.h"
@@ -31,7 +32,7 @@ public:
         giu_    = &emu_.Get<Vr41xxGiu>();
         gauge_  = &emu_.Get<IbmWorkpadZ50BatteryGauge>();
         eeprom_ = &emu_.Get<IbmWorkpadZ50BoardEeprom>();
-        target_.emplace([this](bool released) { DriveSda(released); },
+        target_.emplace(emu_.Get<GuestCpuReset>(), [this](bool released) { DriveSda(released); },
                         std::vector<I2cSlave*>{ gauge_, eeprom_ },
                         [this](uint8_t addr, bool read) {
                             if (addr == IbmWorkpadZ50BatteryGauge::kAddress) return;

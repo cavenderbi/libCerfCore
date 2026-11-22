@@ -277,7 +277,7 @@ void ScanOut::TextCell(uint32_t* line, int64_t x0, uint32_t counter, uint32_t ro
                         row_scan <= cursor_end_;
     const bool ninth  = line_graphics_ && (ch & 0xE0u) == 0xC0u;
     for (uint32_t i = 0; i < char_dots_; ++i) {
-        const bool set = i < 8u ? ((bits >> (7u - i)) & 1u) != 0u : ninth && (bits & 1u);
+        const bool set = i < 8u ? lcd_pixel::IndexMsbFirst(bits, i, 1u) != 0u : ninth && (bits & 1u);
         uint32_t   xrgb = Pen((set || underline) ? fg : bg);
         if (cursor) xrgb = Pen(own);
         Put(line, x0 + i, xrgb);

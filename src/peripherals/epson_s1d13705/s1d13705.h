@@ -2,10 +2,10 @@
 
 #include "../../lcd/display_mode_latch.h"
 #include "../../socs/raster_scan_peripheral.h"
+#include "../epson_display_buffer/epson_display_buffer.h"
 #include "../epson_lut/epson_lut.h"
 
 #include <cstdint>
-#include <vector>
 
 namespace cerfcore {
 
@@ -48,8 +48,8 @@ public:
     uint32_t AddressOffsetWords() const { return Reg(0x11); }
     uint32_t Screen1VerticalSize() const { return ((Reg(0x13) & 0x3u) << 8) | Reg(0x12); }
     uint32_t SwivelStrideBytes() const { return Reg(0x1C) != 0u ? Reg(0x1C) : 256u; }
-    void     LutRgb(uint32_t index, uint8_t& r4, uint8_t& g4, uint8_t& b4) const { lut_table_.Rgb(index, r4, g4, b4); }
-    const uint8_t* Vram() const { return vram_.data(); }
+    uint32_t LutXrgb(uint32_t index) const { return lut_table_.Xrgb(index, Color()); }
+    const uint8_t* Vram() const { return buffer_.Data(); }
 
     void SaveState(StateWriter& w) override;
     void RestoreState(StateReader& r) override;
@@ -89,7 +89,7 @@ private:
     S1d13705Config*      config_    = nullptr;
     uint32_t             mmio_base_ = 0;
     uint8_t              reg_[kRegCount] = {};
-    std::vector<uint8_t> vram_;
+    EpsonDisplayBuffer   buffer_;
     EpsonLutTable        lut_table_;
     EpsonLutPort         lut_port_;
     DisplayModeLatch     mode_latch_;

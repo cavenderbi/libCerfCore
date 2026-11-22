@@ -3,5 +3,6 @@
   "soc_id": "sh7729",
   "device_year": 2000,
   "rom_placing_mode": "flat_container",
+  "ga_window_size": 50331648,
   "board_config": { "ram": { "default": "16mb", "values": ["16mb", "32mb"] } }
 }

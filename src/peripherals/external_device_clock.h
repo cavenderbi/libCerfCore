@@ -50,6 +50,8 @@ public:
     void SaveDeadline(const Deadline& deadline, StateWriter& w, const char* prefix);
     void RestoreDeadline(Deadline& deadline, StateReader& r, const char* prefix);
 
+    int64_t SleptNsAtDue(const Timer& timer);
+
     void SaveTimer(Timer& timer, StateWriter& w, const char* prefix);
     void RestoreTimer(Timer& timer, StateReader& r, const char* prefix);
     void ResumeTimer(Timer& timer);

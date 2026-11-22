@@ -20,7 +20,8 @@ public:
     void     SetDrive(uint32_t pins, uint32_t high);
     bool     Apply(uint16_t icr1, uint32_t irl_pins, bool resetting);
     bool     IrqRequest(uint16_t icr1, uint32_t n) const;
-    uint32_t PintRequests(uint16_t icr2, uint16_t pinter) const;
+    uint32_t PintRequests(uint16_t icr2, uint16_t pinter, uint32_t override_pints = 0u,
+                          uint32_t override_high = 0u) const;
     uint32_t IrlCode(bool irls_in_use) const;
     uint8_t  ReadIrr0(uint16_t icr1, uint16_t icr2, uint16_t pinter, uint32_t absent_pints);
     void     ClearIrr0(uint8_t value);
@@ -33,7 +34,7 @@ private:
 
     bool     HighLocked(uint32_t n) const;
     bool     IrqRequestLocked(uint16_t icr1, uint32_t n) const;
-    uint32_t PintRequestsLocked(uint16_t icr2, uint16_t pinter) const;
+    uint32_t PintRequestsLocked(uint16_t icr2, uint16_t pinter, uint32_t override_pints, uint32_t override_high) const;
     uint32_t Settled() const;
 
     mutable std::mutex mtx_;

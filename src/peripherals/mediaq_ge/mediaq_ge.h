@@ -138,7 +138,7 @@ protected:
                          uint32_t pmask, uint8_t rop, uint32_t pattern, uint32_t source);
 
     static uint32_t MonoBit(const uint8_t* bytes, uint64_t bit_idx) {
-        return (bytes[bit_idx >> 3] >> lcd_pixel::MsbFirstShift(static_cast<uint32_t>(bit_idx), 1u)) & 1u;
+        return lcd_pixel::IndexMsbFirst(bytes[bit_idx >> 3], static_cast<uint32_t>(bit_idx), 1u);
     }
     const uint8_t* SrcFifoBytes() const {
         return reinterpret_cast<const uint8_t*>(src_fifo_.data());

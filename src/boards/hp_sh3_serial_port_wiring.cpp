@@ -13,8 +13,9 @@ void HpSh3SerialPortWiring::OnReady() {
     TrackNets();
 }
 
-bool HpSh3SerialPortWiring::Asserted(const ActiveLowPin& pin) const {
-    return (ports_->NetLevels(pin.port) & pin.mask) == 0u;
+bool HpSh3SerialPortWiring::Asserted(const ControlPin& pin) const {
+    const bool high = (ports_->NetLevels(pin.port) & pin.mask) != 0u;
+    return high == (pin.level == ActiveLevel::kHigh);
 }
 
 void HpSh3SerialPortWiring::TrackNets() {

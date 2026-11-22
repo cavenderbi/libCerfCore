@@ -76,9 +76,8 @@ private:
                 const uint32_t sx = gui.CursorX() + cx;
                 if (sx >= w) break;
                 const uint32_t at      = cy * kCursorRowBytes + cx / 8u;
-                const uint32_t shift   = 7u - (cx & 7u);
-                const uint32_t and_bit = (img[at] >> shift) & 1u;
-                const uint32_t xor_bit = (img[kCursorPlane + at] >> shift) & 1u;
+                const uint32_t and_bit = lcd_pixel::IndexMsbFirst(img[at], cx, 1u);
+                const uint32_t xor_bit = lcd_pixel::IndexMsbFirst(img[kCursorPlane + at], cx, 1u);
                 uint32_t& px = dib[static_cast<size_t>(sy) * host_w + sx];
                 if (and_bit) {
                     if (xor_bit) px ^= kRgbBits;

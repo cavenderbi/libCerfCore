@@ -4,14 +4,13 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include "hp_jornada_520_id.h"
 #include "hp_jornada_525_id.h"
+#include "hp_jornada_540_display_controller_pa.h"
 #include "hp_jornada_540_family_id.h"
 #include "hp_jornada_540_lcd_clock.h"
 
 namespace cerfcore {
 
 namespace {
-
-constexpr uint32_t kS1d13705Pa = 0x14000000u;
 
 class HpJornada540S1d13705Config : public S1d13705Config {
 public:
@@ -27,7 +26,7 @@ public:
         clock_ = &emu_.Get<HpJornada540LcdClock>();
     }
 
-    uint32_t              HostWindowBase() const override { return kS1d13705Pa; }
+    uint32_t              HostWindowBase() const override { return kHpJornada540DisplayControllerPa; }
     GuestCycleClock::Rate ClkiRate() const override { return clock_->Rate(); }
     void RegisterClkiListener(std::function<void()> fn) override { clock_->RegisterListener(std::move(fn)); }
 

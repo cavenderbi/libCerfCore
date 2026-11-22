@@ -10,7 +10,8 @@ class StateWriter;
 
 class EpsonLutTable {
 public:
-    void Rgb(uint32_t index, uint8_t& r4, uint8_t& g4, uint8_t& b4) const;
+    void     Rgb(uint32_t index, uint8_t& r4, uint8_t& g4, uint8_t& b4) const;
+    uint32_t Xrgb(uint32_t index, bool color) const;
     void Store(uint8_t index, const uint8_t (&rgb)[3]);
     uint8_t Component(uint8_t index, uint8_t component) const { return entries_[index][component]; }
 

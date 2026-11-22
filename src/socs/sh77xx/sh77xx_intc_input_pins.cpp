@@ -49,9 +49,10 @@ bool Sh77xxIntcInputPins::IrqRequest(uint16_t icr1, uint32_t n) const {
     return IrqRequestLocked(icr1, n);
 }
 
-uint32_t Sh77xxIntcInputPins::PintRequests(uint16_t icr2, uint16_t pinter) const {
+uint32_t Sh77xxIntcInputPins::PintRequests(uint16_t icr2, uint16_t pinter, uint32_t override_pints,
+                                           uint32_t override_high) const {
     std::lock_guard<std::mutex> lk(mtx_);
-    return PintRequestsLocked(icr2, pinter);
+    return PintRequestsLocked(icr2, pinter, override_pints, override_high);
 }
 
 uint32_t Sh77xxIntcInputPins::IrlCode(bool irls_in_use) const {
@@ -68,7 +69,7 @@ uint8_t Sh77xxIntcInputPins::ReadIrr0(uint16_t icr1, uint16_t icr2, uint16_t pin
     for (uint32_t n = 0; n < kIrqPins; ++n) {
         if (IrqRequestLocked(icr1, n)) value = static_cast<uint8_t>(value | (1u << n));
     }
-    const uint32_t pint = PintRequestsLocked(icr2, pinter) & ~absent_pints;
+    const uint32_t pint = PintRequestsLocked(icr2, pinter, 0u, 0u) & ~absent_pints;
     if ((pint & kPintGroupBits[0]) != 0u) value |= kIrr0Pint0R;
     if ((pint & kPintGroupBits[1]) != 0u) value |= kIrr0Pint1R;
     irr0_read_ones_ |= value & kIrr0IrqMask;
@@ -114,8 +115,10 @@ bool Sh77xxIntcInputPins::IrqRequestLocked(uint16_t icr1, uint32_t n) const {
     return ((irq_latch_ >> n) & 1u) != 0u;
 }
 
-uint32_t Sh77xxIntcInputPins::PintRequestsLocked(uint16_t icr2, uint16_t pinter) const {
-    const uint32_t levels = (high_ >> kPintBit0) & kPintPinMask;
+uint32_t Sh77xxIntcInputPins::PintRequestsLocked(uint16_t icr2, uint16_t pinter, uint32_t override_pints,
+                                                 uint32_t override_high) const {
+    const uint32_t levels =
+        (((high_ >> kPintBit0) & ~override_pints) | (override_high & override_pints)) & kPintPinMask;
     return ~(levels ^ icr2) & pinter & kPintPinMask;
 }
 

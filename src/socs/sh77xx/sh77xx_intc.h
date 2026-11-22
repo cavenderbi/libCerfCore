@@ -74,6 +74,10 @@ enum class Sh77xxIntcPin : uint8_t {
     kCount,
 };
 
+constexpr Sh77xxIntcPin Sh77xxPintPin(uint32_t pint) {
+    return static_cast<Sh77xxIntcPin>(static_cast<uint32_t>(Sh77xxIntcPin::kPint0) + pint);
+}
+
 class Sh77xxIntc : public Peripheral {
 public:
     using Peripheral::Peripheral;
@@ -85,6 +89,7 @@ public:
     virtual bool PinLevel(Sh77xxIntcPin pin)                                                          = 0;
     virtual void SetNmiLevel(bool high)                                                               = 0;
     virtual bool WakesStandby(Sh77xxIntcSource source)                                                = 0;
+    virtual bool PintWakesStandby(uint32_t pint, bool high)                                           = 0;
     virtual void SetStandbyWake(Sh77xxIntcSource source, bool wakes)                                  = 0;
 
     virtual uint16_t ReadArea7Half(uint32_t addr)                  = 0;

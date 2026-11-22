@@ -24,11 +24,7 @@ constexpr uint32_t kQuickLaunchBits = Bit(HpJornada540Button::kQuickLaunch1) | B
 constexpr uint32_t kWakeKeyBits = kQuickLaunchBits | Bit(HpJornada540Button::kRecord);
 
 constexpr Sh77xxIntcPin kPortFButtonPins[] = {
-    Sh77xxIntcPin::kPint8,
-    static_cast<Sh77xxIntcPin>(static_cast<uint8_t>(Sh77xxIntcPin::kPint8) + 1u),
-    static_cast<Sh77xxIntcPin>(static_cast<uint8_t>(Sh77xxIntcPin::kPint8) + 2u),
-    static_cast<Sh77xxIntcPin>(static_cast<uint8_t>(Sh77xxIntcPin::kPint8) + 3u),
-    static_cast<Sh77xxIntcPin>(static_cast<uint8_t>(Sh77xxIntcPin::kPint8) + 4u),
+    Sh77xxPintPin(8u), Sh77xxPintPin(9u), Sh77xxPintPin(10u), Sh77xxPintPin(11u), Sh77xxPintPin(12u),
 };
 
 }

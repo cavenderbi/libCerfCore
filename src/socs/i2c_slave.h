@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cerfcore/core/service.h>
+#include <cerfcore/socs/guest_cpu_reset.h>
 
 #include <cstdint>
 
@@ -28,6 +29,8 @@ public:
 
     virtual void BusStart() {}
     virtual void BusStop() {}
+
+    virtual bool ResetsWithLine(uint8_t, ResetLineKind) const { return false; }
 };
 
 }

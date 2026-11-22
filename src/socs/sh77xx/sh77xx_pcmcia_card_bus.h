@@ -11,6 +11,7 @@ class Sh77xxPcmciaCardBus : public Service {
 public:
     using Service::Service;
 
+    virtual bool     ServesArea(uint32_t area) const = 0;
     virtual uint32_t ReadCycles(uint32_t area, uint32_t offset, bool io, PcmciaIoWidth width, unsigned bytes) = 0;
     virtual void     WriteCycles(uint32_t area, uint32_t offset, bool io, PcmciaIoWidth width, unsigned bytes,
                                  uint32_t value) = 0;

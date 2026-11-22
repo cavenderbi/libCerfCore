@@ -15,6 +15,10 @@ inline uint32_t PackXrgb(uint32_t r, uint32_t g, uint32_t b) {
     return 0xFF000000u | (r << 16) | (g << 8) | b;
 }
 
+inline uint32_t PackXrgb4(uint32_t r4, uint32_t g4, uint32_t b4) {
+    return PackXrgb(Expand4(r4), Expand4(g4), Expand4(b4));
+}
+
 inline uint32_t Luma8(uint32_t xrgb) {
     return (((xrgb >> 16) & 0xFFu) * 77u + ((xrgb >> 8) & 0xFFu) * 150u +
             (xrgb & 0xFFu) * 29u) >> 8;
@@ -36,9 +40,13 @@ inline uint16_t PackRgb565(uint32_t xrgb) {
 
 inline uint32_t MsbFirstShift(uint32_t bit, uint32_t bpp) { return 8u - bpp - (bit & 7u); }
 
+inline uint32_t IndexMsbFirst(uint32_t byte, uint32_t bit, uint32_t bpp) {
+    return (byte >> MsbFirstShift(bit, bpp)) & ((1u << bpp) - 1u);
+}
+
 inline uint32_t PackedIndexMsbFirst(const uint8_t* row, uint32_t x, uint32_t bpp) {
     const uint32_t bit = x * bpp;
-    return (row[bit >> 3] >> MsbFirstShift(bit, bpp)) & ((1u << bpp) - 1u);
+    return IndexMsbFirst(row[bit >> 3], bit, bpp);
 }
 
 inline uint32_t PackedIndexLsbFirst(const uint8_t* row, uint32_t x, uint32_t bpp) {

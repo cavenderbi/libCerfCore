@@ -40,7 +40,7 @@ protected:
     void     WriteStraddlePixel(const Surface& s, int32_t x, int32_t y,
                                 uint32_t bpp, uint32_t value);
     uint8_t* SubBytePixelPtr(const Surface& s, int32_t x, int32_t y, uint32_t bits,
-                             uint32_t* shift);
+                             uint32_t* bit_out);
     bool ReadSubBytePixel(const Surface& s, int32_t x, int32_t y, uint32_t bits,
                           uint32_t* out);
     bool WriteSubBytePixel(const Surface& s, int32_t x, int32_t y, uint32_t bits,
@@ -141,12 +141,12 @@ inline void BltSurfaceAccess::WriteStraddlePixel(const Surface& s, int32_t x,
 }
 
 inline uint8_t* BltSurfaceAccess::SubBytePixelPtr(const Surface& s, int32_t x, int32_t y,
-                                                  uint32_t bits, uint32_t* shift) {
+                                                  uint32_t bits, uint32_t* bit_out) {
     const CerfBltSurface& d = *s.desc;
     if (!d.is_rotate) {
         const int32_t bit_x = (int32_t)((uint32_t)x * bits);
         uint32_t run = 0;
-        *shift = lcd_pixel::MsbFirstShift((uint32_t)bit_x, bits);
+        *bit_out = (uint32_t)bit_x;
         return PixelPtr(s, (int32_t)(bit_x >> 3), y, 1u, &run);
     }
     const CerfRotatedLayout l = CerfRotatedLayoutFor(d.rotate, (int32_t)d.screen_w, (int32_t)d.screen_h,
@@ -155,26 +155,27 @@ inline uint8_t* BltSurfaceAccess::SubBytePixelPtr(const Surface& s, int32_t x, i
     if (bit < 0) return nullptr;
     uint8_t* p = s.host_base + (bit >> 3);
     if (p < s.host_lo || p >= s.host_hi) return nullptr;
-    *shift = lcd_pixel::MsbFirstShift((uint32_t)bit, bits);
+    *bit_out = (uint32_t)bit;
     return p;
 }
 
 inline bool BltSurfaceAccess::ReadSubBytePixel(const Surface& s, int32_t x,
                                                int32_t y, uint32_t bits,
                                                uint32_t* out) {
-    uint32_t shift = 0;
-    uint8_t* p = SubBytePixelPtr(s, x, y, bits, &shift);
+    uint32_t bit = 0;
+    uint8_t* p = SubBytePixelPtr(s, x, y, bits, &bit);
     if (!p) return false;
-    *out = (uint32_t)((*p >> shift) & ((1u << bits) - 1u));
+    *out = lcd_pixel::IndexMsbFirst(*p, bit, bits);
     return true;
 }
 
 inline bool BltSurfaceAccess::WriteSubBytePixel(const Surface& s, int32_t x,
                                                 int32_t y, uint32_t bits,
                                                 uint32_t value) {
-    uint32_t shift = 0;
-    uint8_t* p = SubBytePixelPtr(s, x, y, bits, &shift);
+    uint32_t bit = 0;
+    uint8_t* p = SubBytePixelPtr(s, x, y, bits, &bit);
     if (!p) return false;
+    const uint32_t shift = lcd_pixel::MsbFirstShift(bit, bits);
     const uint8_t  mask  = (uint8_t)(((1u << bits) - 1u) << shift);
     *p = (uint8_t)((*p & ~mask) | ((value << shift) & mask));
     return true;

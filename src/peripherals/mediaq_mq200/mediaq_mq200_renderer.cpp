@@ -77,7 +77,7 @@ private:
         if (MediaQMq200Gc::DepthIndexed(win.depth)) {
             const uint32_t bit   = col * bits;
             const uint8_t  byte  = FbByte(line + bit / 8u);
-            const uint32_t index = (byte >> lcd_pixel::MsbFirstShift(bit, bits)) & ((1u << bits) - 1u);
+            const uint32_t index = lcd_pixel::IndexMsbFirst(byte, bit, bits);
             return PalRgb(chip_->PaletteEntry(win.palette_base | index));
         }
         const int64_t at = line + static_cast<int64_t>(col) * (bits / 8u);

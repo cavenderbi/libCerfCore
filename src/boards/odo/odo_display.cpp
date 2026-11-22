@@ -5,6 +5,7 @@
 #include <cerfcore/peripherals/peripheral_base.h>
 #include "../../host/panel_frame_renderer.h"
 #include <cerfcore/host/host_presentation.h>
+#include <cerfcore/lcd/lcd_pixel_expand.h>
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
@@ -196,10 +197,8 @@ public:
             uint32_t* dst_row = dib_bgra32 + y * width;
             for (uint32_t x = 0; x < width; ++x) {
                 const uint32_t src_x = (x * guest_w) / width;
-                const uint32_t byte_off = src_x >> 2;        /* 4 px / byte */
-                const uint32_t shift    = (3u - (src_x & 3u)) * 2u;
-                const uint8_t  b        = mem.ReadByte(row_pa + byte_off);
-                const uint32_t level    = (b >> shift) & 0x3u;
+                const uint8_t  b     = mem.ReadByte(row_pa + (src_x >> 2));
+                const uint32_t level = lcd_pixel::IndexMsbFirst(b, src_x * 2u, 2u);
                 dst_row[x] = kGrayscaleBgra[level];
             }
         }

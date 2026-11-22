@@ -78,16 +78,14 @@ public:
         const uint8_t* upper       = mem_->TryTranslateRange(s.upper_pa, panel_bytes);
         const uint8_t* lower       = s.dual ? mem_->TryTranslateRange(s.lower_pa, panel_bytes) : nullptr;
         const uint64_t swap        = s.linear_bytes ? 0u : 3u;
-        const uint32_t mask        = (1u << s.bits_per_dot) - 1u;
         for (uint32_t y = 0; y < copy_h; ++y) {
             const bool     lower_half = y >= s.panel_lines;
             const uint8_t* fb         = lower_half ? lower : upper;
             const uint64_t line       = lower_half ? y - s.panel_lines : y;
             uint32_t*      dst        = dib_bgra32 + (size_t)y * host_w;
             for (uint32_t x = 0; x < copy_w; ++x) {
-                const uint64_t bit   = (line * s.dots + x) * s.bits_per_dot;
-                const uint32_t shift = lcd_pixel::MsbFirstShift(static_cast<uint32_t>(bit & 7u), s.bits_per_dot);
-                dst[x]               = colors[(fb[(bit >> 3) ^ swap] >> shift) & mask];
+                const uint64_t bit = (line * s.dots + x) * s.bits_per_dot;
+                dst[x] = colors[lcd_pixel::IndexMsbFirst(fb[(bit >> 3) ^ swap], static_cast<uint32_t>(bit), s.bits_per_dot)];
             }
         }
     }

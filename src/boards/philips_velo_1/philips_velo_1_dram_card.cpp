@@ -1,6 +1,7 @@
 #include "../../socs/pr31x00/pr31x00_mfio_slave.h"
 
 #include <cerfcore/core/cerf_emulator.h>
+#include <cerfcore/socs/guest_cpu_reset.h>
 #include "../../peripherals/i2c/i2c_bit_bang_target.h"
 #include "../../socs/pr31x00/pr31x00_io.h"
 #include <cerfcore/boards/board_context.h>
@@ -36,7 +37,7 @@ public:
 
     void OnReady() override {
         eeprom_ = &emu_.Get<PhilipsVelo1DramCardIdEeprom>();
-        target_.emplace([this](bool released) { DriveSda(released); },
+        target_.emplace(emu_.Get<GuestCpuReset>(), [this](bool released) { DriveSda(released); },
                         std::vector<I2cSlave*>{ eeprom_ }, I2cBitBangTarget::Unmatched{});
         DriveSda(true);
     }

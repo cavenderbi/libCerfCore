@@ -8,6 +8,7 @@
 #include "hp_jornada_540_audio_out.h"
 #include "hp_jornada_540_battery.h"
 #include "hp_jornada_540_capture_timer.h"
+#include "hp_jornada_540_cf_socket.h"
 #include "hp_jornada_540_family_id.h"
 #include "hp_jornada_540_key_wake.h"
 #include "hp_jornada_540_lcd_clock.h"
@@ -41,6 +42,8 @@ constexpr size_t   kRunningLatch        = 1u;
 constexpr uint16_t kRunning             = 0x0002u;
 constexpr size_t   kDisplayLatch        = 2u;
 constexpr uint16_t kDisplayPower        = 0x0002u;
+constexpr size_t   kCfLatch             = 2u;
+constexpr uint16_t kCfPower             = 0x0100u;
 constexpr uint32_t kCommandOffset    = 0x04u;
 constexpr uint32_t kStatusOffset     = 0x08u;
 constexpr uint32_t kCaptureDivisorOffset = 0x10u;
@@ -87,6 +90,7 @@ public:
         audio_out_ = &emu_.Get<HpJornada540AudioOut>();
         capture_   = &emu_.Get<HpJornada540CaptureTimer>();
         key_wake_  = &emu_.Get<HpJornada540KeyWake>();
+        cf_socket_ = &emu_.Get<HpJornada540CfSocket>();
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
             if (emu_.Get<GuestCpuReset>().PowerOnReset(kind)) PowerOnReset();
         });
@@ -160,6 +164,7 @@ public:
         audio_out_->SaveState(w);
         capture_->SaveState(w);
         key_wake_->SaveState(w);
+        cf_socket_->SaveState(w);
     }
 
     void RestoreState(StateReader& r) override {
@@ -174,6 +179,7 @@ public:
         audio_out_->RestoreState(r, (audio_control_ & kOutputEnable) != 0u, FifoResetHeld());
         capture_->RestoreState(r, static_cast<uint16_t>(clock & kCaptureControlBits));
         key_wake_->RestoreState(r);
+        cf_socket_->RestoreState(r);
     }
 
 private:
@@ -186,11 +192,13 @@ private:
     void SetLatch(size_t i, uint16_t level) {
         levels_[i] = level;
         if (i == kAudioLatch) audio_out_->SetFifoReset(FifoResetHeld());
+        if (i == kCfLatch) cf_socket_->SetCardPower((level & kCfPower) != 0u);
         led_->SetDisplayOff(DisplayOffWhileRunning());
     }
 
     void PowerOnReset() {
         levels_.fill(0u);
+        cf_socket_->SetCardPower(false);
         register94_    = 0u;
         audio_control_ = 0u;
         ApplyClock(0u);
@@ -230,7 +238,7 @@ private:
     }
 
     uint16_t Status() const {
-        uint16_t v = kStatusCfAbsent;
+        uint16_t v = cf_socket_->CardAbsent() ? kStatusCfAbsent : 0u;
         if (!led_->Blinking()) v = static_cast<uint16_t>(v | kStatusLedIdle);
         if (battery_->Charging()) v = static_cast<uint16_t>(v | kStatusCharging);
         if (!battery_->OnExternalPower()) v = static_cast<uint16_t>(v | kStatusAcAbsent);
@@ -254,6 +262,7 @@ private:
     HpJornada540AudioOut*                 audio_out_ = nullptr;
     HpJornada540CaptureTimer*             capture_   = nullptr;
     HpJornada540KeyWake*                  key_wake_  = nullptr;
+    HpJornada540CfSocket*                 cf_socket_ = nullptr;
     std::array<uint16_t, kLatches.size()> levels_{};
     uint16_t                              register94_    = 0u;
     uint16_t                              clock_         = 0u;

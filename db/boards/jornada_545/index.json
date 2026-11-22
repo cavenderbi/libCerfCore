@@ -2,6 +2,6 @@
   "name": "HP Jornada 545",
   "short_name": "Jornada 545",
   "board_family_id": "hp_jornada_540",
-  "support_level": "unknown_partial",
+  "support_level": "bootable_full",
   "internal__spec_divergences": "USB 1.1 port"
 }

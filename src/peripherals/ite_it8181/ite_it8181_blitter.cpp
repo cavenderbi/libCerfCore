@@ -4,6 +4,7 @@
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
+#include <cerfcore/lcd/lcd_pixel_expand.h>
 #include "../raster/gpe_line_walk.h"
 #include "../raster/rop3.h"
 
@@ -149,8 +150,7 @@ void IteIt8181Blitter::Rectangle(const Registers& r, const uint8_t* host) {
             const int64_t dx = XOf(r.bdls) + step * col;
             uint32_t s = 0u;
             if (hosted && mono) {
-                const uint8_t byte = host[row * mono_row + col / 8u];
-                const bool    set  = ((byte >> (7u - (col & 7u))) & 1u) != 0u;
+                const bool set = lcd_pixel::PackedIndexMsbFirst(host + row * mono_row, col, 1u) != 0u;
                 if (!set && clear) continue;
                 s = set ? r.fcr : r.bcr;
             } else if (hosted) {

@@ -3,7 +3,7 @@
 #include "sed1356_config.h"
 #include "sed1356_panel_power.h"
 #include "sed1356_power_sequence.h"
-#include <cerfcore/core/byte_order.h>
+#include "../epson_ink_cursor/epson_ink_cursor_layer.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
 #include "../peripheral_dispatcher.h"
@@ -22,10 +22,8 @@ bool Sed1356::ShouldRegister() {
 void Sed1356::OnReady() {
     auto& cfg = emu_.Get<Sed1356Config>();
     mmio_base_        = cfg.HostWindowBase();
-    vram_size_        = cfg.DisplayBufferBytes();
-    vram_mask_        = (vram_size_ & (vram_size_ - 1u)) ? 0u : (vram_size_ - 1u);
     product_rev_code_ = cfg.ProductRevCode();
-    vram_.assign(vram_size_, 0u);
+    buffer_.Allocate(cfg.DisplayBufferBytes());
     reg_[0x01] = MemSelectResetValue();
     bus_clock_hz_ = cfg.BusClockHz();
     power_seq_    = &emu_.Get<Sed1356PowerSequence>();
@@ -75,8 +73,7 @@ void Sed1356::LcdLutRgb(uint32_t index, uint8_t& r4, uint8_t& g4,
 }
 
 uint32_t Sed1356::LcdInkCursorStartByte() const {
-    const uint32_t n = Reg(0x71);              /* Table 14-1 encoding. */
-    return n == 0 ? vram_size_ - 1024u : vram_size_ - n * 8192u;
+    return EpsonInkCursorLayer::StartByte(buffer_.Size(), Reg(0x71));
 }
 
 void Sed1356::LcdInkColor(uint32_t which, uint8_t& r5, uint8_t& g6,
@@ -331,28 +328,11 @@ void Sed1356::RegWrite(uint32_t off, uint8_t value) {
     }
 }
 
-uint32_t Sed1356::VramLoad(uint32_t off, uint32_t width) const {
-    const uint32_t r = VramWrap(off);
-    if (r + width <= vram_size_) return static_cast<uint32_t>(cerf::le::UN(&vram_[r], width));
-    uint32_t v = 0;
-    for (uint32_t i = 0; i < width; ++i) v |= uint32_t(vram_[VramWrap(r + i)]) << (8u * i);
-    return v;
-}
-
-void Sed1356::VramStore(uint32_t off, uint32_t value, uint32_t width) {
-    const uint32_t r = VramWrap(off);
-    if (r + width <= vram_size_) {
-        cerf::le::PutN(&vram_[r], value, width);
-        return;
-    }
-    for (uint32_t i = 0; i < width; ++i) vram_[VramWrap(r + i)] = uint8_t(value >> (8u * i));
-}
-
 uint8_t Sed1356::ReadByte(uint32_t addr) {
     const uint32_t off = addr - MmioBase();
     if (off < kRegWindow) return RegRead(off);
     if (off >= kVramBase && off < kVramBase + kVramAperture)
-        return vram_[VramWrap(off - kVramBase)];
+        return static_cast<uint8_t>(buffer_.Load(off - kVramBase, 1u));
     /* §8.3.18: byte access to the BitBLT data registers is not allowed. */
     HaltUnsupportedAccess("ReadByte", addr, 0);
 }
@@ -363,7 +343,7 @@ uint16_t Sed1356::ReadHalf(uint32_t addr) {
         return (uint16_t)(RegRead(off) | (RegRead(off + 1) << 8));
     if (off >= kBltAperture && off < kBltApertureEnd) return blt_.DataRead();
     if (off >= kVramBase && off + 1 < kVramBase + kVramAperture) {
-        return static_cast<uint16_t>(VramLoad(off - kVramBase, 2u));
+        return static_cast<uint16_t>(buffer_.Load(off - kVramBase, 2u));
     }
     HaltUnsupportedAccess("ReadHalf", addr, 0);
 }
@@ -378,7 +358,7 @@ uint32_t Sed1356::ReadWord(uint32_t addr) {
         return lo | (uint32_t)blt_.DataRead() << 16;
     }
     if (off >= kVramBase && off + 3 < kVramBase + kVramAperture) {
-        return VramLoad(off - kVramBase, 4u);
+        return buffer_.Load(off - kVramBase, 4u);
     }
     HaltUnsupportedAccess("ReadWord", addr, 0);
 }
@@ -387,7 +367,7 @@ void Sed1356::WriteByte(uint32_t addr, uint8_t value) {
     const uint32_t off = addr - MmioBase();
     if (off < kRegWindow) { RegWrite(off, value); return; }
     if (off >= kVramBase && off < kVramBase + kVramAperture) {
-        vram_[VramWrap(off - kVramBase)] = value;
+        buffer_.Store(off - kVramBase, value, 1u);
         return;
     }
     HaltUnsupportedAccess("WriteByte", addr, value);
@@ -405,7 +385,7 @@ void Sed1356::WriteHalf(uint32_t addr, uint16_t value) {
         return;
     }
     if (off >= kVramBase && off + 1 < kVramBase + kVramAperture) {
-        VramStore(off - kVramBase, value, 2u);
+        buffer_.Store(off - kVramBase, value, 2u);
         return;
     }
     HaltUnsupportedAccess("WriteHalf", addr, value);
@@ -426,7 +406,7 @@ void Sed1356::WriteWord(uint32_t addr, uint32_t value) {
         return;
     }
     if (off >= kVramBase && off + 3 < kVramBase + kVramAperture) {
-        VramStore(off - kVramBase, value, 4u);
+        buffer_.Store(off - kVramBase, value, 4u);
         return;
     }
     HaltUnsupportedAccess("WriteWord", addr, value);
@@ -435,7 +415,7 @@ void Sed1356::WriteWord(uint32_t addr, uint32_t value) {
 void Sed1356::SaveState(StateWriter& w) {
     std::lock_guard<std::mutex> lk(state_mtx_);
     w.WriteBytes("reg", reg_, sizeof(reg_));
-    w.WriteBytes("vram", vram_.data(), vram_.size());
+    buffer_.SaveState(w, "vram");
     lut_.SaveState(w);
     mode_latch_.SaveState(w);
     blt_.SaveState(w);
@@ -447,7 +427,7 @@ void Sed1356::SaveState(StateWriter& w) {
 void Sed1356::RestoreState(StateReader& r) {
     std::lock_guard<std::mutex> lk(state_mtx_);
     r.ReadBytes("reg", reg_, sizeof(reg_));
-    r.ReadBytes("vram", vram_.data(), vram_.size());
+    buffer_.RestoreState(r, "vram");
     lut_.RestoreState(r);
     mode_latch_.RestoreState(r);
     blt_.RestoreState(r);

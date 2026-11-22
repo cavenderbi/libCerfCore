@@ -5,12 +5,14 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 
+#include <utility>
+
 namespace cerfcore {
 
 namespace {
 
-constexpr uint32_t kArea5Base         = 0x14000000u;
-constexpr uint32_t kAreas5And6Bytes   = 0x08000000u;
+constexpr uint32_t kFirstPcmciaArea   = 5u;
+constexpr uint32_t kLastPcmciaArea    = 6u;
 constexpr uint32_t kAreaShift         = 26u;
 constexpr uint32_t kAreaOffsetMask    = 0x03FFFFFFu;
 constexpr uint32_t kIoCardInterface   = 0x02000000u;
@@ -22,16 +24,22 @@ class Sh77xxPcmciaSpace : public Peripheral {
 public:
     using Peripheral::Peripheral;
 
-    bool ShouldRegister() override { return emu_.TryGet<Sh77xxPcmciaCardBus>() != nullptr; }
+    bool ShouldRegister() override {
+        const Sh77xxPcmciaCardBus* bus = emu_.TryGet<Sh77xxPcmciaCardBus>();
+        return bus != nullptr && ServedAreas(*bus).first != 0u;
+    }
 
     void OnReady() override {
         bsc_      = &emu_.Get<Sh77xxBsc>();
         card_bus_ = &emu_.Get<Sh77xxPcmciaCardBus>();
+        const std::pair<uint32_t, uint32_t> areas = ServedAreas(*card_bus_);
+        first_area_ = areas.first;
+        last_area_  = areas.second;
         emu_.Get<PeripheralDispatcher>().Register(this);
     }
 
-    uint32_t MmioBase() const override { return kArea5Base; }
-    uint32_t MmioSize() const override { return kAreas5And6Bytes; }
+    uint32_t MmioBase() const override { return first_area_ << kAreaShift; }
+    uint32_t MmioSize() const override { return (last_area_ - first_area_ + 1u) << kAreaShift; }
 
     uint8_t  ReadByte(uint32_t addr) override { return static_cast<uint8_t>(Read(addr, 1u)); }
     uint16_t ReadHalf(uint32_t addr) override { return static_cast<uint16_t>(Read(addr, 2u)); }
@@ -42,6 +50,17 @@ public:
     void WriteWord(uint32_t addr, uint32_t value) override { Write(addr, 4u, value); }
 
 private:
+    std::pair<uint32_t, uint32_t> ServedAreas(const Sh77xxPcmciaCardBus& bus) const {
+        uint32_t first = 0u;
+        uint32_t last  = 0u;
+        for (uint32_t area = kFirstPcmciaArea; area <= kLastPcmciaArea; ++area) {
+            if (!bus.ServesArea(area)) continue;
+            if (first == 0u) first = area;
+            last = area;
+        }
+        return {first, last};
+    }
+
     struct Cycle {
         uint32_t      area;
         uint32_t      offset;
@@ -75,8 +94,10 @@ private:
         card_bus_->WriteCycles(c.area, c.offset, c.io, c.width, bytes, value);
     }
 
-    Sh77xxBsc*           bsc_      = nullptr;
-    Sh77xxPcmciaCardBus* card_bus_ = nullptr;
+    Sh77xxBsc*           bsc_        = nullptr;
+    Sh77xxPcmciaCardBus* card_bus_   = nullptr;
+    uint32_t             first_area_ = 0u;
+    uint32_t             last_area_  = 0u;
 };
 
 }

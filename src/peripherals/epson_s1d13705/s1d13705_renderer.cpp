@@ -108,15 +108,8 @@ private:
     }
 
     static uint32_t Pixel(S1d13705& lcd, uint32_t index) {
-        uint8_t r4, g4, b4;
-        lcd.LutRgb(index, r4, g4, b4);
-        if (!lcd.Color()) r4 = b4 = g4;
-        if (lcd.Inverted()) {
-            r4 ^= 0xFu;
-            g4 ^= 0xFu;
-            b4 ^= 0xFu;
-        }
-        return lcd_pixel::PackXrgb(lcd_pixel::Expand4(r4), lcd_pixel::Expand4(g4), lcd_pixel::Expand4(b4));
+        const uint32_t xrgb = lcd.LutXrgb(index);
+        return lcd.Inverted() ? xrgb ^ 0x00FFFFFFu : xrgb;
     }
 };
 

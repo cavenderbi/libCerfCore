@@ -31,7 +31,9 @@ public:
     }
 
 protected:
-    ControlPins Pins() const override { return {{kSh77xxPortSc, 0x08u}, {kSh77xxPortH, 0x80u}, {kSh77xxPortSc, 0x40u}}; }
+    ControlPins Pins() const override {
+        return {{kSh77xxPortSc, 0x08u, ActiveLevel::kHigh}, {kSh77xxPortH, 0x80u}, {kSh77xxPortSc, 0x40u}};
+    }
 
 private:
     Sh77xxIntc* intc_ = nullptr;

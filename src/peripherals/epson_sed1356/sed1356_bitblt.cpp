@@ -3,7 +3,6 @@
 #include "sed1356.h"
 #include <cerfcore/state/state_stream.h>
 
-#include <cstring>
 #include <vector>
 
 namespace cerfcore {
@@ -126,19 +125,12 @@ uint32_t Sed1356BitBlt::WordsPerLine() const {
     return (p_.width + (p_.src & 1u) + 1u) >> 1;
 }
 
-/* AB[20:0] addressing: accesses alias within the populated buffer (TM
-   X25B-A-001 §10 Fig 10-1) via owner_.VramWrap - never fault. */
 uint16_t Sed1356BitBlt::ReadPxAt(uint32_t byte_addr) const {
-    const uint8_t* m = owner_.vram_.data();
-    const uint8_t  lo = m[owner_.VramWrap(byte_addr)];
-    if (!p_.bpp16) return lo;
-    return (uint16_t)(lo | m[owner_.VramWrap(byte_addr + 1u)] << 8);
+    return static_cast<uint16_t>(owner_.buffer_.Load(byte_addr, p_.bpp16 ? 2u : 1u));
 }
 
 void Sed1356BitBlt::WritePxAt(uint32_t byte_addr, uint16_t v) {
-    uint8_t* m = owner_.vram_.data();
-    m[owner_.VramWrap(byte_addr)] = (uint8_t)v;
-    if (p_.bpp16) m[owner_.VramWrap(byte_addr + 1u)] = (uint8_t)(v >> 8);
+    owner_.buffer_.Store(byte_addr, v, p_.bpp16 ? 2u : 1u);
 }
 
 /* 8x8 pattern addressing, Programming Notes Table 10-3: the source start
@@ -307,17 +299,10 @@ void Sed1356BitBlt::ExecuteDisplayOp() {
                 const uint32_t line_base = p_.src + y * p_.src_stride;
                 const uint32_t skip = 8u * (line_base & 1u) + start_bit;
                 const uint32_t nwords = (skip + p_.width + 15u) >> 4;
-                const uint32_t wbase = owner_.VramWrap(line_base & ~1u);
+                const uint32_t wbase = line_base & ~1u;
                 std::vector<uint16_t> words(nwords);
-                const uint32_t tail = owner_.VramSize() - wbase;
-                if (nwords * 2u <= tail) {
-                    std::memcpy(words.data(), owner_.vram_.data() + wbase,
-                                nwords * 2u);
-                } else {        /* run wraps the populated buffer boundary */
-                    std::memcpy(words.data(), owner_.vram_.data() + wbase,
-                                tail);
-                    std::memcpy((uint8_t*)words.data() + tail,
-                                owner_.vram_.data(), nwords * 2u - tail);
+                for (uint32_t i = 0; i < nwords; ++i) {
+                    words[i] = static_cast<uint16_t>(owner_.buffer_.Load(wbase + 2u * i, 2u));
                 }
                 ExpandLine(y, words.data(), nwords, skip,
                            p_.op == kMoveColorExpandTr);

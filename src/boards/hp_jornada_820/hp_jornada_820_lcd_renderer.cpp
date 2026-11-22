@@ -62,9 +62,7 @@ public:
         uint32_t lut[256];
         for (uint32_t i = 0; i < 256; ++i) {
             const uint16_t e = cerf::le::U16(upper, i * 2);
-            lut[i] = lcd_pixel::PackXrgb(lcd_pixel::Expand4((e >> 8) & 0xFu),
-                                         lcd_pixel::Expand4((e >> 4) & 0xFu),
-                                         lcd_pixel::Expand4(e & 0xFu));
+            lut[i] = lcd_pixel::PackXrgb4((e >> 8) & 0xFu, (e >> 4) & 0xFu, e & 0xFu);
         }
 
         const uint32_t panel_h    = guest_h / 2u;

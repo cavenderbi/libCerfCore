@@ -17,7 +17,7 @@ void Eeprom24cxx::OnReady() {
         OpenStorage(path);
     }
     emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
-        if (kind != ResetLineKind::Rtc) return;
+        if (!ResetsWithLine(DeviceAddress(), kind)) return;
         page_.fill(0);
         page_dirty_   = 0;
         addr_         = 0;

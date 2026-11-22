@@ -24,6 +24,7 @@ public:
     uint8_t TxnReadByte(uint8_t slave_addr) final;
     void    BusStart() final;
     void    BusStop() final;
+    bool    ResetsWithLine(uint8_t, ResetLineKind kind) const final { return kind == ResetLineKind::Rtc; }
 
     void SaveState(StateWriter& w) final;
     void RestoreState(StateReader& r) final;

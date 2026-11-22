@@ -3,11 +3,13 @@
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../peripherals/pin_drive.h"
+#include "../../peripherals/philips_pdiusbd12/pdiusbd12.h"
 #include "../../peripherals/pin_net_hold.h"
 #include "../../socs/sh77xx/sh77xx_pfc.h"
 #include "../../socs/sh77xx/sh77xx_port_data.h"
 #include "hp_jornada_540_audio_request_line.h"
 #include "hp_jornada_540_buttons.h"
+#include "hp_jornada_540_cf_socket.h"
 #include "hp_jornada_540_eeprom_bus.h"
 #include "hp_jornada_540_family_id.h"
 
@@ -21,10 +23,12 @@ constexpr uint8_t  kPortDAudioRequest  = 0x10u;
 constexpr uint8_t  kPortDWiredInputs   = kPortDUnreadInputs | kPortDAudioRequest;
 constexpr uint32_t kAudioRequestDreq   = 0u;
 constexpr uint8_t kPortJEepromScl    = 0x08u;
+constexpr uint32_t kCfResetPin       = 5u;
 constexpr uint8_t kPortEEepromSda    = 0x04u;
-constexpr uint8_t kPortEUsbConnect   = 0x10u;
+constexpr uint8_t kPortEUsbSuspend   = 0x10u;
+constexpr uint32_t kUsbSuspendPin    = 4u;
 constexpr uint8_t kPortEQuickLaunch1 = 0x40u;
-constexpr uint8_t kPortEWiredInputs  = kPortEEepromSda | kPortEUsbConnect | kPortEQuickLaunch1;
+constexpr uint8_t kPortEWiredInputs  = kPortEEepromSda | kPortEUsbSuspend | kPortEQuickLaunch1;
 constexpr uint8_t kPortGQuickLaunch4 = 0x01u;
 constexpr uint8_t kPortGQuickLaunch3 = 0x02u;
 constexpr uint8_t kPortGQuickLaunch2 = 0x04u;
@@ -61,11 +65,15 @@ public:
         eeprom_bus_    = &emu_.Get<HpJornada540EepromBus>();
         audio_request_ = &emu_.Get<HpJornada540AudioRequestLine>();
         buttons_       = &emu_.Get<HpJornada540Buttons>();
+        cf_socket_     = &emu_.Get<HpJornada540CfSocket>();
+        usb_           = emu_.TryGet<Pdiusbd12>();
     }
 
     void TrackDrive(const Sh77xxPortData& ports) override {
         nets_.Track(ports);
         quick_launch_row_low_ = ports.Drive(kSh77xxPortD, kQuickLaunchRowPin) == PinDrive::kLow;
+        cf_socket_->SetResetLine(ports.Drive(kSh77xxPortJ, kCfResetPin) == PinDrive::kHigh);
+        if (usb_ != nullptr) usb_->SetSuspendHeldLow(ports.Drive(kSh77xxPortE, kUsbSuspendPin) == PinDrive::kLow);
         eeprom_bus_->OnLines((nets_.Levels(kSh77xxPortJ) & kPortJEepromScl) != 0u, SdaLine());
     }
 
@@ -86,8 +94,9 @@ public:
         const uint8_t nets = nets_.Levels(port);
         if (port == kSh77xxPortD) return Level(nets, kPortDAudioRequest, !audio_request_->Asserted());
         if (port == kSh77xxPortE) {
-            const uint8_t sda = Level(nets, kPortEEepromSda, SdaLine());
-            return QuickLaunchColumn(sda, kPortEQuickLaunch1, HpJornada540Button::kQuickLaunch1);
+            uint8_t levels = Level(nets, kPortEEepromSda, SdaLine());
+            if (usb_ != nullptr) levels = Level(levels, kPortEUsbSuspend, usb_->SuspendPinHigh());
+            return QuickLaunchColumn(levels, kPortEQuickLaunch1, HpJornada540Button::kQuickLaunch1);
         }
         if (port == kSh77xxPortG) {
             uint8_t levels = QuickLaunchColumn(nets, kPortGQuickLaunch2, HpJornada540Button::kQuickLaunch2);
@@ -123,6 +132,8 @@ private:
     HpJornada540EepromBus*                        eeprom_bus_    = nullptr;
     HpJornada540AudioRequestLine*                 audio_request_ = nullptr;
     HpJornada540Buttons*                          buttons_       = nullptr;
+    HpJornada540CfSocket*                         cf_socket_     = nullptr;
+    Pdiusbd12*                                    usb_           = nullptr;
     bool                                          quick_launch_row_low_ = false;
     PinNetHold<kSh77xxPortCount, kSh77xxPortPins> nets_;
 };
