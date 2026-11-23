@@ -1,8 +1,7 @@
 #include "intel_82365sl.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/nec_mobilepro_200/nec_mobilepro_200_family_id.h"
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/state/state_stream.h>
 
@@ -73,13 +72,7 @@ constexpr ExcaPartRules kExcaRules = [] {
 Intel82365sl::Intel82365sl(CerfEmulator& emu)
     : IsaExcaSocketPair(emu, kExcaRules) {}
 
-bool Intel82365sl::FittedOnFamily(std::string_view family) {
-    return family == BoardFamilyId::NecMobilepro200;
-}
-
-bool Intel82365sl::ShouldRegister() {
-    return FittedOnFamily(emu_.Get<BoardContext>().GetBoardFamilyId());
-}
+bool Intel82365sl::ShouldRegister() { return emu_.Get<BoardParts>().Has(kPartId); }
 
 void Intel82365sl::OnReady() {
     board_ = &emu_.Get<Intel82365slBoard>();

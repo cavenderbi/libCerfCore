@@ -1,6 +1,7 @@
 #include "hp_300_battery.h"
 
 #include <cerfcore/boards/board_context.h>
+#include <cerfcore/core/board_database.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/host/machine_object_tree.h>
 #include "../../core/board_config.h"
@@ -35,7 +36,7 @@ bool Hp300Battery::ShouldRegister() {
 
 void Hp300Battery::OnReady() {
     intc_      = &emu_.Get<Sh77xxIntc>();
-    level_adc_ = emu_.Get<BoardConfig>().Enum(BoardConfigParamId::MainBatteries, kLevelAdc);
+    level_adc_ = ValueByName(kLevelAdc, emu_.Get<BoardConfig>().Part(BoardConfigParamId::MainBatteries).chemistry);
     battery_.AddChangeListener([this] { DriveExternalPowerInterruptPin(); });
     emu_.Get<MachineObjectTree>().Add(&battery_);
     DriveExternalPowerInterruptPin();

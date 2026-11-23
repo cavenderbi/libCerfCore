@@ -1,7 +1,7 @@
 #include <cerfcore/peripherals/peripheral_base.h>
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/nec_sg2_vr5500/nec_sg2_vr5500_family_id.h"
+#include "../../core/board_parts.h"
+#include "dallas_ds1386_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/host/guest_deep_sleep.h>
@@ -55,7 +55,7 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecSg2Vr5500;
+        return emu_.Get<BoardParts>().Has(PartId::DallasDs1386);
     }
 
     void OnReady() override {

@@ -1,9 +1,0 @@
-{
-  "name": "Casio Cassiopeia A-51",
-  "short_name": "A-51",
-  "board_family_id": "casio_cassiopeia_a10",
-  "support_level": "bootable_full",
-  "internal__spec_divergences": "CompactFlash slot",
-  "device_year": 1997,
-  "board_config": { "ram": { "default": "8mb", "values": ["4mb", "5mb", "6mb", "7mb", "8mb"] } }
-}

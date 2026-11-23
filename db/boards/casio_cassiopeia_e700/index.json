@@ -1,7 +1,0 @@
-{
-  "name": "Casio Cassiopeia E-700",
-  "short_name": "E-700",
-  "board_family_id": "casio_jx670",
-  "support_level": "bootable_full",
-  "board_config": { "ram": { "default": "32mb" } }
-}

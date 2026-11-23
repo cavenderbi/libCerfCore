@@ -2,8 +2,8 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/hp_jornada_700/hp_jornada_700_family_id.h"
+#include "../../core/board_parts.h"
+#include "intel_sa1111_part_id.h"
 #include <cerfcore/state/state_stream.h>
 
 namespace cerfcore {
@@ -29,8 +29,7 @@ constexpr uint32_t kSacr1L3Mb = 1u << 2;
 }
 
 bool Sa1111SacL3::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::HpJornada700;
+    return emu_.Get<BoardParts>().Has(PartId::IntelSa1111);
 }
 
 /* Table 7-10 (printed 7-13): L3WD "1 - L3 Control Bus Data Write Data is Done", L3RD "1 - L3

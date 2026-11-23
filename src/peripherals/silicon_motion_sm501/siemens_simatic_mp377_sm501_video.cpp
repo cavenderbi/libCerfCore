@@ -5,6 +5,8 @@
 
 #include <cerfcore/boards/board_context.h>
 #include "../../boards/siemens_simatic_mp377/siemens_simatic_mp377_family_id.h"
+#include "../../core/board_parts.h"
+#include "silicon_motion_sm501_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
 
@@ -14,7 +16,8 @@ namespace siemens_simatic_mp377 {
 
 bool SiemensSimaticMp377Sm501Video::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377;
+    return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377 &&
+           emu_.Get<BoardParts>().Has(PartId::SiliconMotionSm501);
 }
 
 const uint8_t* SiemensSimaticMp377Sm501Video::Vram() {

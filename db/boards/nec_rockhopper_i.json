@@ -3,5 +3,5 @@
   "short_name": "Rockhopper I",
   "board_family_id": "nec_sg2_vr5500",
   "support_level": "no_support",
-  "internal__spec_divergences": "no ALi M1535 south bridge, EPLD on LCS2, second flash on LCS1"
+  "internal__spec_divergences": "EPLD on LCS2, second flash on LCS1"
 }

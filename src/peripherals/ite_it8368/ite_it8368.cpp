@@ -1,9 +1,7 @@
 #include "ite_it8368.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/philips_nino/philips_nino_family_id.h"
-#include "../../boards/philips_velo_1/philips_velo_1_family_id.h"
-#include "../../boards/sharp_mobilon_hc/sharp_mobilon_hc_family_id.h"
+#include "../../core/board_parts.h"
+#include "ite_it8368_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
@@ -86,9 +84,7 @@ constexpr uint16_t kCtrlKnown = kCtrlFixAttrIo | kCtrlAddrSel | kCtrlByteSwap |
 }  /* namespace */
 
 bool IteIt8368::ShouldRegister() {
-    const std::string_view board = emu_.Get<BoardContext>().GetBoardFamilyId();
-    return board == BoardFamilyId::PhilipsNino || board == BoardFamilyId::PhilipsVelo1 ||
-           board == BoardFamilyId::SharpMobilonHc;
+    return emu_.Get<BoardParts>().Has(PartId::IteIt8368);
 }
 
 void IteIt8368::OnReady() {

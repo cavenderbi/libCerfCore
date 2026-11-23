@@ -1,8 +1,0 @@
-{
-  "name": "HP Jornada 690 (Europe)",
-  "short_name": "Jornada 690",
-  "board_family_id": "hp_600",
-  "support_level": "unknown_partial",
-  "device_year": 1999,
-  "board_config": { "ram": { "default": "32mb" } }
-}

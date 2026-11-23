@@ -1,0 +1,7 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "width": 480,
+  "height": 272,
+  "connections": [{ "board_family_ids": ["siemens_simatic_tp177b_4"] }]
+}

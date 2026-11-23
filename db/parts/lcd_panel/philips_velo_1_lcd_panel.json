@@ -1,0 +1,8 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "technology": "monochrome_stn",
+  "width": 480,
+  "height": 240,
+  "connections": [{ "board_family_ids": ["philips_velo_1"] }]
+}

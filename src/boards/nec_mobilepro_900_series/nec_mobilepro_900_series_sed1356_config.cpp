@@ -3,6 +3,8 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../socs/pxa255/pxa255_memory_controller.h"
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "../../peripherals/epson_sed1356/epson_s1d13806_part_id.h"
 #include "nec_mobilepro_900_series_family_id.h"
 
 namespace cerfcore {
@@ -18,7 +20,8 @@ public:
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::NecMobilepro900Series;
+        return bd && bd->GetBoardFamilyId() == BoardFamilyId::NecMobilepro900Series &&
+               emu_.Get<BoardParts>().Has(PartId::EpsonS1d13806);
     }
 
     uint32_t HostWindowBase()        const override { return 0x0C000000u; }

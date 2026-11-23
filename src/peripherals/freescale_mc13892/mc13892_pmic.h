@@ -2,8 +2,8 @@
 
 #include "../../socs/i2c_slave.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/ford_sync_gen2/ford_sync_gen2_family_id.h"
+#include "../../core/board_parts.h"
+#include "freescale_mc13892_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/state/state_stream.h>
 
@@ -21,8 +21,7 @@ public:
     using I2cSlave::I2cSlave;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::FordSyncGen2;
+        return emu_.Get<BoardParts>().Has(PartId::FreescaleMc13892);
     }
 
     bool MatchesAddress(uint8_t slave_addr) const override {

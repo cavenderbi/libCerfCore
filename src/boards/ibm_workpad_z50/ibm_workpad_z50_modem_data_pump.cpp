@@ -1,11 +1,12 @@
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "../../peripherals/rockwell_rcvdl56dpfl/rockwell_rcvdl56dpfl_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../peripherals/rockwell_rcvdl56dpfl/rcvdl56dpfl_data_pump_peripheral.h"
 #include "../../peripherals/rockwell_rcvdl56dpfl/rcvdl56dpfl_self_test.h"
 #include "../../socs/vr41xx/vr41xx_hsp.h"
 #include "ibm_workpad_z50_family_id.h"
-#include "ibm_workpad_z50_member_straps.h"
 
 #include <cstdint>
 
@@ -29,7 +30,7 @@ public:
 
     bool ShouldRegister() override {
         return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::IbmWorkpadZ50 &&
-               emu_.Get<IbmWorkpadZ50MemberStraps>().ModemFitted();
+               emu_.Get<BoardParts>().Has(PartId::RockwellRcvdl56dpfl);
     }
 
     void OnReady() override {

@@ -2,11 +2,10 @@
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
+#include "../../peripherals/philips_pdiusbd12/philips_pdiusbd12_part_id.h"
 #include "../../socs/sh77xx/sh77xx_intc.h"
 #include "hp_jornada_540_family_id.h"
-#include "hp_jornada_545_id.h"
-#include "hp_jornada_547_id.h"
-#include "hp_jornada_548_id.h"
 #include "hp_jornada_540_pdiusbd12_ports.h"
 
 namespace cerfcore {
@@ -21,10 +20,8 @@ public:
     using Pdiusbd12Config::Pdiusbd12Config;
 
     bool ShouldRegister() override {
-        auto& board = emu_.Get<BoardContext>();
-        if (board.GetBoardFamilyId() != BoardFamilyId::HpJornada540) return false;
-        const auto id = board.GetBoardId();
-        return id == BoardId::HpJornada545 || id == BoardId::HpJornada547 || id == BoardId::HpJornada548;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::HpJornada540 &&
+               emu_.Get<BoardParts>().Has(PartId::PhilipsPdiusbd12);
     }
 
     void OnReady() override { intc_ = &emu_.Get<Sh77xxIntc>(); }

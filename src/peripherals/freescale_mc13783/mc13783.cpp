@@ -2,8 +2,8 @@
 
 #include "mc13783_adc.h"
 #include "mc13783_int_line.h"
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/toshiba_gigabeat_s/toshiba_gigabeat_s_family_id.h"
+#include "../../core/board_parts.h"
+#include "freescale_mc13783_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/host/guest_deep_sleep.h>
@@ -123,8 +123,7 @@ constexpr uint32_t kWritable[64] = {
 }
 
 bool Mc13783::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::ToshibaGigabeatS;
+    return emu_.Get<BoardParts>().Has(PartId::FreescaleMc13783);
 }
 
 void Mc13783::OnReady() {

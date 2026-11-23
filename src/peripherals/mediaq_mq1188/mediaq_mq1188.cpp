@@ -1,7 +1,7 @@
 #include "mediaq_mq1188.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/askey_pc3xx/askey_pc3xx_family_id.h"
+#include "../../core/board_parts.h"
+#include "mediaq_mq1188_part_id.h"
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
@@ -70,8 +70,7 @@ const OhciProfile MediaQMq1188::kUsbProfile = {
 };
 
 bool MediaQMq1188::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::AskeyPc3xx;
+    return emu_.Get<BoardParts>().Has(PartId::MediaqMq1188);
 }
 
 Fatal& MediaQMq1188::OwnerFatal() {

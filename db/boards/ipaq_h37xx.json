@@ -5,5 +5,5 @@
   "support_level": "unknown_partial",
   "internal__spec_divergences": "32 MB flash",
   "device_year": 2001,
-  "board_config": { "ram": { "default": "64mb" } }
+  "board_config": { "ram_v2": { "default": "compaq_ipaq_h3000_ram_64mb" } }
 }

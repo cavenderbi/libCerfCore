@@ -1,0 +1,1 @@
+{ "name": "Li-polymer battery", "supported": false, "connections": [{ "board_ids": ["casio_gfort"] }] }

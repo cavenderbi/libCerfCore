@@ -1,0 +1,1 @@
+{ "name": "Philips UCB1100", "supported": true, "connections": [{ "board_family_ids": ["philips_velo_1"] }] }

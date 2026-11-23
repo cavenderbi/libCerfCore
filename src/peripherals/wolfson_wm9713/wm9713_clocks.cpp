@@ -1,7 +1,7 @@
 #include "wm9713_clocks.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/symbol_hamptons/symbol_hamptons_family_id.h"
+#include "../../core/board_parts.h"
+#include "wolfson_wm9713_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/state/state_stream.h>
 #include "wm9713_master_clocks.h"
@@ -25,8 +25,7 @@ constexpr uint32_t kKMask       = 0x003FFFFFu;
 }  // namespace
 
 bool Wm9713Clocks::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::SymbolHamptons;
+    return emu_.Get<BoardParts>().Has(PartId::WolfsonWm9713);
 }
 
 void Wm9713Clocks::OnReady() { inputs_ = &emu_.Get<Wm9713MasterClocks>(); }

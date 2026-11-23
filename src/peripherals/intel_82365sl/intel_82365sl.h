@@ -2,6 +2,7 @@
 
 #include "../pcic82365/isa_exca_socket_pair.h"
 #include "intel_82365sl_board.h"
+#include "intel_82365sl_part_id.h"
 
 #include <cstdint>
 #include <string_view>
@@ -15,7 +16,7 @@ public:
     static constexpr const char* kName                 = "82365SL";
     static constexpr bool        kPortOverlayUndefined = true;
 
-    static bool FittedOnFamily(std::string_view family);
+    static constexpr std::string_view kPartId = PartId::Intel82365sl;
 
     bool ShouldRegister() override;
     void OnReady() override;

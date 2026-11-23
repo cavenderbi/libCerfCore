@@ -1,0 +1,7 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "width": 240,
+  "height": 320,
+  "connections": [{ "board_family_ids": ["casio_tomcat"] }]
+}

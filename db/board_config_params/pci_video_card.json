@@ -1,0 +1,5 @@
+{
+  "part_picker": true,
+  "generic_part_id": "gpu",
+  "enum_values": [{ "part_id": "ati_rage_xl" }]
+}

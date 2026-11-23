@@ -1,0 +1,15 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "connections": [
+    {
+      "board_ids": [
+        "casio_cassiopeia_a20", "casio_cassiopeia_a20f", "casio_cassiopeia_a20j", "casio_cassiopeia_a21s",
+        "casio_cassiopeia_a22t", "casio_cassiopeia_a23g", "casio_cassiopeia_a50", "casio_cassiopeia_a51",
+        "casio_cassiopeia_a51v", "casio_cassiopeia_a55v", "casio_cassiopeia_a60", "casio_cassiopeia_pa2400",
+        "casio_cassiopeia_pa2400w", "casio_cassiopeia_pa_2000", "casio_cassiopeia_pa_2000v",
+        "casio_cassiopeia_pa_2100", "casio_cassiopeia_pa_2300v"
+      ]
+    }
+  ]
+}

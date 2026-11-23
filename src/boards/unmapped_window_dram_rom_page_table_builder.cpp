@@ -2,7 +2,7 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include "../core/board_config.h"
-#include "ram_param.h"
+#include "ram_param_id.h"
 
 namespace cerfcore {
 
@@ -14,7 +14,7 @@ void UnmappedWindowDramRomPageTableBuilder::OnReady() {
 
 void UnmappedWindowDramRomPageTableBuilder::SetRamParamDram(uint32_t pa_base, uint32_t window_bytes,
                                                             DramRepeat repeat) {
-    const uint32_t bytes   = emu_.Get<BoardConfig>().Enum(BoardConfigParamId::Ram, kRamBytes);
+    const uint32_t bytes   = emu_.Get<BoardConfig>().SelectedBytes(BoardConfigParamId::Ram);
     const bool     repeats = repeat == DramRepeat::kPowerOfTwoSize && (bytes & (bytes - 1u)) == 0u;
     dram_ = CachedWindowDram(pa_base, bytes, repeats ? window_bytes : 0u, window_bytes);
 }

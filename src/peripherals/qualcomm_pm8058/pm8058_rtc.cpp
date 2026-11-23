@@ -2,8 +2,8 @@
 
 #include "pm8058_irq.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/nokia_sea_ray/nokia_sea_ray_family_id.h"
+#include "../../core/board_parts.h"
+#include "qualcomm_pm8058_part_id.h"
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
@@ -32,8 +32,7 @@ constexpr uint32_t kRtcIrq   = 53u;
 }  // namespace
 
 bool Pm8058Rtc::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::NokiaSeaRay;
+    return emu_.Get<BoardParts>().Has(PartId::QualcommPm8058);
 }
 
 void Pm8058Rtc::OnReady() {

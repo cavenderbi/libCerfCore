@@ -6,6 +6,8 @@
 #include "../vr4111/vr4111_id.h"
 #include "../vr4121/vr4121_id.h"
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
+#include "../../core/touch_generic_part_id.h"
 #include <cerfcore/host/host_presentation.h>
 #include <cerfcore/host/touch_input.h>
 #include "vr41xx_piu.h"
@@ -35,7 +37,7 @@ public:
     bool ShouldRegister() override {
         const std::string_view soc = emu_.Get<BoardContext>().GetSocId();
         return (soc == SocId::Vr4101 || soc == SocId::Vr4102 || soc == SocId::Vr4111 || soc == SocId::Vr4121) &&
-               emu_.Get<Vr41xxPiuScreen>().HasTouchscreen();
+               emu_.Get<BoardParts>().Find(GenericPartId::Touch);
     }
 
     void PenDown(int x, int y) override { Drive(true, x, y); }

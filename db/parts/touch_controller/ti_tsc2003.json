@@ -1,0 +1,5 @@
+{
+  "name": "Texas Instruments TSC2003",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["ford_sync_gen2"] }]
+}

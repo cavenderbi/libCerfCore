@@ -1,0 +1,5 @@
+{
+  "part_picker": true,
+  "generic_part_id": "battery",
+  "enum_values": [{ "part_id": "hp_300_alkaline" }, { "part_id": "hp_300_nicd_nimh" }]
+}

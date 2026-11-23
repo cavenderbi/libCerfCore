@@ -3,8 +3,17 @@
   "soc_id": "pr31700",
   "device_year": 1997,
   "board_config": {
-    "ram": { "default": "12mb", "values": ["4mb", "8mb", "12mb", "16mb"] },
-    "lcd_panel": { "default": "monochrome_stn", "values": ["monochrome_stn", "color_dstn"] },
+    "ram_v2": {
+      "default": "sharp_mobilon_hc_ram_12mb",
+      "values": [
+        "sharp_mobilon_hc_ram_4mb", "sharp_mobilon_hc_ram_8mb", "sharp_mobilon_hc_ram_12mb",
+        "sharp_mobilon_hc_ram_16mb"
+      ]
+    },
+    "lcd_panel_v2": {
+      "default": "sharp_mobilon_hc_monochrome_stn",
+      "values": ["sharp_mobilon_hc_monochrome_stn", "sharp_mobilon_hc_color_dstn"]
+    },
     "backlight": { "default": "none", "values": ["none", "installed"] }
   },
   "notes": [],

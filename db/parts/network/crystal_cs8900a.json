@@ -1,0 +1,1 @@
+{ "name": "Crystal CS8900A", "supported": false, "connections": [{ "board_family_ids": ["samsung_smdk2410"] }] }

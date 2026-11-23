@@ -1,7 +1,0 @@
-{
-  "name": "Casio GFORT",
-  "short_name": "GFORT",
-  "board_family_id": "casio_jx670",
-  "support_level": "unknown_partial",
-  "internal__spec_divergences": "CF slot instead of SD"
-}

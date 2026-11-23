@@ -1,7 +1,7 @@
 #include "wm9713_codec.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/symbol_hamptons/symbol_hamptons_family_id.h"
+#include "../../core/board_parts.h"
+#include "wolfson_wm9713_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
@@ -109,8 +109,7 @@ constexpr uint16_t kAdco       = 1u << 4;
 }  // namespace
 
 bool Wm9713Codec::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::SymbolHamptons;
+    return emu_.Get<BoardParts>().Has(PartId::WolfsonWm9713);
 }
 
 void Wm9713Codec::OnReady() {

@@ -2,8 +2,9 @@
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
+#include "hp_300_compact_flash_part_id.h"
 #include "hp_300_family_id.h"
-#include "hp_300_member_straps.h"
 
 namespace cerfcore {
 
@@ -24,11 +25,9 @@ public:
         return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp300;
     }
 
-    void OnReady() override { straps_ = &emu_.Get<Hp300MemberStraps>(); }
+    void OnReady() override { cf_fitted_ = emu_.Get<BoardParts>().Has(PartId::Hp300CompactFlash); }
 
-    bool Fitted(uint32_t channel) const override {
-        return channel == kPcCardChannel || !(straps_->Luke() && !straps_->Model2());
-    }
+    bool Fitted(uint32_t channel) const override { return channel == kPcCardChannel || cf_fitted_; }
 
     ObjectIdentity Socket(uint32_t channel) const override {
         if (channel == kPcCardChannel) return {kPcCardSlotId, kPcCardSlotLabel};
@@ -36,7 +35,7 @@ public:
     }
 
 private:
-    const Hp300MemberStraps* straps_ = nullptr;
+    bool cf_fitted_ = false;
 };
 
 }

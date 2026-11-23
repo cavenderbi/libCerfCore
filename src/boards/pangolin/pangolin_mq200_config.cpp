@@ -2,6 +2,8 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "../../peripherals/mediaq_mq200/mediaq_mq200_part_id.h"
 #include "pangolin_family_id.h"
 
 namespace cerfcore {
@@ -14,7 +16,8 @@ public:
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::Pangolin;
+        return bd && bd->GetBoardFamilyId() == BoardFamilyId::Pangolin &&
+               emu_.Get<BoardParts>().Has(PartId::MediaqMq200);
     }
 
     uint32_t HostWindowBase() const override { return 0x4B800000u; }

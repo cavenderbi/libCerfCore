@@ -1,5 +1,0 @@
-{
-  "name": "Main batteries",
-  "enum_values": [{ "id": "alkaline", "name": "Alkaline" }, { "id": "nicd_nimh", "name": "NiCd / NiMH" }],
-  "generic_part_id": "battery"
-}

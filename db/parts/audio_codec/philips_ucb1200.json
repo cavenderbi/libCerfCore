@@ -1,0 +1,5 @@
+{
+  "name": "Philips UCB1200",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["hp_jornada_820", "philips_nino"] }]
+}

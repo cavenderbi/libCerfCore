@@ -1,8 +1,8 @@
 #include <cerfcore/peripherals/peripheral_base.h>
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/siemens_simpad/siemens_simpad_family_id.h"
+#include "../../core/board_parts.h"
+#include "philips_tda8007b_part_id.h"
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
 #include "../peripheral_dispatcher.h"
@@ -23,8 +23,7 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimpad;
+        return emu_.Get<BoardParts>().Has(PartId::PhilipsTda8007b);
     }
 
     void OnReady() override {

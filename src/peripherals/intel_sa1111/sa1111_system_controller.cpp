@@ -1,8 +1,8 @@
 #include "sa1111_system_controller.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/hp_jornada_700/hp_jornada_700_family_id.h"
+#include "../../core/board_parts.h"
+#include "intel_sa1111_part_id.h"
 #include "../../socs/sa11xx/sa11xx_test_unit.h"
 #include <cerfcore/state/state_stream.h>
 #include "sa1111_sbi.h"
@@ -52,8 +52,7 @@ PllSetting DecodeSkcdr(uint32_t skcdr) {
 }
 
 bool Sa1111SystemController::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::HpJornada700;
+    return emu_.Get<BoardParts>().Has(PartId::IntelSa1111);
 }
 
 void Sa1111SystemController::OnUnitReady() {

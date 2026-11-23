@@ -1,0 +1,1 @@
+{ "name": "Texas Instruments ADS7846", "supported": true, "connections": [{ "board_family_ids": ["siemens_simatic_mp377"] }] }

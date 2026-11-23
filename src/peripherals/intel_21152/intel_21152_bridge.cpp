@@ -1,12 +1,12 @@
 #include "intel_21152_bridge.h"
 
-#include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "intel_21152_part_id.h"
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
-#include "../../boards/nec_sg2_vr5500/nec_sg2_vr5500_family_id.h"
 #include "../pci/pci_host_bridge.h"
 #include "intel_21152_board.h"
 
@@ -100,7 +100,7 @@ Intel21152Bridge::Intel21152Bridge(CerfEmulator& emu)
     : Service(emu), header_(kIdentity), pm_(kPowerManagement), secondary_("21152 secondary") {}
 
 bool Intel21152Bridge::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecSg2Vr5500;
+    return emu_.Get<BoardParts>().Has(PartId::Intel21152);
 }
 
 void Intel21152Bridge::OnReady() {

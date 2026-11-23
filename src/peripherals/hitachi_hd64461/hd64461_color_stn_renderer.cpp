@@ -1,13 +1,13 @@
 #define NOMINMAX
 
-#include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
 #include "../../host/panel_frame_renderer.h"
 #include <cerfcore/lcd/lcd_pixel_expand.h>
-#include "../../boards/hp_600/hp_600_family_id.h"
 #include "hd64461_lcdc.h"
 #include "hd64461_panel.h"
+#include "hitachi_hd64461_part_id.h"
 
 #include <algorithm>
 #include <cstring>
@@ -23,7 +23,7 @@ public:
     using PanelFrameRenderer::PanelFrameRenderer;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600 &&
+        return emu_.Get<BoardParts>().Has(PartId::HitachiHd64461) &&
                emu_.Get<Hd64461Panel>().PanelKind() == Hd64461Panel::Kind::kColorStn8Bit;
     }
 

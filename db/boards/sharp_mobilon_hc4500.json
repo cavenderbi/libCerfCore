@@ -1,0 +1,11 @@
+{
+  "name": "Sharp Mobilon HC-4500",
+  "short_name": "Mobilon HC-4500",
+  "board_family_id": "sharp_mobilon_hc",
+  "support_level": "bootable_full",
+  "board_config": {
+    "ram_v2": { "default": "sharp_mobilon_hc_ram_16mb" },
+    "lcd_panel_v2": { "default": "sharp_mobilon_hc_color_dstn" },
+    "backlight": { "default": "installed" }
+  }
+}

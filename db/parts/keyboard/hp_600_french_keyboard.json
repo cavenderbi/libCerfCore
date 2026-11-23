@@ -1,0 +1,5 @@
+{
+  "name": "French keyboard",
+  "supported": true,
+  "connections": [{ "board_ids": ["jornada_680_france", "jornada_690_france"] }]
+}

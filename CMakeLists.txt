@@ -94,6 +94,13 @@ execute_process(COMMAND "${Python3_EXECUTABLE}" -B -m sad "${cerfcore_db_dir}" j
 if(NOT cerfcore_db_rc EQUAL 0)
     message(FATAL_ERROR "sad could not compile ${cerfcore_db_dir} (${cerfcore_db_rc})")
 endif()
+set(cerfcore_db_check "${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_board_database.py")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${cerfcore_db_check}")
+execute_process(COMMAND "${Python3_EXECUTABLE}" -B "${cerfcore_db_check}" "${CERFCORE_DB_JSON}"
+                RESULT_VARIABLE cerfcore_db_check_rc)
+if(NOT cerfcore_db_check_rc EQUAL 0)
+    message(FATAL_ERROR "${cerfcore_db_dir} breaks a rule of the board database")
+endif()
 
 add_library(cerfcore STATIC ${cerfcore_sources})
 add_library(cerfcore::cerfcore ALIAS cerfcore)

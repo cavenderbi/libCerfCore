@@ -6,6 +6,8 @@
 #include <cerfcore/core/fatal.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
+#include "../../core/board_parts.h"
+#include "../../core/touch_generic_part_id.h"
 #include "vr41xx_cmu.h"
 #include "vr41xx_buffered_piu.h"
 #include "vr41xx_piu_panel.h"
@@ -86,7 +88,10 @@ bool PageBufferSlot(uint32_t off, int* page, int* idx) {
 
 bool Vr41xxPiuConverter::ShouldRegister() { return emu_.TryGet<Vr41xxBufferedPiu>() != nullptr; }
 
-void Vr41xxPiuConverter::OnReady() { emu_.Get<PeripheralDispatcher>().Register(this); }
+void Vr41xxPiuConverter::OnReady() {
+    touchscreen_ = emu_.Get<BoardParts>().Find(GenericPartId::Touch) != nullptr;
+    emu_.Get<PeripheralDispatcher>().Register(this);
+}
 
 uint32_t Vr41xxPiuConverter::MmioBase() const { return emu_.Get<Vr41xxBufferedPiu>().Piu2Base(); }
 uint32_t Vr41xxPiuConverter::MmioSize() const { return emu_.Get<Vr41xxBufferedPiu>().Piu2Size(); }
@@ -121,7 +126,7 @@ bool Vr41xxPiuConverter::ConvertCommand(uint16_t cmd, uint16_t pos_x, uint16_t p
     }
     Vr41xxPiuPanel& panel = emu_.Get<Vr41xxPiuPanel>();
     const std::optional<uint16_t> val = adcmd < kAdcmdAdin0
-        ? std::optional<uint16_t>(FilmPortSample(cmd, adcmd, pos_x, pos_y, contact, panel.HasTouchscreen()))
+        ? std::optional<uint16_t>(FilmPortSample(cmd, adcmd, pos_x, pos_y, contact, touchscreen_))
         : panel.PortSample(adcmd);
     std::lock_guard<std::mutex> lk(mtx_);
     adbuf_[0] = val ? static_cast<uint16_t>(kValid | (*val & 0x3FFu)) : 0u;

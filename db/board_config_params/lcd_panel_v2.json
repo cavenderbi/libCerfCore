@@ -1,0 +1,10 @@
+{
+  "part_picker": true,
+  "generic_part_id": "lcd_panel",
+  "enum_values": [
+    { "part_id": "compaq_ipaq_h3000_color_tft" },
+    { "part_id": "compaq_ipaq_h3000_monochrome_stn" },
+    { "part_id": "sharp_mobilon_hc_color_dstn" },
+    { "part_id": "sharp_mobilon_hc_monochrome_stn" }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "Cirrus Logic CL-PD6710",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["samsung_smdk2410"] }]
+}

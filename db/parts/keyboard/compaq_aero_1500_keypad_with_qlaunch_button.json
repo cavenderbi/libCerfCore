@@ -1,0 +1,1 @@
+{ "name": "Keypad with QLaunch button", "supported": true, "connections": [{ "board_ids": ["compaq_aero_1550"] }] }

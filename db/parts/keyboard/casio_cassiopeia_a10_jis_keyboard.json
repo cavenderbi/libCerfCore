@@ -1,0 +1,12 @@
+{
+  "name": "JIS keyboard",
+  "supported": true,
+  "connections": [
+    {
+      "board_ids": [
+        "casio_cassiopeia_a50", "casio_cassiopeia_a51", "casio_cassiopeia_a51v", "casio_cassiopeia_a55v",
+        "casio_cassiopeia_a60", "casio_cassiopeia_pa_2000", "casio_cassiopeia_pa_2000v"
+      ]
+    }
+  ]
+}

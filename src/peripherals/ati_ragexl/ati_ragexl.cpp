@@ -8,8 +8,8 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/nec_sg2_vr5500/nec_sg2_vr5500_family_id.h"
+#include "../../core/board_parts.h"
+#include "ati_rage_xl_part_id.h"
 #include <cerfcore/host/host_presentation.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
@@ -80,8 +80,7 @@ public:
     explicit AtiRageXl(CerfEmulator& emu) : RageXlDisplay(emu) {}
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::NecSg2Vr5500;
+        return emu_.Get<BoardParts>().Has(PartId::AtiRageXl);
     }
     void OnReady() override {
         fb_.assign(kFbSize, 0);

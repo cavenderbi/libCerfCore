@@ -1,0 +1,5 @@
+{
+  "name": "National Semiconductor PC97338",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["compaq_aero_1500"] }]
+}

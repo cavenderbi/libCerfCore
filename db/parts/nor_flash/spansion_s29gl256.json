@@ -1,0 +1,5 @@
+{
+  "name": "Spansion S29GL256",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["siemens_simatic_tp177b_4"] }]
+}

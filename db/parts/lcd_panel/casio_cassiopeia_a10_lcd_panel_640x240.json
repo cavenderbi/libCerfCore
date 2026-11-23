@@ -1,0 +1,14 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "width": 640,
+  "height": 240,
+  "connections": [
+    {
+      "board_ids": [
+        "casio_cassiopeia_a20", "casio_cassiopeia_a20f", "casio_cassiopeia_a20j", "casio_cassiopeia_a21s",
+        "casio_cassiopeia_a22t", "casio_cassiopeia_a23g", "casio_cassiopeia_a60"
+      ]
+    }
+  ]
+}

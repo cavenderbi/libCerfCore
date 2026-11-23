@@ -2,6 +2,7 @@
 
 #include "../pcic82365/isa_exca_socket_pair.h"
 #include "nec_vrc4171a_board.h"
+#include "nec_vrc4171a_part_id.h"
 
 #include <cstdint>
 #include <optional>
@@ -17,7 +18,8 @@ public:
     static constexpr const char* kName                 = "VRC4171A";
     static constexpr bool        kPortOverlayUndefined = false;
 
-    static bool FittedOnFamily(std::string_view family);
+    static constexpr std::string_view kPartId = PartId::NecVrc4171a;
+
     static bool IsTopLevelPort(uint32_t port);
 
     bool ShouldRegister() override;

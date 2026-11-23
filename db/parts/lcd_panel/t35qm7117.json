@@ -1,0 +1,7 @@
+{
+  "name": "T35QM7117",
+  "supported": true,
+  "width": 320,
+  "height": 240,
+  "connections": [{ "board_ids": ["symbol_mk500", "symbol_mk590"] }]
+}

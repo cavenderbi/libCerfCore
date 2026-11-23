@@ -1,0 +1,5 @@
+{
+  "name": "Ricoh RF5C396",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["nec_cronos3e", "nec_mobilepro_700"] }]
+}

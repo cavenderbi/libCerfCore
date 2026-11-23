@@ -1,7 +1,7 @@
 #include "ti_tsc2003_touch.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/ford_sync_gen2/ford_sync_gen2_family_id.h"
+#include "../../core/board_parts.h"
+#include "ti_tsc2003_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
@@ -16,8 +16,7 @@ namespace cerfcore {
 REGISTER_SERVICE(Tsc2003Touch);
 
 bool Tsc2003Touch::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::FordSyncGen2;
+    return emu_.Get<BoardParts>().Has(PartId::TiTsc2003);
 }
 
 void Tsc2003Touch::OnReady() {

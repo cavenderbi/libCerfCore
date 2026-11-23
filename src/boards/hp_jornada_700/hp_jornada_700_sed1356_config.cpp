@@ -2,6 +2,8 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "../../peripherals/epson_sed1356/epson_sed1356_part_id.h"
 #include "hp_jornada_700_family_id.h"
 
 namespace cerfcore {
@@ -17,7 +19,8 @@ public:
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::HpJornada700;
+        return bd && bd->GetBoardFamilyId() == BoardFamilyId::HpJornada700 &&
+               emu_.Get<BoardParts>().Has(PartId::EpsonSed1356);
     }
 
     uint32_t HostWindowBase()        const override { return 0x48000000u; }

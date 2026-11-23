@@ -5,12 +5,15 @@
 #include "name_table.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <string_view>
 #include <utility>
 
 namespace cerfcore {
+
+struct DbPart;
 
 class BoardConfig : public Service {
 public:
@@ -20,6 +23,9 @@ public:
 
     bool               Has(std::string_view param_id) const;
     const std::string& EnumId(std::string_view param_id) const;
+    const DbPart*      SelectedPart(std::string_view param_id) const;
+    const DbPart&      Part(std::string_view param_id) const;
+    uint32_t           SelectedBytes(std::string_view param_id) const;
 
     template <typename T, size_t N>
     T Enum(std::string_view param_id, const std::pair<std::string_view, T> (&table)[N]) const {

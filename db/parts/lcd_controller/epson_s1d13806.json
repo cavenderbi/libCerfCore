@@ -1,0 +1,1 @@
+{ "name": "Epson S1D13806", "supported": true, "connections": [{ "board_family_ids": ["nec_mobilepro_900_series"] }] }

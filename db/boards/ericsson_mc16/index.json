@@ -1,8 +1,0 @@
-{
-  "name": "Ericsson MC16",
-  "short_name": "MC16",
-  "board_family_id": "hp_300",
-  "support_level": "unknown_partial",
-  "internal__spec_divergences": "white backlight",
-  "board_config": { "ram": { "default": "8mb", "values": ["2mb", "4mb", "8mb", "16mb", "32mb"] } }
-}

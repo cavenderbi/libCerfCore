@@ -1,0 +1,1 @@
+{ "name": "Navigation stick", "supported": false, "connections": [{ "board_ids": ["toshiba_gigabeat_v30t"] }] }

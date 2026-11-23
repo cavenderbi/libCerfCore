@@ -1,16 +1,15 @@
 #include "sa1111_sac_rx_fifo.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/hp_jornada_700/hp_jornada_700_family_id.h"
+#include "../../core/board_parts.h"
+#include "intel_sa1111_part_id.h"
 #include "sa1111_sac_tx_stream.h"
 #include <cerfcore/state/state_stream.h>
 
 namespace cerfcore {
 
 bool Sa1111SacRxFifo::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::HpJornada700;
+    return emu_.Get<BoardParts>().Has(PartId::IntelSa1111);
 }
 
 /* SA-1111 Developer's Manual §7.3.2.2: "Each phase of the Left/Right signal is accompanied

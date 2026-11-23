@@ -1,0 +1,9 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "width": 240,
+  "height": 320,
+  "connections": [
+    { "board_ids": ["devemu", "devemu_gen1", "devemu_gen1_sp_qvga", "devemu_sp_qvga", "samsung_smdk2410"] }
+  ]
+}

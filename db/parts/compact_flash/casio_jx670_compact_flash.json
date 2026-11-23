@@ -1,0 +1,5 @@
+{
+  "unknown_name": true,
+  "supported": false,
+  "connections": [{ "board_ids": ["casio_cassiopeia_e707", "casio_cassiopeia_e800", "casio_gfort"] }]
+}

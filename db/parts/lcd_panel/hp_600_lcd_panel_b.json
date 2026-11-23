@@ -1,0 +1,8 @@
+{
+  "name": "B",
+  "unknown_name": true,
+  "supported": true,
+  "width": 640,
+  "height": 240,
+  "connections": [{ "board_ids": ["hp_620lx", "hp_620lx_japan", "hp_660lx"] }]
+}

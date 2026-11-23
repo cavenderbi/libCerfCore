@@ -35,11 +35,17 @@ class SiemensSimaticMp377Panel : public Service {
 public:
     using Service::Service;
 
-    virtual SiemensSimaticMp377PanelProfile Profile() const = 0;
+    bool ShouldRegister() override;
+    void OnReady() override;
+
+    SiemensSimaticMp377PanelProfile Profile() const { return profile_; }
 
     SiemensSimaticMp377PanelDescriptor Descriptor() const {
-        return Mp377PanelDescriptor(Profile());
+        return Mp377PanelDescriptor(profile_);
     }
+
+private:
+    SiemensSimaticMp377PanelProfile profile_ = SiemensSimaticMp377PanelProfile::Inch12_800x600;
 };
 
 inline constexpr uint32_t Mp377PanelWidth(SiemensSimaticMp377PanelProfile p) {

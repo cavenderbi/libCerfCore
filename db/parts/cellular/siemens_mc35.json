@@ -1,0 +1,1 @@
+{ "name": "Siemens MC35", "supported": false, "connections": [{ "board_family_ids": ["pangolin"] }] }

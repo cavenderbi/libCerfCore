@@ -1,0 +1,7 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "width": 480,
+  "height": 240,
+  "connections": [{ "board_family_ids": ["odo"] }]
+}

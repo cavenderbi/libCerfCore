@@ -3,7 +3,7 @@
   "soc_id": "vr4121",
   "device_year": 1999,
   "board_config": {
-    "dram_card": { "default": "none", "values": ["none", "32mb"] },
+    "dram_card_v2": { "default": "none", "values": ["none", "ibm_workpad_z50_dram_card_32mb"] },
     "mips16en": { "default": "low", "values": ["low", "high"] }
   },
   "notes": ["Slow emulation"],

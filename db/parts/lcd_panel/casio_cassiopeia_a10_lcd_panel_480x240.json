@@ -1,0 +1,18 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "width": 480,
+  "height": 240,
+  "connections": [
+    {
+      "board_ids": [
+        "casio_cassiopeia_a10", "casio_cassiopeia_a11", "casio_cassiopeia_a11_plus", "casio_cassiopeia_a11a",
+        "casio_cassiopeia_a11j", "casio_cassiopeia_a50", "casio_cassiopeia_a51", "casio_cassiopeia_a51v",
+        "casio_cassiopeia_a55v", "casio_cassiopeia_pa2400", "casio_cassiopeia_pa2400w", "casio_cassiopeia_pa_2000",
+        "casio_cassiopeia_pa_2000v", "casio_cassiopeia_pa_2100", "casio_cassiopeia_pa_2300v",
+        "compaq_pc_companion_c120", "compaq_pc_companion_c120_plus_2", "compaq_pc_companion_c120_plus_4",
+        "compaq_pc_companion_c140"
+      ]
+    }
+  ]
+}

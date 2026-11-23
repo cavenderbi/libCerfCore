@@ -33,8 +33,6 @@ public:
         return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::IbmWorkpadZ50;
     }
 
-    bool HasTouchscreen() const override { return false; }
-
     std::optional<uint16_t> PressureSample(bool) override { return kUndrivenPortSample; }
 
     uint16_t ReleasedPlateSample() override { return kUndrivenPortSample; }

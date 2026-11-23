@@ -5,9 +5,9 @@
 #include "pci1225_legacy_port.h"
 #include "pci1225_socket_function.h"
 #include "ti_cardbus_board.h"
-#include "../../boards/nec_sg2_vr5500/nec_sg2_vr5500_family_id.h"
 
-#include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "ti_pci1225_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/host/machine_object_tree.h>
@@ -33,7 +33,7 @@ public:
           socket_b_(emu, 1u, {kSocketBId, kSocketBLabel}, shared_, mtx_, sequencer_) {}
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecSg2Vr5500;
+        return emu_.Get<BoardParts>().Has(PartId::TiPci1225);
     }
 
     void OnReady() override {

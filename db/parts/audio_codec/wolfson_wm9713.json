@@ -1,0 +1,1 @@
+{ "name": "Wolfson WM9713", "supported": true, "connections": [{ "board_family_ids": ["symbol_hamptons"] }] }

@@ -1,0 +1,7 @@
+{
+  "unknown_name": true,
+  "supported": false,
+  "width": 480,
+  "height": 800,
+  "connections": [{ "board_family_ids": ["nokia_sea_ray"] }]
+}

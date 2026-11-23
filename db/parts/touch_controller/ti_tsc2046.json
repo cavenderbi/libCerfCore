@@ -1,0 +1,5 @@
+{
+  "name": "Texas Instruments TSC2046",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["ti_omap35x_evm"] }]
+}

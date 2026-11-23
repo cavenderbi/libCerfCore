@@ -49,4 +49,15 @@ bool BoardConfig::Has(std::string_view param_id) const { return values_.find(par
 
 const std::string& BoardConfig::EnumId(std::string_view param_id) const { return values_.find(param_id)->second; }
 
+const DbPart* BoardConfig::SelectedPart(std::string_view param_id) const {
+    return emu_.Get<BoardDatabase>().FindPart(EnumId(param_id));
+}
+
+const DbPart& BoardConfig::Part(std::string_view param_id) const { return *SelectedPart(param_id); }
+
+uint32_t BoardConfig::SelectedBytes(std::string_view param_id) const {
+    const DbPart* part = SelectedPart(param_id);
+    return part ? *part->size_mb << 20 : 0u;
+}
+
 }

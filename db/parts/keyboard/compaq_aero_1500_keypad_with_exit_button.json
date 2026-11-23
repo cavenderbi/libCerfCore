@@ -1,0 +1,5 @@
+{
+  "name": "Keypad with exit button",
+  "supported": true,
+  "connections": [{ "board_ids": ["compaq_aero_1520", "compaq_aero_1530", "compaq_presario_150"] }]
+}

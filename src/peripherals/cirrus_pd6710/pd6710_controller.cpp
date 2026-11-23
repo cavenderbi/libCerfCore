@@ -3,8 +3,8 @@
 #include "pd6710_card_irq_line.h"
 #include "pd6710_management_irq_line.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/samsung_smdk2410/samsung_smdk2410_family_id.h"
+#include "../../core/board_parts.h"
+#include "cirrus_pd6710_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
@@ -105,7 +105,7 @@ Pd6710Controller::Pd6710Controller(CerfEmulator& emu)
     : Service(emu), slot_(emu, *this, {kSlotId, kSlotLabel}), exca_(kExcaRules) {}
 
 bool Pd6710Controller::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SamsungSmdk2410;
+    return emu_.Get<BoardParts>().Has(PartId::CirrusPd6710);
 }
 
 void Pd6710Controller::OnReady() {

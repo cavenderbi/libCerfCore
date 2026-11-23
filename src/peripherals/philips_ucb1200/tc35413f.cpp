@@ -1,7 +1,7 @@
 #include "ucb1x00_codec.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/sharp_mobilon_hc/sharp_mobilon_hc_family_id.h"
+#include "../../core/board_parts.h"
+#include "toshiba_tc35413f_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 
 #include <cstdint>
@@ -19,8 +19,7 @@ public:
     using Ucb1x00Codec::Ucb1x00Codec;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc;
+        return emu_.Get<BoardParts>().Has(PartId::ToshibaTc35413f);
     }
 
 protected:

@@ -1,0 +1,1 @@
+{ "name": "SMSC LAN91C113", "supported": false, "connections": [{ "board_family_ids": ["pangolin"] }] }

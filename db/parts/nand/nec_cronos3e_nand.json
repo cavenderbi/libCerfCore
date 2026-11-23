@@ -1,0 +1,5 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "connections": [{ "board_ids": ["nec_mobilegear2_r450", "nec_mobilegear2_r550", "nec_mobilepro_790"] }]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "SMSC LAN9220",
+  "supported": false,
+  "connections": [
+    {
+      "board_ids": [
+        "omap_3530_evm_gen2"
+      ]
+    }
+  ]
+}

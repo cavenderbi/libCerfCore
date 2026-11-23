@@ -2,7 +2,7 @@
   "name": "HP 600 series",
   "soc_id": "sh7729",
   "device_year": 1998,
-  "board_config": { "ram": { "default": "16mb", "values": ["16mb", "32mb"] } },
+  "board_config": { "ram_v2": { "default": "hp_600_ram_16mb", "values": ["hp_600_ram_16mb", "hp_600_ram_32mb"] } },
   "notes": [],
   "ga_window_size": 50331648,
   "rom_placing_mode": "flat_container"

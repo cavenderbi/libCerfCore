@@ -1,0 +1,1 @@
+{ "name": "Dallas DS1386", "supported": true, "connections": [{ "board_family_ids": ["nec_sg2_vr5500"] }] }

@@ -2,7 +2,9 @@
 
 #include <cerfcore/boards/board_context.h>
 #include "../../core/board_config.h"
-#include "../dram_card_param.h"
+#include "../../core/board_parts.h"
+#include "../../peripherals/rockwell_rcvdl56dpfl/rockwell_rcvdl56dpfl_part_id.h"
+#include "../dram_card_param_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../peripherals/peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
@@ -40,7 +42,8 @@ bool IbmWorkpadZ50GpioBuffers::ShouldRegister() {
 void IbmWorkpadZ50GpioBuffers::OnReady() {
     straps_  = &emu_.Get<IbmWorkpadZ50MemberStraps>();
     battery_ = &emu_.Get<IbmWorkpadZ50Battery>();
-    extension_ram_strap_ = ExtensionRamStrap(emu_.Get<BoardConfig>().Enum(BoardConfigParamId::DramCard, kDramCardBytes));
+    extension_ram_strap_ = ExtensionRamStrap(emu_.Get<BoardConfig>().SelectedBytes(BoardConfigParamId::DramCard));
+    modem_strap_ = emu_.Get<BoardParts>().Has(PartId::RockwellRcvdl56dpfl) ? kCs1ModemFitted : 0u;
     emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {
         cs0_out_.store(0u, std::memory_order_release);
         cs1_out_.store(0u, std::memory_order_release);
@@ -54,9 +57,7 @@ uint8_t IbmWorkpadZ50GpioBuffers::Cs0Inputs() const {
                                 ((straps_->KeyboardId() << kCs0KeyboardShift) & kCs0KeyboardMask));
 }
 
-uint8_t IbmWorkpadZ50GpioBuffers::Cs1Inputs() const {
-    return straps_->ModemFitted() ? kCs1ModemFitted : 0u;
-}
+uint8_t IbmWorkpadZ50GpioBuffers::Cs1Inputs() const { return modem_strap_; }
 
 uint8_t IbmWorkpadZ50GpioBuffers::ReadByte(uint32_t addr) {
     const uint32_t off = addr - kCs0Base;

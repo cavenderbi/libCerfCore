@@ -53,18 +53,34 @@ struct DbGenericPart {
     std::string icon;
 };
 
-struct DbDeviceSpec {
+struct DbFeature {
+    std::string generic_part_id;
+    bool        supported;
+};
+
+struct DbPart {
+    std::string             id;
+    std::string             name;
     std::string             generic_part_id;
+    bool                    unknown_name;
     bool                    supported;
-    std::string             displayed_name;
-    std::optional<uint32_t> display_width;
-    std::optional<uint32_t> display_height;
+    std::optional<uint32_t> width;
+    std::optional<uint32_t> height;
+    std::optional<uint32_t> size_mb;
+    std::optional<uint32_t> chip_count;
+    std::optional<uint32_t> row_bits;
+    std::optional<uint32_t> column_bits;
+    std::optional<uint32_t> bank_bits;
+    std::string             technology;
+    bool                    clamp_viewport;
+    std::string             chemistry;
 };
 
 struct DbBoardConfigParam {
     std::string                  id;
     std::string                  name;
     std::string                  generic_part_id;
+    bool                         part_picker;
     std::vector<ConfigEnumValue> enum_values;
 };
 
@@ -96,7 +112,9 @@ struct DbBoard {
     uint32_t                      device_year;
     std::optional<std::array<uint8_t, 3>> led_color;
     std::vector<std::string>              notes;
-    std::vector<DbDeviceSpec>         specs;
+    std::vector<DbFeature>            features;
+    std::vector<const DbPart*>        connected_parts;
+    std::vector<const DbPart*>        parts;
     std::vector<DbBoardConfigSetting> config;
 };
 
@@ -110,6 +128,9 @@ public:
     std::span<const DbBoardFamily>   Families() const { return board_families_; }
     std::span<const DbGenericPart>   GenericParts() const { return generic_parts_; }
 
+    const DbGenericPart& GenericPart(std::string_view id) const;
+    const DbPart*        FindPart(std::string_view id) const;
+
     const std::string& GaSharedFolderMountPoint() const {
         return ga_shared_folder_mount_point_;
     }
@@ -119,6 +140,15 @@ public:
     }
 
     const DbBoardConfigParam* FindBoardConfigParam(std::string_view id) const;
+
+    template <class Pick>
+    std::vector<const DbPart*> ComposeParts(const DbBoard& board, Pick pick) const {
+        std::vector<const DbPart*> parts = board.connected_parts;
+        for (const DbBoardConfigSetting& s : board.config)
+            if (FindBoardConfigParam(s.param_id)->part_picker)
+                if (const DbPart* picked = pick(s)) parts.push_back(picked);
+        return parts;
+    }
 
     const DbBoard*       FindBoard(std::string_view id) const;
     const DbSoc&         Soc(std::string_view id) const;
@@ -131,6 +161,7 @@ private:
     std::vector<DbSoc>           socs_;
     std::vector<DbBoardFamily>   board_families_;
     std::vector<DbGenericPart>   generic_parts_;
+    std::vector<DbPart>          parts_;
     std::vector<DbBoard>         boards_;
     std::string              ga_shared_folder_mount_point_;
     std::vector<std::string> ga_video_driver_names_;

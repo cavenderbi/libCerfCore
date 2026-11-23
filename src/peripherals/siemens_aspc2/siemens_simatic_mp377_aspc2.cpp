@@ -4,6 +4,8 @@
 #include <cerfcore/core/fatal.h>
 #include "../peripheral_dispatcher.h"
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "siemens_aspc2_part_id.h"
 #include "../../boards/siemens_simatic_mp377/siemens_simatic_mp377_family_id.h"
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
@@ -14,7 +16,8 @@ namespace siemens_simatic_mp377 {
 
 bool SiemensSimaticMp377Aspc2::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377;
+    return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377 &&
+           emu_.Get<BoardParts>().Has(PartId::SiemensAspc2);
 }
 
 void SiemensSimaticMp377Aspc2::OnReady() {

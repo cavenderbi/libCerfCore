@@ -1,9 +1,9 @@
 #include "hd64461_pcc.h"
 
-#include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "hitachi_hd64461_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
-#include "../../boards/hp_600/hp_600_family_id.h"
 #include "hd64461_gpio.h"
 #include "hd64461_intc.h"
 #include "hd64461_socket_wiring.h"
@@ -24,7 +24,7 @@ constexpr uint16_t kScrWriteProtect = 0x01u;
 }
 
 bool Hd64461Pcc::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
+    return emu_.Get<BoardParts>().Has(PartId::HitachiHd64461);
 }
 
 void Hd64461Pcc::OnReady() {

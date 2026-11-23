@@ -1,0 +1,9 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "connections": [
+    {
+      "board_ids": ["sharp_mobilon_hc4000", "sharp_mobilon_hc4100", "sharp_mobilon_hc4100_8mb", "sharp_mobilon_hc4600"]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "Siemens MD34",
+  "supported": false,
+  "connections": [{ "board_ids": ["simpad_cl4", "simpad_slc", "swisscom_wp50", "t_sinus_pad"] }]
+}

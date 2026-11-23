@@ -1,0 +1,7 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "connections": [
+    { "board_ids": ["siemens_mp377", "siemens_mp377_15_inox", "siemens_mp377_15_touch", "siemens_mp377_19_touch"] }
+  ]
+}

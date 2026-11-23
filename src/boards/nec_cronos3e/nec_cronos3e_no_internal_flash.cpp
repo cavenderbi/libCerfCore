@@ -2,10 +2,9 @@
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
 #include "nec_cronos3e_family_id.h"
-#include "nec_mobilegear2_r430_id.h"
-#include "nec_mobilegear2_r530_id.h"
-#include "nec_mobilepro_780_id.h"
+#include "nec_cronos3e_nand_part_id.h"
 
 #include <cstdint>
 
@@ -22,10 +21,8 @@ public:
 
 protected:
     std::string_view WindowBoardFamilyId() const override { return BoardFamilyId::NecCronos3e; }
-    bool WindowOnBoard(const BoardContext& bd) const override {
-        const auto board = bd.GetBoardId();
-        return board == BoardId::NecMobilepro780 || board == BoardId::NecMobilegear2R530 ||
-               board == BoardId::NecMobilegear2R430;
+    bool WindowOnBoard(const BoardContext&) const override {
+        return !emu_.Get<BoardParts>().Has(PartId::NecCronos3eNand);
     }
     const char*      WindowTag()           const override { return "CRONOS3E no internal flash"; }
 };

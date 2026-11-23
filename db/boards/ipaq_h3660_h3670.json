@@ -4,5 +4,5 @@
   "board_family_id": "compaq_ipaq_h3000",
   "support_level": "bootable_full",
   "device_year": 2001,
-  "board_config": { "ram": { "default": "64mb" } }
+  "board_config": { "ram_v2": { "default": "compaq_ipaq_h3000_ram_64mb" } }
 }

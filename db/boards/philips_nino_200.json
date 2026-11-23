@@ -1,0 +1,8 @@
+{
+  "name": "Philips Nino 200",
+  "short_name": "Nino 200",
+  "board_family_id": "philips_nino",
+  "support_level": "unknown_partial",
+  "device_year": 1999,
+  "board_config": { "ram_v2": { "default": "philips_nino_ram_8mb" } }
+}

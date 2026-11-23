@@ -1,0 +1,1 @@
+{ "name": "128 MB OneNAND", "supported": false, "connections": [{ "board_ids": ["omap_3530_evm_onenand"] }] }

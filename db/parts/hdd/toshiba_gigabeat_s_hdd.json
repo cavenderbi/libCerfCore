@@ -1,0 +1,5 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "connections": [{ "board_ids": ["toshiba_gigabeat_s30", "toshiba_gigabeat_v30t", "zune_30"] }]
+}

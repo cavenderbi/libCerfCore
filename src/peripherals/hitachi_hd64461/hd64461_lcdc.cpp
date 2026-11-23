@@ -1,6 +1,7 @@
 #include "hd64461_lcdc.h"
 
-#include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "hitachi_hd64461_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
@@ -8,7 +9,6 @@
 #include <cerfcore/cpu/memory_kind.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
-#include "../../boards/hp_600/hp_600_family_id.h"
 #include "hd64461_system_control.h"
 
 #include <algorithm>
@@ -55,7 +55,7 @@ constexpr uint32_t kCgStorageBits[16] = {1u, 2u, 4u, 8u, 8u, 0u, 0u, 0u, 16u, 0u
 }
 
 bool Hd64461Lcdc::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
+    return emu_.Get<BoardParts>().Has(PartId::HitachiHd64461);
 }
 
 void Hd64461Lcdc::OnReady() {

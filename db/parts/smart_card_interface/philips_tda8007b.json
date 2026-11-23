@@ -1,0 +1,1 @@
+{ "name": "Philips TDA8007B", "supported": true, "connections": [{ "board_family_ids": ["siemens_simpad"] }] }

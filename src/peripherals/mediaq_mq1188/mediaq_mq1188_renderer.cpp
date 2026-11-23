@@ -3,8 +3,8 @@
 #include "mediaq_mq1188.h"
 
 #include "../mediaq_ge/mediaq_panel_renderer.h"
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/askey_pc3xx/askey_pc3xx_family_id.h"
+#include "../../core/board_parts.h"
+#include "mediaq_mq1188_part_id.h"
 
 namespace cerfcore {
 
@@ -15,8 +15,7 @@ public:
     using MediaQPanelRenderer<MediaQMq1188>::MediaQPanelRenderer;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::AskeyPc3xx;
+        return emu_.Get<BoardParts>().Has(PartId::MediaqMq1188);
     }
 };
 

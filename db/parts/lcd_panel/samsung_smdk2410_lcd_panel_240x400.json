@@ -1,0 +1,7 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "width": 240,
+  "height": 400,
+  "connections": [{ "board_ids": ["devemu_wqvga"] }]
+}

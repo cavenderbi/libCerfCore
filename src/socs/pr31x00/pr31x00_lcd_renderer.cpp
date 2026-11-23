@@ -2,12 +2,14 @@
 
 #include "pr31x00_lcd.h"
 #include "pr31x00_lcd_shading.h"
-#include "pr31x00_panel.h"
 
 #include <cerfcore/boards/board_context.h>
 #include "pr31500_id.h"
 #include "pr31700_id.h"
+#include <cerfcore/core/board_database.h>
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
+#include "../../core/lcd_panel_generic_part_id.h"
 #include <cerfcore/cpu/emulated_memory.h>
 #include "../../host/panel_frame_renderer.h"
 #include <cerfcore/lcd/lcd_pixel_expand.h>
@@ -33,7 +35,9 @@ public:
         return soc == SocId::Pr31500 || soc == SocId::Pr31700;
     }
 
-    void OnReady() override { panel_color_ = emu_.Get<Pr31x00Panel>().Color(); }
+    void OnReady() override {
+        panel_color_ = emu_.Get<BoardParts>().Find(GenericPartId::LcdPanel)->technology != "monochrome_stn";
+    }
 
     void PresentedSize(uint32_t& w, uint32_t& h) override {
         const Pr31x00Lcd::Scanout s = emu_.Get<Pr31x00Lcd>().GetScanout();

@@ -1,10 +1,10 @@
 #include "hd64461_gpio.h"
 
-#include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "hitachi_hd64461_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/state/state_stream.h>
-#include "../../boards/hp_600/hp_600_family_id.h"
 #include "hd64461_gpio_wiring.h"
 #include "hd64461_pcc.h"
 #include "hd64461_socket_wiring.h"
@@ -56,7 +56,7 @@ uint8_t HeldNets(uint64_t gate, uint32_t port) { return static_cast<uint8_t>(gat
 }
 
 bool Hd64461Gpio::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
+    return emu_.Get<BoardParts>().Has(PartId::HitachiHd64461);
 }
 
 void Hd64461Gpio::OnReady() {

@@ -1,0 +1,1 @@
+{ "name": "QWERTZ keyboard", "supported": true, "connections": [{ "board_ids": ["casio_cassiopeia_a23g"] }] }

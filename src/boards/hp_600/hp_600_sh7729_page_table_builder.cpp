@@ -6,7 +6,7 @@
 #include "../../core/board_config.h"
 #include "../../socs/sh7729/sh7729_id.h"
 #include "../../socs/sh77xx/sh77xx_area3_dram.h"
-#include "../ram_param.h"
+#include "../ram_param_id.h"
 #include "hp_600_family_id.h"
 
 #include <cstdint>
@@ -31,7 +31,7 @@ public:
     }
 
     void OnReady() override {
-        const uint32_t ram = emu_.Get<BoardConfig>().Enum(BoardConfigParamId::Ram, kRamBytes);
+        const uint32_t ram = emu_.Get<BoardConfig>().SelectedBytes(BoardConfigParamId::Ram);
         bank1_ = CachedWindowDram(kSh77xxRas3uPaBase, ram - kBank0Bytes, kSh77xxRasWindowBytes, kSh77xxRasWindowBytes);
         rom_   = PlaceEntryXipRom(kBank0.region.va_base, kBank0Bytes);
     }

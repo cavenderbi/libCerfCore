@@ -1,0 +1,14 @@
+{
+  "name": "HP 620LX (Japan)",
+  "short_name": "620LX",
+  "board_family_id": "hp_600",
+  "soc_id": "sh7709",
+  "support_level": "unknown_partial",
+  "board_config": {
+    "ram_v2": {
+      "default": "hp_600_ram_16mb",
+      "values": ["hp_600_ram_4mb", "hp_600_ram_8mb", "hp_600_ram_12mb", "hp_600_ram_16mb", "hp_600_ram_32mb"]
+    }
+  },
+  "ga_color_depth": 8
+}

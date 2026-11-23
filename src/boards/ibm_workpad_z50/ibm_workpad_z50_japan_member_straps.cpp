@@ -9,7 +9,7 @@ namespace cerfcore {
 namespace {
 
 class IbmWorkpadZ50JapanMemberStraps
-    : public IbmWorkpadZ50FixedMemberStraps<0x0u, true, kIbmWorkpadZ50RomCard32Mb> {
+    : public IbmWorkpadZ50FixedMemberStraps<0x0u, kIbmWorkpadZ50RomCard32Mb> {
 public:
     using IbmWorkpadZ50FixedMemberStraps::IbmWorkpadZ50FixedMemberStraps;
 

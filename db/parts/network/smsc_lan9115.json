@@ -1,0 +1,17 @@
+{
+  "name": "SMSC LAN9115",
+  "supported": false,
+  "connections": [
+    {
+      "board_family_ids": [
+        "siemens_simatic_tp177b_4"
+      ]
+    },
+    {
+      "board_ids": [
+        "omap_3530_evm",
+        "omap_3530_evm_onenand"
+      ]
+    }
+  ]
+}

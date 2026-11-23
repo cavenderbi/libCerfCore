@@ -1,7 +1,7 @@
 #include "../amd_command_set_flash.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/siemens_simatic_tp177b_4/siemens_simatic_tp177b_4_family_id.h"
+#include "../../core/board_parts.h"
+#include "spansion_s29gl256_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 
 #include <cstdint>
@@ -28,8 +28,7 @@ public:
     using AmdCommandSetFlash::AmdCommandSetFlash;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticTp177b4;
+        return emu_.Get<BoardParts>().Has(PartId::SpansionS29gl256);
     }
 
     uint32_t MmioBase() const override { return kBase; }

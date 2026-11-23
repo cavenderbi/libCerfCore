@@ -3,8 +3,8 @@
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/askey_pc3xx/askey_pc3xx_family_id.h"
+#include "../../core/board_parts.h"
+#include "msystems_diskonchip_g3_part_id.h"
 #include "../peripheral_dispatcher.h"
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
@@ -79,10 +79,7 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        /* Off-chip part: register on each board that wires it. The matching
-           board supplies its base via MsystemsDocG3Base. */
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::AskeyPc3xx;
+        return emu_.Get<BoardParts>().Has(PartId::MsystemsDiskonchipG3);
     }
 
     void OnReady() override {

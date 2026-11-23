@@ -1,0 +1,5 @@
+{
+  "name": "Projected-capacitive touch",
+  "supported": false,
+  "connections": [{ "board_ids": ["siemens_mp377_15_daylight"] }]
+}

@@ -1,0 +1,5 @@
+{
+  "name": "Intel 28F320C3",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["compaq_ipaq_h3000"] }]
+}

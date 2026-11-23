@@ -5,6 +5,8 @@
 #include "siemens_simatic_mp377_ertec400.h"
 
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "siemens_ertec400_part_id.h"
 #include "../../boards/siemens_simatic_mp377/siemens_simatic_mp377_family_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/cpu/emulated_memory.h>
@@ -162,7 +164,8 @@ SiemensSimaticMp377Ertec400Nrt::~SiemensSimaticMp377Ertec400Nrt() = default;
 
 bool SiemensSimaticMp377Ertec400Nrt::ShouldRegister() {
     auto* board = emu_.TryGet<BoardContext>();
-    return board && board->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377;
+    return board && board->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377 &&
+           emu_.Get<BoardParts>().Has(PartId::SiemensErtec400);
 }
 
 void SiemensSimaticMp377Ertec400Nrt::OnReady() {

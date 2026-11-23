@@ -1,7 +1,7 @@
 #include "mc13783_adc.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/toshiba_gigabeat_s/toshiba_gigabeat_s_family_id.h"
+#include "../../core/board_parts.h"
+#include "freescale_mc13783_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/state/state_stream.h>
 
@@ -35,8 +35,7 @@ constexpr uint32_t kAdcselTwoRequests = 1u, kAdcselNoAccess = 2u;
 }
 
 bool Mc13783Adc::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::ToshibaGigabeatS;
+    return emu_.Get<BoardParts>().Has(PartId::FreescaleMc13783);
 }
 
 void Mc13783Adc::OnReady() { Reset(); }

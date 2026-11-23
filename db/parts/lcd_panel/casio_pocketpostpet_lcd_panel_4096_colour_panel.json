@@ -1,0 +1,7 @@
+{
+  "name": "4096-colour panel",
+  "supported": true,
+  "width": 320,
+  "height": 240,
+  "connections": [{ "board_ids": ["casio_pocketpostpet"] }]
+}

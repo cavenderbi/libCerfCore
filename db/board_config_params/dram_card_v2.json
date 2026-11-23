@@ -1,0 +1,21 @@
+{
+  "part_picker": true,
+  "generic_part_id": "dram_card",
+  "enum_values": [
+    { "id": "none", "name": "None" },
+    { "part_id": "casio_cassiopeia_a10_dram_card_1mb" },
+    { "part_id": "casio_cassiopeia_a10_dram_card_2mb" },
+    { "part_id": "casio_cassiopeia_a10_dram_card_3mb" },
+    { "part_id": "casio_cassiopeia_a10_dram_card_4mb" },
+    { "part_id": "casio_cassiopeia_a10_dram_card_5mb" },
+    { "part_id": "casio_cassiopeia_a10_dram_card_6mb" },
+    { "part_id": "casio_cassiopeia_a10_dram_card_7mb" },
+    { "part_id": "casio_cassiopeia_a10_dram_card_8mb" },
+    { "part_id": "ibm_workpad_z50_dram_card_32mb" },
+    { "part_id": "philips_velo_1_dram_card_16mb" },
+    { "part_id": "philips_velo_1_dram_card_1mb" },
+    { "part_id": "philips_velo_1_dram_card_2mb" },
+    { "part_id": "philips_velo_1_dram_card_4mb" },
+    { "part_id": "philips_velo_1_dram_card_8mb" }
+  ]
+}

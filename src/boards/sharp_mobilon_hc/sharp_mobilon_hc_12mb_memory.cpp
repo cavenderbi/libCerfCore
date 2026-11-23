@@ -3,7 +3,7 @@
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../core/board_config.h"
-#include "../ram_param.h"
+#include "../ram_param_id.h"
 #include "sharp_mobilon_hc_family_id.h"
 
 #include <cstdint>
@@ -18,7 +18,7 @@ public:
 
     bool ShouldRegister() override {
         return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SharpMobilonHc &&
-               emu_.Get<BoardConfig>().EnumId(BoardConfigParamId::Ram) == "12mb";
+               emu_.Get<BoardConfig>().SelectedBytes(BoardConfigParamId::Ram) == (12u << 20);
     }
 
     uint32_t MemConfig0Banks() const override { return 0x00019090u; }

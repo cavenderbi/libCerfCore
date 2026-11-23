@@ -1,0 +1,1 @@
+{ "name": "SMSC USB3317", "supported": true, "connections": [{ "board_family_ids": ["ford_sync_gen2"] }] }

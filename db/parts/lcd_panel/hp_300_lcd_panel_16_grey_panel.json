@@ -1,0 +1,7 @@
+{
+  "name": "16-grey panel",
+  "supported": true,
+  "width": 640,
+  "height": 240,
+  "connections": [{ "board_ids": ["ericsson_mc16", "hp_360lx"] }]
+}

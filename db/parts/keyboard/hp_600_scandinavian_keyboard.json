@@ -1,0 +1,5 @@
+{
+  "name": "Scandinavian keyboard",
+  "supported": true,
+  "connections": [{ "board_ids": ["jornada_680_scandinavia", "jornada_690_scandinavia"] }]
+}

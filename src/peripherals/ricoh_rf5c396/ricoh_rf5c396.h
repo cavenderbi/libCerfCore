@@ -3,6 +3,7 @@
 #include "../pcic82365/isa_exca_socket_pair.h"
 #include "ricoh_rf5c396_board.h"
 #include "ricoh_rf5c396_chip_registers.h"
+#include "ricoh_rf5c396_part_id.h"
 
 #include <cstdint>
 #include <string_view>
@@ -16,7 +17,7 @@ public:
     static constexpr const char* kName                 = "RF5C396";
     static constexpr bool        kPortOverlayUndefined = false;
 
-    static bool FittedOnFamily(std::string_view family);
+    static constexpr std::string_view kPartId = PartId::RicohRf5c396;
 
     bool ShouldRegister() override;
     void OnReady() override;

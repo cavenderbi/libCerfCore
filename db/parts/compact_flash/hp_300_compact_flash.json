@@ -1,0 +1,5 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "connections": [{ "board_ids": ["ericsson_mc12", "ericsson_mc16", "hp_320lx", "hp_340lx", "hp_360lx"] }]
+}

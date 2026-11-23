@@ -1,0 +1,1 @@
+{ "name": "MediaQ MQ1188", "supported": true, "connections": [{ "board_family_ids": ["askey_pc3xx"] }] }

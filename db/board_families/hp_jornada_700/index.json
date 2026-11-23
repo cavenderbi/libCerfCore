@@ -5,5 +5,5 @@
   "notes": [],
   "ga_color_depth": 24,
   "rom_placing_mode": "flat_container",
-  "board_config": { "ram": { "default": "32mb", "values": ["32mb"] } }
+  "board_config": { "ram_v2": { "default": "samsung_k4s281632b", "values": ["samsung_k4s281632b"] } }
 }

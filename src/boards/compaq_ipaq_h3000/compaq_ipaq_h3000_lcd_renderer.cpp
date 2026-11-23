@@ -10,12 +10,14 @@
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
 #include <cerfcore/cpu/emulated_memory.h>
+#include "../../core/board_parts.h"
 #include "../../host/panel_frame_renderer.h"
 #include <cerfcore/lcd/lcd_pixel_expand.h>
 
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 
 namespace cerfcore {
 
@@ -28,10 +30,6 @@ namespace {
 
 constexpr uint32_t kDummyPaletteBytes  = 32;
 constexpr uint32_t kBytesPerGuestPixel = 2;
-
-/* Panel is 320x240: Linux arch/arm/mach-sa1100/h3600.c h3600_lcd_info and
-   h3100.c h3100_lcd_info, both .xres = 320, .yres = 240. */
-constexpr uint32_t kPanelLines = 240;
 
 /* SA-1110 §11.7.1.5 Table 11-7: dither value -> pixel-ON duty. The H31xx
    STN glass darkens when driven (Linux h3100_lcd_info: cmap_inverse=1;
@@ -56,6 +54,10 @@ public:
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
         return bd && bd->GetBoardFamilyId() == BoardFamilyId::CompaqIpaqH3000;
+    }
+
+    void OnReady() override {
+        if (const auto clamp = emu_.Get<BoardParts>().ViewportClamp()) max_lines_ = clamp->width;
     }
 
     void PresentedSize(uint32_t& w, uint32_t& h) override {
@@ -95,8 +97,10 @@ public:
 
 private:
     uint32_t PanelH() {
-        return std::min(emu_.Get<Sa11xxLcd>().GetGuestH(), kPanelLines);
+        return std::min(emu_.Get<Sa11xxLcd>().GetGuestH(), max_lines_);
     }
+
+    uint32_t max_lines_ = std::numeric_limits<uint32_t>::max();
 
     MonoLayout ResolveMonoLayout(const uint8_t* fb_base) {
         const uint16_t entry0 = cerf::le::U16(fb_base);

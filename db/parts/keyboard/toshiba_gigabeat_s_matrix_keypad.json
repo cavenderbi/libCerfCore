@@ -1,0 +1,5 @@
+{
+  "name": "Matrix keypad",
+  "supported": false,
+  "connections": [{ "board_ids": ["toshiba_gigabeat_s30", "toshiba_gigabeat_s60v"] }]
+}

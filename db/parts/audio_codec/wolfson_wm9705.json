@@ -1,0 +1,1 @@
+{ "name": "Wolfson WM9705", "supported": true, "connections": [{ "board_family_ids": ["askey_pc3xx"] }] }

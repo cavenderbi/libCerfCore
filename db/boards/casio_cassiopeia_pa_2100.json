@@ -1,0 +1,16 @@
+{
+  "name": "Casio Cassiopeia PA-2100",
+  "short_name": "PA-2100",
+  "board_family_id": "casio_cassiopeia_a10",
+  "support_level": "unknown_partial",
+  "device_year": 1997,
+  "board_config": {
+    "ram_v2": {
+      "default": "casio_cassiopeia_a10_ram_8mb",
+      "values": [
+        "casio_cassiopeia_a10_ram_4mb", "casio_cassiopeia_a10_ram_5mb", "casio_cassiopeia_a10_ram_6mb",
+        "casio_cassiopeia_a10_ram_7mb", "casio_cassiopeia_a10_ram_8mb"
+      ]
+    }
+  }
+}

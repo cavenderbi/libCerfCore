@@ -1,0 +1,18 @@
+{
+  "name": "Casio Cassiopeia A-10",
+  "short_name": "A-10",
+  "board_family_id": "casio_cassiopeia_a10",
+  "support_level": "unknown_partial",
+  "board_config": {
+    "ram_v2": { "default": "casio_cassiopeia_a10_ram_2mb" },
+    "dram_card_v2": {
+      "default": "none",
+      "values": [
+        "none", "casio_cassiopeia_a10_dram_card_1mb", "casio_cassiopeia_a10_dram_card_2mb",
+        "casio_cassiopeia_a10_dram_card_3mb", "casio_cassiopeia_a10_dram_card_4mb",
+        "casio_cassiopeia_a10_dram_card_5mb", "casio_cassiopeia_a10_dram_card_6mb",
+        "casio_cassiopeia_a10_dram_card_7mb", "casio_cassiopeia_a10_dram_card_8mb"
+      ]
+    }
+  }
+}

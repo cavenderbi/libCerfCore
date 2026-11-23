@@ -6,7 +6,7 @@ namespace cerfcore {
 
 namespace BoardConfigParamId {
 
-inline constexpr std::string_view LcdPanel = "lcd_panel";
+inline constexpr std::string_view LcdPanel = "lcd_panel_v2";
 
 }
 

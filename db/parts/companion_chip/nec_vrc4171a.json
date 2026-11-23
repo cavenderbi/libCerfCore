@@ -1,0 +1,5 @@
+{
+  "name": "NEC VRC4171A",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["compaq_aero_1500", "ibm_workpad_z50"] }]
+}

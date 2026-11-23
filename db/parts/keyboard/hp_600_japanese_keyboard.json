@@ -1,0 +1,5 @@
+{
+  "name": "Japanese keyboard",
+  "supported": true,
+  "connections": [{ "board_ids": ["jornada_680_japan", "jornada_690_japan"] }]
+}

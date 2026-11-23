@@ -3,5 +3,5 @@
   "short_name": "CASSIOPEIA for DoCoMo",
   "board_family_id": "casio_tomcat",
   "support_level": "unknown_partial",
-  "board_config": { "ram": { "default": "8mb" } }
+  "board_config": { "ram_v2": { "default": "casio_tomcat_ram_8mb" } }
 }

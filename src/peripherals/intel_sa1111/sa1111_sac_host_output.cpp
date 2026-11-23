@@ -3,8 +3,8 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/instance_threads.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/hp_jornada_700/hp_jornada_700_family_id.h"
+#include "../../core/board_parts.h"
+#include "intel_sa1111_part_id.h"
 #include "../../execution/guest_cycle_clock.h"
 
 namespace cerfcore {
@@ -18,8 +18,7 @@ constexpr uint32_t kHostIdleRateHz = 44100u;
 }
 
 bool Sa1111SacHostOutput::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::HpJornada700;
+    return emu_.Get<BoardParts>().Has(PartId::IntelSa1111);
 }
 
 void Sa1111SacHostOutput::OnReady() {

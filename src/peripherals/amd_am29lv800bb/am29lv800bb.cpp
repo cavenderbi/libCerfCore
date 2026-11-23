@@ -1,7 +1,7 @@
 #include "../amd_command_set_flash.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/samsung_smdk2410/samsung_smdk2410_family_id.h"
+#include "../../core/board_parts.h"
+#include "amd_am29lv800bb_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 
 #include <cstdint>
@@ -26,8 +26,7 @@ public:
     using AmdCommandSetFlash::AmdCommandSetFlash;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SamsungSmdk2410;
+        return emu_.Get<BoardParts>().Has(PartId::AmdAm29lv800bb);
     }
 
     uint32_t MmioBase() const override { return kBase; }

@@ -1,0 +1,1 @@
+{ "name": "ITE IT8181", "supported": true, "connections": [{ "board_family_ids": ["ibm_workpad_z50"] }] }

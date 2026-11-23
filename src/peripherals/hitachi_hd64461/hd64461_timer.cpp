@@ -1,11 +1,11 @@
 #include "hd64461_timer.h"
 
-#include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "hitachi_hd64461_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
-#include "../../boards/hp_600/hp_600_family_id.h"
 #include "../../socs/sh77xx/sh77xx_cpg.h"
 #include "../peripheral_dispatcher.h"
 #include "hd64461_gpio.h"
@@ -54,7 +54,7 @@ uint32_t PrescaleShift(uint16_t control) { return kPrescaleShift[(control & kTcr
 }
 
 bool Hd64461Timer::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
+    return emu_.Get<BoardParts>().Has(PartId::HitachiHd64461);
 }
 
 void Hd64461Timer::OnReady() {

@@ -1,0 +1,5 @@
+{
+  "unknown_name": true,
+  "supported": false,
+  "connections": [{ "board_ids": ["simpad_sl4", "simpad_slc", "swisscom_wp50", "t_sinus_pad"] }]
+}

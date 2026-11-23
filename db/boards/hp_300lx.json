@@ -1,0 +1,7 @@
+{
+  "name": "HP 300LX",
+  "short_name": "300LX",
+  "board_family_id": "hp_300",
+  "support_level": "bootable_full",
+  "board_config": { "ram_v2": { "default": "hp_300_ram_2mb" }, "backlight": { "default": "none" } }
+}

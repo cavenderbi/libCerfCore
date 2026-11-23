@@ -1,4 +1,6 @@
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "../../peripherals/ibm_trackpoint/ibm_trackpoint_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
@@ -26,7 +28,8 @@ public:
     using QueuedRelativeMouseInput::QueuedRelativeMouseInput;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::IbmWorkpadZ50;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::IbmWorkpadZ50 &&
+               emu_.Get<BoardParts>().Has(PartId::IbmTrackpoint);
     }
 
     static constexpr char kSourceName[] = "TrackPoint";

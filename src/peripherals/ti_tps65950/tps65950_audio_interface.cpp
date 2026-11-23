@@ -1,7 +1,7 @@
 #include "tps65950_audio_interface.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/ti_omap35x_evm/ti_omap35x_evm_family_id.h"
+#include "../../core/board_parts.h"
+#include "ti_tps65950_part_id.h"
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
@@ -61,7 +61,7 @@ uint32_t ApllRateHz(uint8_t code) {
 }
 
 bool Tps65950AudioInterface::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::TiOmap35xEvm;
+    return emu_.Get<BoardParts>().Has(PartId::TiTps65950);
 }
 
 void Tps65950AudioInterface::OnReady() {

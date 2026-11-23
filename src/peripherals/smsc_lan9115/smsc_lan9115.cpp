@@ -4,6 +4,8 @@
 #include "../peripheral_dispatcher.h"
 #include <cerfcore/boards/board_context.h>
 #include "../../boards/siemens_simatic_tp177b_4/siemens_simatic_tp177b_4_family_id.h"
+#include "../../core/board_parts.h"
+#include "smsc_lan9115_part_id.h"
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
 
@@ -47,8 +49,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticTp177b4;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SiemensSimaticTp177b4 &&
+               emu_.Get<BoardParts>().Has(PartId::SmscLan9115);
     }
     void OnReady() override {
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {

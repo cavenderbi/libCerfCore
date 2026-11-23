@@ -1,0 +1,7 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "width": 640,
+  "height": 240,
+  "connections": [{ "board_ids": ["ericsson_mc12", "hp_300lx", "hp_320lx", "hp_340lx"] }]
+}

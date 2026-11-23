@@ -2,8 +2,8 @@
 
 #include "pm8058_irq.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/nokia_sea_ray/nokia_sea_ray_family_id.h"
+#include "../../core/board_parts.h"
+#include "qualcomm_pm8058_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
@@ -49,8 +49,7 @@ uint8_t GrayEncode(uint32_t value) {
 }  // namespace
 
 bool Pm8058Keypad::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::NokiaSeaRay;
+    return emu_.Get<BoardParts>().Has(PartId::QualcommPm8058);
 }
 
 void Pm8058Keypad::OnReady() {

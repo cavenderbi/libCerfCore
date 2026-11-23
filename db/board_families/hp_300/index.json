@@ -3,8 +3,11 @@
   "soc_id": "sh7707",
   "device_year": 1997,
   "board_config": {
-    "ram": { "default": "4mb", "values": ["2mb", "4mb", "8mb", "16mb"] },
-    "main_batteries": { "default": "alkaline", "values": ["alkaline", "nicd_nimh"] },
+    "ram_v2": {
+      "default": "hp_300_ram_4mb",
+      "values": ["hp_300_ram_2mb", "hp_300_ram_4mb", "hp_300_ram_8mb", "hp_300_ram_16mb"]
+    },
+    "main_batteries_v2": { "default": "hp_300_alkaline", "values": ["hp_300_alkaline", "hp_300_nicd_nimh"] },
     "backlight": { "default": "installed", "values": ["none", "installed"] }
   },
   "notes": [],

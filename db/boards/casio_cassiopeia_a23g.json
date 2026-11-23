@@ -1,0 +1,13 @@
+{
+  "name": "Casio Cassiopeia A-23G",
+  "short_name": "A-23G",
+  "board_family_id": "casio_cassiopeia_a10",
+  "support_level": "unknown_partial",
+  "device_year": 1999,
+  "board_config": {
+    "ram_v2": {
+      "default": "casio_cassiopeia_a10_ram_16mb",
+      "values": ["casio_cassiopeia_a10_ram_8mb", "casio_cassiopeia_a10_ram_16mb"]
+    }
+  }
+}

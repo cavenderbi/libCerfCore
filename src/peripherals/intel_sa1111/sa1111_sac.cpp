@@ -3,8 +3,8 @@
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/hp_jornada_700/hp_jornada_700_family_id.h"
+#include "../../core/board_parts.h"
+#include "intel_sa1111_part_id.h"
 #include "sa1111_intc.h"
 #include "sa1111_sac_dma.h"
 #include "sa1111_sac_frame_clock.h"
@@ -57,8 +57,7 @@ constexpr uint32_t kRxDmaFirst = 0x48u;
 }
 
 bool Sa1111Sac::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::HpJornada700;
+    return emu_.Get<BoardParts>().Has(PartId::IntelSa1111);
 }
 
 void Sa1111Sac::OnUnitReady() {

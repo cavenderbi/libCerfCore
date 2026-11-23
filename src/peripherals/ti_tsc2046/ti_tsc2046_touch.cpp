@@ -1,7 +1,7 @@
 #include "ti_tsc2046_touch.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/ti_omap35x_evm/ti_omap35x_evm_family_id.h"
+#include "../../core/board_parts.h"
+#include "ti_tsc2046_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
@@ -11,10 +11,7 @@ namespace cerfcore {
 REGISTER_SERVICE(Tsc2046Touch);
 
 bool Tsc2046Touch::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    if (!bd) return false;
-    const auto b = bd->GetBoardFamilyId();
-    return b == BoardFamilyId::TiOmap35xEvm;
+    return emu_.Get<BoardParts>().Has(PartId::TiTsc2046);
 }
 
 void Tsc2046Touch::OnReady() {

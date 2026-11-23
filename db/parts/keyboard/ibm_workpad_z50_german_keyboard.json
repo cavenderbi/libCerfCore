@@ -1,0 +1,1 @@
+{ "name": "German keyboard", "supported": true, "connections": [{ "board_ids": ["ibm_workpad_z50_germany"] }] }

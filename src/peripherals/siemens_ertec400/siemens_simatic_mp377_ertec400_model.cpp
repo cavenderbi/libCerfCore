@@ -5,6 +5,8 @@
 #include "siemens_simatic_mp377_ertec400_write_only_map.h"
 
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "siemens_ertec400_part_id.h"
 #include "../../boards/siemens_simatic_mp377/siemens_simatic_mp377_family_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
@@ -24,7 +26,8 @@ REGISTER_SERVICE(SiemensSimaticMp377Ertec400Model);
 
 bool SiemensSimaticMp377Ertec400Model::ShouldRegister() {
     auto* board = emu_.TryGet<BoardContext>();
-    return board && board->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377;
+    return board && board->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377 &&
+           emu_.Get<BoardParts>().Has(PartId::SiemensErtec400);
 }
 
 void SiemensSimaticMp377Ertec400Model::OnReady() {

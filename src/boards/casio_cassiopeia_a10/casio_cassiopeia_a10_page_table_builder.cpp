@@ -4,7 +4,7 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../core/board_config.h"
 #include "../../socs/sh77xx/sh77xx_area2_dram.h"
-#include "../dram_card_param.h"
+#include "../dram_card_param_id.h"
 #include "../../socs/sh77xx/sh77xx_area3_dram.h"
 #include "casio_cassiopeia_a10_family_id.h"
 

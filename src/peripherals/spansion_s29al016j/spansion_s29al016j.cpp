@@ -4,8 +4,8 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/toshiba_gigabeat_s/toshiba_gigabeat_s_family_id.h"
+#include "../../core/board_parts.h"
+#include "spansion_s29al016j_part_id.h"
 #include "../peripheral_dispatcher.h"
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
@@ -141,8 +141,7 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::ToshibaGigabeatS;
+        return emu_.Get<BoardParts>().Has(PartId::SpansionS29al016j);
     }
 
     void OnReady() override {

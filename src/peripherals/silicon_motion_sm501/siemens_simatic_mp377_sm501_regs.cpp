@@ -7,6 +7,8 @@
 
 #include <cerfcore/boards/board_context.h>
 #include "../../boards/siemens_simatic_mp377/siemens_simatic_mp377_family_id.h"
+#include "../../core/board_parts.h"
+#include "silicon_motion_sm501_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include "../peripheral_dispatcher.h"
@@ -31,7 +33,8 @@ constexpr uint32_t kMp377Sm501IrqContributor = 1u << 1;
 
 bool SiemensSimaticMp377Sm501Regs::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377;
+    return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377 &&
+           emu_.Get<BoardParts>().Has(PartId::SiliconMotionSm501);
 }
 void SiemensSimaticMp377Sm501Regs::OnReady() {
     irq_ = &emu_.Get<IrqController>();

@@ -1,0 +1,5 @@
+{
+  "name": "Philips PDIUSBD12",
+  "supported": true,
+  "connections": [{ "board_ids": ["jornada_545", "jornada_547", "jornada_548"] }]
+}

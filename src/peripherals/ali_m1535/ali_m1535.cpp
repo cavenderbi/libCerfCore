@@ -2,8 +2,8 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/nec_sg2_vr5500/nec_sg2_vr5500_family_id.h"
+#include "../../core/board_parts.h"
+#include "ali_m1535_part_id.h"
 #include "../intel_i8042/i8042_controller.h"
 #include "../pci/pci_device.h"
 #include "../pci/pci_host_bridge.h"
@@ -194,8 +194,7 @@ public:
           usb_engine_(emu, usb_, [this](bool asserted) { SetUsbInterrupt(asserted); }) {}
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::NecSg2Vr5500;
+        return emu_.Get<BoardParts>().Has(PartId::AliM1535);
     }
     void OnReady() override {
         board_    = &emu_.Get<AliM1535Board>();

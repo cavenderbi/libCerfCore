@@ -1,9 +1,7 @@
 #include "ricoh_rf5c396.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/nec_cronos3e/nec_cronos3e_family_id.h"
-#include "../../boards/nec_mobilepro_700/nec_mobilepro_700_family_id.h"
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
 #include <cerfcore/core/fatal.h>
 
 namespace cerfcore {
@@ -61,13 +59,7 @@ constexpr unsigned kMemcs16FullDecode    = 12u;
 RicohRf5c396::RicohRf5c396(CerfEmulator& emu)
     : IsaExcaSocketPair(emu, kExcaRules) {}
 
-bool RicohRf5c396::FittedOnFamily(std::string_view family) {
-    return family == BoardFamilyId::NecMobilepro700 || family == BoardFamilyId::NecCronos3e;
-}
-
-bool RicohRf5c396::ShouldRegister() {
-    return FittedOnFamily(emu_.Get<BoardContext>().GetBoardFamilyId());
-}
+bool RicohRf5c396::ShouldRegister() { return emu_.Get<BoardParts>().Has(kPartId); }
 
 void RicohRf5c396::OnReady() {
     board_ = &emu_.Get<RicohRf5c396Board>();

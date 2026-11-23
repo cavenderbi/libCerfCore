@@ -3,8 +3,8 @@
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/nec_sg2_vr5500/nec_sg2_vr5500_family_id.h"
+#include "../../core/board_parts.h"
+#include "../../peripherals/ali_m1535/ali_m1535_part_id.h"
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
 
@@ -38,8 +38,7 @@ I8042Controller::I8042Controller(CerfEmulator& emu)
       }) {}
 
 bool I8042Controller::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::NecSg2Vr5500;
+    return emu_.Get<BoardParts>().Has(PartId::AliM1535);
 }
 
 void I8042Controller::OnReady() {

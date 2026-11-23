@@ -1,9 +1,0 @@
-{
-  "name": "Casio Cassiopeia A-11",
-  "short_name": "A-11",
-  "board_family_id": "casio_cassiopeia_a10",
-  "support_level": "bootable_full",
-  "board_config": {
-    "dram_card": { "default": "none", "values": ["none", "1mb", "2mb", "3mb", "4mb", "5mb", "6mb", "7mb", "8mb"] }
-  }
-}

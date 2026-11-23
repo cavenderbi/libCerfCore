@@ -2,6 +2,8 @@
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
+#include "../../peripherals/ite_it8181/ite_it8181_part_id.h"
 #include "ibm_workpad_z50_family_id.h"
 
 namespace cerfcore {
@@ -13,7 +15,8 @@ public:
     using IteIt8181Config::IteIt8181Config;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::IbmWorkpadZ50;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::IbmWorkpadZ50 &&
+               emu_.Get<BoardParts>().Has(PartId::IteIt8181);
     }
 
     uint32_t HostWindowBase() const override { return 0x0A000000u; }

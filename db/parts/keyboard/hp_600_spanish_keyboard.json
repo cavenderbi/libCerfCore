@@ -1,0 +1,5 @@
+{
+  "name": "Spanish keyboard",
+  "supported": true,
+  "connections": [{ "board_ids": ["jornada_680_spain", "jornada_690_spain"] }]
+}

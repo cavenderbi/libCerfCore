@@ -2,7 +2,7 @@
 #include "../../socs/pr31x00/pr31x00_io_pins.h"
 #include <cerfcore/boards/board_context.h>
 #include "../../core/board_config.h"
-#include "../dram_card_param.h"
+#include "../dram_card_param_id.h"
 #include "philips_velo_1_family_id.h"
 #include "philips_velo_1_rom_upgrade_card.h"
 
@@ -42,7 +42,7 @@ public:
     }
 
     void OnReady() override {
-        const bool card = emu_.Get<BoardConfig>().Enum(BoardConfigParamId::DramCard, kDramCardBytes) != 0u;
+        const bool card = emu_.Get<BoardConfig>().SelectedBytes(BoardConfigParamId::DramCard) != 0u;
         const bool rom_card = emu_.Get<PhilipsVelo1RomUpgradeCard>().Fitted();
         io_din_ = kMModuleAttached | (rom_card ? 0u : kMiniCardSlot2) | (card ? 0u : kMiniCardSlot1);
     }

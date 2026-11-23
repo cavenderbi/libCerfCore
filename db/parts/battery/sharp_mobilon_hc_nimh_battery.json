@@ -1,0 +1,5 @@
+{
+  "name": "NiMH battery",
+  "supported": true,
+  "connections": [{ "board_ids": ["sharp_mobilon_hc4500", "sharp_mobilon_hc4500_8mb"] }]
+}

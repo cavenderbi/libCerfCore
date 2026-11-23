@@ -1,0 +1,7 @@
+{
+  "name": "AU Optronics A035QN02",
+  "supported": true,
+  "width": 320,
+  "height": 240,
+  "connections": [{ "board_ids": ["symbol_mk500_a035qn02"] }]
+}

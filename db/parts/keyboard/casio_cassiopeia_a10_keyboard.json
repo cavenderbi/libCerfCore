@@ -1,0 +1,14 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "connections": [
+    {
+      "board_ids": [
+        "casio_cassiopeia_a10", "casio_cassiopeia_a11", "casio_cassiopeia_a11_plus", "casio_cassiopeia_a11a",
+        "casio_cassiopeia_a11j", "casio_cassiopeia_a20", "casio_cassiopeia_a20j", "casio_cassiopeia_a21s",
+        "casio_cassiopeia_a22t", "compaq_pc_companion_c120", "compaq_pc_companion_c120_plus_2",
+        "compaq_pc_companion_c120_plus_4", "compaq_pc_companion_c140"
+      ]
+    }
+  ]
+}

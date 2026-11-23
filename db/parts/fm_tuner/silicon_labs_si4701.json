@@ -1,0 +1,1 @@
+{ "name": "Silicon Labs Si4701", "supported": false, "connections": [{ "board_ids": ["zune_30"] }] }

@@ -1,0 +1,9 @@
+{
+  "name": "Samsung K4S281632B",
+  "supported": true,
+  "size_mb": 32,
+  "chip_count": 2,
+  "row_bits": 12,
+  "column_bits": 9,
+  "bank_bits": 2
+}

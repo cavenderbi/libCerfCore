@@ -1,0 +1,7 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "width": 480,
+  "height": 640,
+  "connections": [{ "board_ids": ["devemu_gen1_vga", "devemu_vga"] }]
+}

@@ -41,6 +41,7 @@ private:
     uint16_t   page_buf_[2][5] = {};
     uint16_t   next_page_      = 0;
     uint16_t   adbuf_[4]       = {};
+    bool       touchscreen_    = false;
 };
 
 }

@@ -1,0 +1,1 @@
+{ "name": "Intel 28F256K3", "supported": true, "connections": [{ "board_family_ids": ["symbol_hamptons"] }] }

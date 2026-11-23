@@ -1,0 +1,1 @@
+{ "name": "Hitachi HD64461", "supported": true, "connections": [{ "board_family_ids": ["hp_600"] }] }

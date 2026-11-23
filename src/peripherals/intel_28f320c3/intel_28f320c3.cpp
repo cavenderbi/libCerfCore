@@ -2,8 +2,8 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/log.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/compaq_ipaq_h3000/compaq_ipaq_h3000_family_id.h"
+#include "../../core/board_parts.h"
+#include "intel_28f320c3_part_id.h"
 #include <cerfcore/cpu/emulated_memory.h>
 #include "../peripheral_dispatcher.h"
 #include <cerfcore/socs/guest_cpu_reset.h>
@@ -23,10 +23,7 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        if (!bd) return false;
-        const auto b = bd->GetBoardFamilyId();
-        return b == BoardFamilyId::CompaqIpaqH3000;
+        return emu_.Get<BoardParts>().Has(PartId::Intel28f320c3);
     }
     void OnReady() override {
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind) {

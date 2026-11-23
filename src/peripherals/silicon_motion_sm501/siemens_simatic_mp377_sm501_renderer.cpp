@@ -6,6 +6,8 @@
 #include <cerfcore/peripherals/peripheral_base.h>
 #include <cerfcore/boards/board_context.h>
 #include "../../boards/siemens_simatic_mp377/siemens_simatic_mp377_family_id.h"
+#include "../../core/board_parts.h"
+#include "silicon_motion_sm501_part_id.h"
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/host/frame_renderer.h>
@@ -38,7 +40,8 @@ public:
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377;
+        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377 &&
+               emu_.Get<BoardParts>().Has(PartId::SiliconMotionSm501);
     }
 
     void OnReady() override { BuildRgb565ToXrgbLut(rgb565_to_xrgb_); }

@@ -1,0 +1,5 @@
+{
+  "name": "ITE IT8368",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["philips_nino", "philips_velo_1", "sharp_mobilon_hc"] }]
+}

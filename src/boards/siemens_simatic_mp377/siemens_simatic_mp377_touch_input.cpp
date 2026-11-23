@@ -3,6 +3,8 @@
 #include <cerfcore/boards/board_context.h>
 #include "siemens_simatic_mp377_family_id.h"
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
+#include "../../core/touch_generic_part_id.h"
 #include <cerfcore/host/touch_input.h>
 
 namespace cerfcore {
@@ -15,7 +17,8 @@ public:
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377;
+        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377 &&
+               emu_.Get<BoardParts>().Find(GenericPartId::Touch);
     }
 
     void PenDown(int x, int y) override { UpdateTouch(x, y, true); }

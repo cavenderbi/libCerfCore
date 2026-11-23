@@ -1,7 +1,0 @@
-{
-  "name": "TI OMAP35x EVM (OneNAND module)",
-  "short_name": "OMAP35x EVM",
-  "board_family_id": "ti_omap35x_evm",
-  "support_level": "no_support",
-  "board_config": { "ram": { "default": "128mb" } }
-}

@@ -1,0 +1,8 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "width": 240,
+  "height": 320,
+  "clamp_viewport": true,
+  "connections": [{ "board_family_ids": ["compaq_aero_1500"] }]
+}

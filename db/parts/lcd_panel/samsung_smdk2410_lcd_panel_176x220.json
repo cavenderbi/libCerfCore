@@ -1,0 +1,7 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "width": 176,
+  "height": 220,
+  "connections": [{ "board_ids": ["devemu_gen1_sp", "devemu_sp"] }]
+}

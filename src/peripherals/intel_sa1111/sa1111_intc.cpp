@@ -1,8 +1,8 @@
 #include "sa1111_intc.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/hp_jornada_700/hp_jornada_700_family_id.h"
+#include "../../core/board_parts.h"
+#include "intel_sa1111_part_id.h"
 #include "../../socs/sa11xx/sa11xx_gpio.h"
 #include <cerfcore/state/state_stream.h>
 #include "sa1111_sbi.h"
@@ -25,8 +25,7 @@ constexpr uint32_t kTstselWake = 1u << 1;
 }
 
 bool Sa1111Intc::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::HpJornada700;
+    return emu_.Get<BoardParts>().Has(PartId::IntelSa1111);
 }
 
 void Sa1111Intc::OnUnitReady() {

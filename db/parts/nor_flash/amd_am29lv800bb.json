@@ -1,0 +1,5 @@
+{
+  "name": "AMD Am29LV800BB",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["samsung_smdk2410"] }]
+}

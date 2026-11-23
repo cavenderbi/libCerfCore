@@ -1,7 +1,7 @@
 #include "tps65950_audio_uplink.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/ti_omap35x_evm/ti_omap35x_evm_family_id.h"
+#include "../../core/board_parts.h"
+#include "ti_tps65950_part_id.h"
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
@@ -53,7 +53,7 @@ bool IsLeft(Tps65950AudioUplink::Channel ch) {
 }
 
 bool Tps65950AudioUplink::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::TiOmap35xEvm;
+    return emu_.Get<BoardParts>().Has(PartId::TiTps65950);
 }
 
 void Tps65950AudioUplink::OnReady() {

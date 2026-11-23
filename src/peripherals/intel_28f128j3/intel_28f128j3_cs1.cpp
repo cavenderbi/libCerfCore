@@ -1,6 +1,8 @@
 #include "intel_28f128j3.h"
 
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "intel_28f128j3_part_id.h"
 #include "../../boards/siemens_simpad/siemens_simpad_family_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 
@@ -16,7 +18,8 @@ public:
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimpad;
+        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimpad &&
+               emu_.Get<BoardParts>().Has(PartId::Intel28f128j3);
     }
 
     uint32_t MmioBase() const override { return 0x08000000u; }

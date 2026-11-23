@@ -1,6 +1,8 @@
 #include "../../peripherals/nec_vrc4171a/nec_vrc4171a_lcd_board.h"
 
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "../../peripherals/nec_vrc4171a/nec_vrc4171a_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include "compaq_aero_1500_family_id.h"
 
@@ -22,7 +24,8 @@ public:
     using NecVrc4171aLcdBoard::NecVrc4171aLcdBoard;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CompaqAero1500;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CompaqAero1500 &&
+               emu_.Get<BoardParts>().Has(PartId::NecVrc4171a);
     }
 
     uint32_t FrameMemoryBase() const override { return kFrameMemoryBase; }

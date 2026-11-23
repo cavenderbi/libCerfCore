@@ -2,7 +2,15 @@
   "name": "Philips Velo 1",
   "soc_id": "pr31500",
   "device_year": 1997,
-  "board_config": { "dram_card": { "default": "none", "values": ["none", "1mb", "2mb", "4mb", "8mb", "16mb"] } },
+  "board_config": {
+    "dram_card_v2": {
+      "default": "none",
+      "values": [
+        "none", "philips_velo_1_dram_card_1mb", "philips_velo_1_dram_card_2mb", "philips_velo_1_dram_card_4mb",
+        "philips_velo_1_dram_card_8mb", "philips_velo_1_dram_card_16mb"
+      ]
+    }
+  },
   "notes": [],
   "ga_color_depth": 24,
   "rom_placing_mode": "flat_container"

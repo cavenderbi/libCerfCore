@@ -1,9 +1,7 @@
 #include "nec_vrc4171a.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/compaq_aero_1500/compaq_aero_1500_family_id.h"
-#include "../../boards/ibm_workpad_z50/ibm_workpad_z50_family_id.h"
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/state/state_stream.h>
 
@@ -128,17 +126,11 @@ NecVrc4171a::NecVrc4171a(CerfEmulator& emu)
       config1_(kConfig1Reset),
       config2_(kConfig2Reset) {}
 
-bool NecVrc4171a::FittedOnFamily(std::string_view family) {
-    return family == BoardFamilyId::IbmWorkpadZ50 || family == BoardFamilyId::CompaqAero1500;
-}
-
 bool NecVrc4171a::IsTopLevelPort(uint32_t port) {
     return port >= kPortTopLevelFirst && port <= kPortConfig1;
 }
 
-bool NecVrc4171a::ShouldRegister() {
-    return FittedOnFamily(emu_.Get<BoardContext>().GetBoardFamilyId());
-}
+bool NecVrc4171a::ShouldRegister() { return emu_.Get<BoardParts>().Has(kPartId); }
 
 void NecVrc4171a::OnReady() {
     board_ = &emu_.Get<NecVrc4171aBoard>();

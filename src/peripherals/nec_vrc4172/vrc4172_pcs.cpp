@@ -1,9 +1,8 @@
 #include "vrc4172_pcs.h"
 
 #include "../peripheral_dispatcher.h"
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/nec_cronos3e/nec_cronos3e_family_id.h"
-#include "../../boards/nec_mobilepro_700/nec_mobilepro_700_family_id.h"
+#include "../../core/board_parts.h"
+#include "nec_vrc4172_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
@@ -29,8 +28,7 @@ constexpr uint32_t kDecodedBits = 0x01FFFFFEu;
 REGISTER_SERVICE(Vrc4172Pcs);
 
 bool Vrc4172Pcs::ShouldRegister() {
-    const auto f = emu_.Get<BoardContext>().GetBoardFamilyId();
-    return f == BoardFamilyId::NecMobilepro700 || f == BoardFamilyId::NecCronos3e;
+    return emu_.Get<BoardParts>().Has(PartId::NecVrc4172);
 }
 
 void Vrc4172Pcs::OnReady() {

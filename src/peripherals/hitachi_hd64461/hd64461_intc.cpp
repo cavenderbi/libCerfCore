@@ -1,10 +1,10 @@
 #include "hd64461_intc.h"
 
-#include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "hitachi_hd64461_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
-#include "../../boards/hp_600/hp_600_family_id.h"
 #include "hd64461_irq_output.h"
 
 namespace cerfcore {
@@ -18,7 +18,7 @@ constexpr uint32_t kNimrIndex = 1u;
 }
 
 bool Hd64461Intc::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
+    return emu_.Get<BoardParts>().Has(PartId::HitachiHd64461);
 }
 
 void Hd64461Intc::OnReady() {

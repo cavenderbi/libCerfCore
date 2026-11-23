@@ -1,0 +1,5 @@
+{
+  "name": "Texas Instruments TPS65950",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["ti_omap35x_evm"] }]
+}

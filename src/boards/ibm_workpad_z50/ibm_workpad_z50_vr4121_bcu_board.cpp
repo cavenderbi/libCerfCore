@@ -5,7 +5,7 @@
 #include "../../socs/vr4121/vr4121_bcu_regs.h"
 #include <cerfcore/boards/board_context.h>
 #include "../../core/board_config.h"
-#include "../dram_card_param.h"
+#include "../dram_card_param_id.h"
 #include "ibm_workpad_z50_dram_layout.h"
 #include "ibm_workpad_z50_family_id.h"
 
@@ -32,7 +32,7 @@ public:
     bool Sdram() const override { return false; }
 
     std::optional<Vr4121DramWiring> DramWiring() const override {
-        const uint32_t card = emu_.Get<BoardConfig>().Enum(BoardConfigParamId::DramCard, kDramCardBytes);
+        const uint32_t card = emu_.Get<BoardConfig>().SelectedBytes(BoardConfigParamId::DramCard);
         return Vr4121DramWiring{ true, { kIbmWorkpadZ50DramBankBytes, 0u, ExpansionBankBytes(card, 0u),
                                          ExpansionBankBytes(card, 1u) } };
     }

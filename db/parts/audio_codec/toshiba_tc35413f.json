@@ -1,0 +1,5 @@
+{
+  "name": "Toshiba TC35413F",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["sharp_mobilon_hc"] }]
+}

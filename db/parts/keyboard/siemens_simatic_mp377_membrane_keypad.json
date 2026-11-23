@@ -1,0 +1,1 @@
+{ "name": "Membrane keypad", "supported": false, "connections": [{ "board_ids": ["siemens_mp377_12_key"] }] }

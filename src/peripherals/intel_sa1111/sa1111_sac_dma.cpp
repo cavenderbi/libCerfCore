@@ -1,8 +1,8 @@
 #include "sa1111_sac_dma.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/hp_jornada_700/hp_jornada_700_family_id.h"
+#include "../../core/board_parts.h"
+#include "intel_sa1111_part_id.h"
 #include <cerfcore/cpu/emulated_memory.h>
 #include "../../host/audio_activity.h"
 #include "sa1111_sac_host_output.h"
@@ -25,8 +25,7 @@ const Sa1111SacDmaChannel::Names kTxNames{
 Sa1111SacDma::Sa1111SacDma(CerfEmulator& emu) : Sa1111SacDmaChannel(emu, kTxNames) {}
 
 bool Sa1111SacDma::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::HpJornada700;
+    return emu_.Get<BoardParts>().Has(PartId::IntelSa1111);
 }
 
 void Sa1111SacDma::OnChannelReady() {

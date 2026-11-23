@@ -1,6 +1,8 @@
 #include "../../peripherals/rtc8564/rtc8564_wiring.h"
 
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "../../peripherals/rtc8564/epson_rtc8564_part_id.h"
 #include "siemens_simatic_mp377_family_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
@@ -16,7 +18,8 @@ public:
 
     bool ShouldRegister() override {
         auto* board = emu_.TryGet<BoardContext>();
-        return board && board->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377;
+        return board && board->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377 &&
+               emu_.Get<BoardParts>().Has(PartId::EpsonRtc8564);
     }
 
     void OnReady() override {

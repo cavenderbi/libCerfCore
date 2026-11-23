@@ -3,5 +3,9 @@
   "soc_id": "vr5500",
   "notes": ["MIPS IV ROM is incompatible with MIPS II apps. Prefer using MIPS II ROM."],
   "ga_color_depth": 24,
-  "rom_placing_mode": "flat_container"
+  "rom_placing_mode": "flat_container",
+  "board_config": {
+    "pci_video_card": { "default": "ati_rage_xl", "values": ["ati_rage_xl"] },
+    "pci_pc_card_adapter": { "default": "ti_pci1225", "values": ["ti_pci1225"] }
+  }
 }

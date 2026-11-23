@@ -6,7 +6,7 @@
 #include <cerfcore/core/log.h>
 #include <cerfengine/unmapped_windows.h>
 #include "../core/board_config.h"
-#include "dram_card_param.h"
+#include "dram_card_param_id.h"
 
 #include <typeinfo>
 
@@ -30,7 +30,7 @@ const ParsedRom& UnmappedWindowPageTableBuilder::PrimaryRom() const {
 
 UnmappedWindowDram UnmappedWindowPageTableBuilder::DramCardBank(uint32_t pa_base, uint32_t decode_span,
                                                                 uint32_t mapped_span) const {
-    const uint32_t bytes = emu_.Get<BoardConfig>().Enum(BoardConfigParamId::DramCard, kDramCardBytes);
+    const uint32_t bytes = emu_.Get<BoardConfig>().SelectedBytes(BoardConfigParamId::DramCard);
     return CachedWindowDram(pa_base, bytes, decode_span, mapped_span);
 }
 

@@ -1,6 +1,8 @@
 #include "hp_jornada_540_eeprom.h"
 
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "hp_jornada_540_eeprom_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/cerf_paths.h>
 #include <cerfcore/core/device_config.h>
@@ -19,7 +21,8 @@ constexpr uint8_t  kBlankCell        = 0xFFu;
 REGISTER_SERVICE(HpJornada540Eeprom);
 
 bool HpJornada540Eeprom::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::HpJornada540;
+    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::HpJornada540 &&
+           emu_.Get<BoardParts>().Has(PartId::HpJornada540Eeprom);
 }
 
 void HpJornada540Eeprom::FillCells() { Cells().fill(kBlankCell); }

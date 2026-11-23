@@ -4,5 +4,7 @@
   "device_year": 2000,
   "rom_placing_mode": "flat_container",
   "ga_window_size": 50331648,
-  "board_config": { "ram": { "default": "16mb", "values": ["16mb", "32mb"] } }
+  "board_config": {
+    "ram_v2": { "default": "hp_jornada_540_ram_16mb", "values": ["hp_jornada_540_ram_16mb", "hp_jornada_540_ram_32mb"] }
+  }
 }

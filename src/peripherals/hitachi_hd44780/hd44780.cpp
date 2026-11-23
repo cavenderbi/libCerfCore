@@ -1,7 +1,7 @@
 #include <cerfcore/peripherals/peripheral_base.h>
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/nec_sg2_vr5500/nec_sg2_vr5500_family_id.h"
+#include "../../core/board_parts.h"
+#include "hitachi_hd44780_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
@@ -56,7 +56,7 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecSg2Vr5500;
+        return emu_.Get<BoardParts>().Has(PartId::HitachiHd44780);
     }
 
     void OnReady() override {

@@ -1,0 +1,7 @@
+{
+  "name": "3.5\"",
+  "supported": false,
+  "width": 320,
+  "height": 240,
+  "connections": [{ "board_ids": ["toshiba_gigabeat_v30t"] }]
+}

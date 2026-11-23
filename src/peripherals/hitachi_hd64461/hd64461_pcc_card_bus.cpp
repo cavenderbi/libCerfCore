@@ -1,8 +1,8 @@
 #include "../hitachi_pcc/hitachi_pcc_card_bus.h"
 
-#include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "hitachi_hd64461_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
-#include "../../boards/hp_600/hp_600_family_id.h"
 #include "hd64461_pcc.h"
 
 namespace cerfcore {
@@ -14,7 +14,7 @@ public:
     using HitachiPccCardBus::HitachiPccCardBus;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
+        return emu_.Get<BoardParts>().Has(PartId::HitachiHd64461);
     }
 
     void OnReady() override { pcc_ = &emu_.Get<Hd64461Pcc>(); }

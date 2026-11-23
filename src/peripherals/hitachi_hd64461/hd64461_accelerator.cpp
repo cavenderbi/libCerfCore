@@ -1,8 +1,8 @@
-#include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "hitachi_hd64461_part_id.h"
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
-#include "../../boards/hp_600/hp_600_family_id.h"
 #include "../../socs/reg_window_impl.h"
 #include "hd64461_lcdc.h"
 
@@ -93,7 +93,7 @@ public:
     using RegWindow::RegWindow;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::Hp600;
+        return emu_.Get<BoardParts>().Has(PartId::HitachiHd64461);
     }
 
     void OnReady() override {

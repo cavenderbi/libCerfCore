@@ -1,0 +1,5 @@
+{
+  "name": "German keyboard",
+  "supported": true,
+  "connections": [{ "board_ids": ["jornada_680_germany", "jornada_690_germany"] }]
+}

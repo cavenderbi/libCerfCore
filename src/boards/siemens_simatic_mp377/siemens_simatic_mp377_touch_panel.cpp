@@ -5,6 +5,8 @@
 
 #include <cerfcore/boards/board_context.h>
 #include "siemens_simatic_mp377_family_id.h"
+#include "ti_ads7846_part_id.h"
+#include "../../core/board_parts.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/state/state_stream.h>
@@ -160,8 +162,8 @@ uint16_t ClampAdc12(double value) {
 } // namespace
 
 bool SiemensSimaticMp377TouchPanel::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377;
+    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377 &&
+           emu_.Get<BoardParts>().Has(PartId::TiAds7846);
 }
 
 void SiemensSimaticMp377TouchPanel::OnReady() {

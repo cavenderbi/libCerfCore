@@ -6,7 +6,7 @@ namespace cerfcore {
 
 namespace BoardConfigParamId {
 
-inline constexpr std::string_view MainBatteries = "main_batteries";
+inline constexpr std::string_view MainBatteries = "main_batteries_v2";
 
 }
 

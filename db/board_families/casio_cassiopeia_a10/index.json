@@ -3,7 +3,13 @@
   "soc_id": "hd6417096",
   "device_year": 1996,
   "board_config": {
-    "ram": { "default": "4mb", "values": ["2mb", "3mb", "4mb", "5mb", "6mb"] },
+    "ram_v2": {
+      "default": "casio_cassiopeia_a10_ram_4mb",
+      "values": [
+        "casio_cassiopeia_a10_ram_2mb", "casio_cassiopeia_a10_ram_3mb", "casio_cassiopeia_a10_ram_4mb",
+        "casio_cassiopeia_a10_ram_5mb", "casio_cassiopeia_a10_ram_6mb"
+      ]
+    },
     "backlight": { "default": "installed", "values": ["none", "installed"] }
   },
   "notes": [],

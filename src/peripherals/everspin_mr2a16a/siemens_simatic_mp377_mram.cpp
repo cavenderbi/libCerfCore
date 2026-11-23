@@ -5,6 +5,8 @@
 #include "../peripheral_dispatcher.h"
 #include <cerfcore/state/state_stream.h>
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "everspin_mr2a16a_part_id.h"
 #include "../../boards/siemens_simatic_mp377/siemens_simatic_mp377_family_id.h"
 
 namespace cerfcore {
@@ -13,7 +15,8 @@ namespace siemens_simatic_mp377 {
 
 bool SiemensSimaticMp377Mram::ShouldRegister() {
     auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377;
+    return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377 &&
+           emu_.Get<BoardParts>().Has(PartId::EverspinMr2a16a);
 }
 
 void SiemensSimaticMp377Mram::OnReady() {

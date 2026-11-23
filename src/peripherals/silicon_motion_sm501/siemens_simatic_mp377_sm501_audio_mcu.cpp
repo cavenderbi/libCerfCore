@@ -3,6 +3,8 @@
 
 #include <cerfcore/boards/board_context.h>
 #include "../../boards/siemens_simatic_mp377/siemens_simatic_mp377_family_id.h"
+#include "../../core/board_parts.h"
+#include "silicon_motion_sm501_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/core/log.h>
@@ -30,7 +32,8 @@ uint32_t AtomicUpdateByte(std::atomic<uint32_t>& target, uint32_t byte, uint8_t 
 
 bool SiemensSimaticMp377Sm501AudioMcu::ShouldRegister() {
     auto* board = emu_.TryGet<BoardContext>();
-    return board && board->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377;
+    return board && board->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377 &&
+           emu_.Get<BoardParts>().Has(PartId::SiliconMotionSm501);
 }
 
 void SiemensSimaticMp377Sm501AudioMcu::OnReady() {

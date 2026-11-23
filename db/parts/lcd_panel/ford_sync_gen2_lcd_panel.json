@@ -1,0 +1,7 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "width": 800,
+  "height": 480,
+  "connections": [{ "board_family_ids": ["ford_sync_gen2"] }]
+}

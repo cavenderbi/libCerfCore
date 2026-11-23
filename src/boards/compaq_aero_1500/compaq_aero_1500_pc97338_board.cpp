@@ -1,6 +1,8 @@
 #include "../../peripherals/national_pc97338/national_pc97338_board.h"
 
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "../../peripherals/national_pc97338/national_pc97338_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include "compaq_aero_1500_family_id.h"
 
@@ -17,7 +19,8 @@ public:
     using NationalPc97338Board::NationalPc97338Board;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CompaqAero1500;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CompaqAero1500 &&
+               emu_.Get<BoardParts>().Has(PartId::NationalPc97338);
     }
 
     uint32_t IsaIoBase() const override { return kDebugConnectorIsaIoBase; }

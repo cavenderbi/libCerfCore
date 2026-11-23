@@ -7,6 +7,8 @@
 #include <cerfcore/state/state_stream.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "samsung_kfg1g16u2d_part_id.h"
 #include "../../boards/siemens_simatic_mp377/siemens_simatic_mp377_family_id.h"
 
 #include <algorithm>
@@ -50,7 +52,8 @@ public:
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377;
+        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SiemensSimaticMp377 &&
+               emu_.Get<BoardParts>().Has(PartId::SamsungKfg1g16u2d);
     }
     void OnReady() override {
         backing_.assign(kBackingSize, uint8_t{0xFFu});

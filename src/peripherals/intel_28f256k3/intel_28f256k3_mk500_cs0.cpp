@@ -1,6 +1,8 @@
 #include "intel_28f256k3.h"
 
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "intel_28f256k3_part_id.h"
 #include "../../boards/symbol_hamptons/symbol_hamptons_family_id.h"
 #include "../../core/no_emulation_runtime_service.h"
 #include "../../socs/pxa27x/pxa27x_power_manager.h"
@@ -19,7 +21,8 @@ public:
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SymbolHamptons;
+        return bd && bd->GetBoardFamilyId() == BoardFamilyId::SymbolHamptons &&
+               emu_.Get<BoardParts>().Has(PartId::Intel28f256k3);
     }
 
     void OnReady() override {

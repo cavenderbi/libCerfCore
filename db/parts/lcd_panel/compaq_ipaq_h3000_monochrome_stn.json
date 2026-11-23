@@ -1,0 +1,8 @@
+{
+  "name": "Monochrome STN",
+  "supported": true,
+  "technology": "monochrome_stn",
+  "width": 240,
+  "height": 320,
+  "clamp_viewport": true
+}

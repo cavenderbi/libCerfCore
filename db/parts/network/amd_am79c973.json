@@ -1,0 +1,11 @@
+{
+  "name": "AMD Am79C973",
+  "supported": false,
+  "connections": [
+    {
+      "board_family_ids": [
+        "nec_sg2_vr5500"
+      ]
+    }
+  ]
+}

@@ -6,8 +6,8 @@
 #include "../pcmcia/pcmcia_slot.h"
 #include "../pcmcia/pcmcia_space_router.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/hp_jornada_700/hp_jornada_700_family_id.h"
+#include "../../core/board_parts.h"
+#include "intel_sa1111_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/host/machine_object_tree.h>
 #include <cerfcore/state/state_stream.h>
@@ -73,7 +73,7 @@ public:
           slots_{ &slot0_, &slot1_ } {}
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::HpJornada700;
+        return emu_.Get<BoardParts>().Has(PartId::IntelSa1111);
     }
 
     void OnShutdown() override {

@@ -1,0 +1,7 @@
+{
+  "unknown_name": true,
+  "supported": true,
+  "width": 800,
+  "height": 600,
+  "connections": [{ "board_ids": ["devemu_gen1_wince_svga", "devemu_wince_svga"] }]
+}

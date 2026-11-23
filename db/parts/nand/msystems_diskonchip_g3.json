@@ -1,0 +1,1 @@
+{ "name": "M-Systems DiskOnChip G3", "supported": false, "connections": [{ "board_family_ids": ["askey_pc3xx"] }] }

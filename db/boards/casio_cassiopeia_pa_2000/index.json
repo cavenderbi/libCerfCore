@@ -1,9 +1,0 @@
-{
-  "name": "Casio Cassiopeia PA-2000",
-  "short_name": "PA-2000",
-  "board_family_id": "casio_cassiopeia_a10",
-  "support_level": "unknown_partial",
-  "internal__spec_divergences": "CompactFlash slot",
-  "device_year": 1997,
-  "board_config": { "ram": { "default": "8mb", "values": ["4mb", "5mb", "6mb", "7mb", "8mb"] } }
-}

@@ -1,8 +1,8 @@
 #include "sa1111_sbi.h"
 
 #include <cerfcore/core/cerf_emulator.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/hp_jornada_700/hp_jornada_700_family_id.h"
+#include "../../core/board_parts.h"
+#include "intel_sa1111_part_id.h"
 #include <cerfcore/state/state_stream.h>
 #include "sa1111_reset_line.h"
 #include "sa1111_system_controller.h"
@@ -10,8 +10,7 @@
 namespace cerfcore {
 
 bool Sa1111Sbi::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::HpJornada700;
+    return emu_.Get<BoardParts>().Has(PartId::IntelSa1111);
 }
 
 /* SA-1111 Developer's Manual §2.3: "Unless indicated otherwise, all register bits are set

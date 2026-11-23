@@ -5,10 +5,11 @@
 #include <cerfcore/host/machine_object_tree.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
+#include "../../core/board_parts.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "casio_cassiopeia_a10_chip_intc.h"
+#include "casio_cassiopeia_a10_compact_flash_part_id.h"
 #include "casio_cassiopeia_a10_family_id.h"
-#include "casio_cassiopeia_a10_members.h"
 #include "casio_cassiopeia_a10_pin_registers.h"
 
 namespace cerfcore {
@@ -36,9 +37,8 @@ CasioCassiopeiaA10CfSlot::CasioCassiopeiaA10CfSlot(CerfEmulator& emu)
     : Peripheral(emu), slot_(emu, *this, {kSlotId, kSlotLabel}) {}
 
 bool CasioCassiopeiaA10CfSlot::ShouldRegister() {
-    BoardContext& board = emu_.Get<BoardContext>();
-    return board.GetBoardFamilyId() == BoardFamilyId::CasioCassiopeiaA10 &&
-           CasioCassiopeiaA10IsA51Class(board.GetBoardId());
+    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CasioCassiopeiaA10 &&
+           emu_.Get<BoardParts>().Has(PartId::CasioCassiopeiaA10CompactFlash);
 }
 
 void CasioCassiopeiaA10CfSlot::OnReady() {

@@ -1,8 +1,8 @@
 #include "../intel_command_set_flash.h"
 
-#include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "sharp_lh28f016su_part_id.h"
 #include "../../boards/page_table_builder.h"
-#include "../../boards/philips_nino/philips_nino_family_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 
 #include <cstdint>
@@ -25,8 +25,7 @@ public:
     using IntelCommandSetFlash::IntelCommandSetFlash;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::PhilipsNino;
+        return emu_.Get<BoardParts>().Has(PartId::SharpLh28f016su);
     }
 
     void OnReady() override {

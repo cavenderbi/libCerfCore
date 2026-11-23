@@ -6,9 +6,10 @@
 #include <cerfcore/cpu/emulated_memory.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include <cerfcore/state/state_stream.h>
+#include "../../core/board_parts.h"
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "casio_cassiopeia_a10_family_id.h"
-#include "casio_cassiopeia_a10_members.h"
+#include "casio_cassiopeia_a10_lcd_controller_part_id.h"
 
 namespace cerfcore {
 
@@ -23,9 +24,8 @@ constexpr uint32_t kControllerPa = 0x0801FF00u;
 }
 
 bool CasioCassiopeiaA10VideoMemory::ShouldRegister() {
-    BoardContext& board = emu_.Get<BoardContext>();
-    return board.GetBoardFamilyId() == BoardFamilyId::CasioCassiopeiaA10 &&
-           CasioCassiopeiaA10IsA51Class(board.GetBoardId());
+    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CasioCassiopeiaA10 &&
+           emu_.Get<BoardParts>().Has(PartId::CasioCassiopeiaA10LcdController);
 }
 
 void CasioCassiopeiaA10VideoMemory::OnReady() {

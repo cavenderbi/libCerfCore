@@ -2,6 +2,8 @@
 
 #include "../peripheral_dispatcher.h"
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "nec_vrc4172_part_id.h"
 #include "../../boards/nec_cronos3e/nec_cronos3e_family_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
@@ -31,7 +33,8 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecCronos3e;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecCronos3e &&
+               emu_.Get<BoardParts>().Has(PartId::NecVrc4172);
     }
 
     void OnReady() override {

@@ -1,0 +1,5 @@
+{
+  "name": "Intel 28F128J3",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["casio_pocketpostpet", "siemens_simpad"] }]
+}

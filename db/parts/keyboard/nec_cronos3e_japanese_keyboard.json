@@ -1,0 +1,5 @@
+{
+  "name": "Japanese keyboard",
+  "supported": false,
+  "connections": [{ "board_ids": ["nec_mobilegear2_r450", "nec_mobilegear2_r530", "nec_mobilegear2_r550"] }]
+}

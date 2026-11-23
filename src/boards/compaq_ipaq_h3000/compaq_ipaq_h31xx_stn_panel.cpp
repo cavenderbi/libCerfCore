@@ -1,6 +1,7 @@
 #include "compaq_ipaq_h3000_panel.h"
 
 #include <cerfcore/boards/board_context.h>
+#include <cerfcore/core/board_database.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include "../../core/board_config.h"
 #include "../lcd_panel_param_id.h"
@@ -16,7 +17,7 @@ public:
 
     bool ShouldRegister() override {
         return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CompaqIpaqH3000 &&
-               emu_.Get<BoardConfig>().EnumId(BoardConfigParamId::LcdPanel) == "monochrome_stn";
+               emu_.Get<BoardConfig>().Part(BoardConfigParamId::LcdPanel).technology == "monochrome_stn";
     }
 
     /* Linux arch/arm/mach-sa1100/h3100.c h3100_lcd_info:

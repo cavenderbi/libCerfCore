@@ -2,9 +2,10 @@
 
 #include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
 #include "casio_cassiopeia_a10_cf_slot.h"
+#include "casio_cassiopeia_a10_compact_flash_part_id.h"
 #include "casio_cassiopeia_a10_family_id.h"
-#include "casio_cassiopeia_a10_members.h"
 
 #include <cstdint>
 
@@ -19,9 +20,8 @@ public:
     using CasioCassiopeiaA10CardWindows::CasioCassiopeiaA10CardWindows;
 
     bool ShouldRegister() override {
-        BoardContext& board = emu_.Get<BoardContext>();
-        return board.GetBoardFamilyId() == BoardFamilyId::CasioCassiopeiaA10 &&
-               CasioCassiopeiaA10IsA51Class(board.GetBoardId());
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::CasioCassiopeiaA10 &&
+               emu_.Get<BoardParts>().Has(PartId::CasioCassiopeiaA10CompactFlash);
     }
 
     void OnReady() override {

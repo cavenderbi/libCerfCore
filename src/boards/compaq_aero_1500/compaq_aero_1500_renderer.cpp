@@ -1,6 +1,6 @@
 #include <cerfcore/boards/board_context.h>
-#include <cerfcore/core/board_database.h>
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
 #include "../../host/panel_frame_renderer.h"
 #include <cerfcore/lcd/lcd_pixel_expand.h>
 #include "../../peripherals/nec_vrc4171a/nec_vrc4171a_frame_memory.h"
@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <optional>
 #include <vector>
 
@@ -34,7 +35,10 @@ public:
         frame_ = &emu_.Get<NecVrc4171aFrameMemory>();
         giu_   = &emu_.Get<Vr41xxGiu>();
         scanout_.emplace(frame_->Data());
-        glass_ = *emu_.Get<BoardDatabase>().FindBoard(emu_.Get<BoardContext>().GetBoardId())->lcd_panel_size;
+        if (const auto clamp = emu_.Get<BoardParts>().ViewportClamp()) {
+            max_columns_ = clamp->height;
+            max_lines_   = clamp->width;
+        }
     }
 
     void PresentedSize(uint32_t& w, uint32_t& h) override {
@@ -69,14 +73,15 @@ public:
     }
 
 private:
-    uint32_t ScanColumns() const { return std::min(scan_.width, glass_.height); }
-    uint32_t ScanLines() const { return std::min(scan_.height, glass_.width); }
+    uint32_t ScanColumns() const { return std::min(scan_.width, max_columns_); }
+    uint32_t ScanLines() const { return std::min(scan_.height, max_lines_); }
 
     NecVrc4171aLcd*                      lcd_   = nullptr;
     NecVrc4171aFrameMemory*              frame_ = nullptr;
     Vr41xxGiu*                           giu_   = nullptr;
     std::optional<NecVrc4171aLcdScanout> scanout_;
-    DbLcdPanelSize                       glass_{};
+    uint32_t                             max_columns_ = std::numeric_limits<uint32_t>::max();
+    uint32_t                             max_lines_   = std::numeric_limits<uint32_t>::max();
     NecVrc4171aLcdScan                   scan_;
     std::vector<uint32_t>                line_;
 };

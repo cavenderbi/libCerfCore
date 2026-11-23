@@ -1,7 +1,7 @@
 #include "pd6710_controller.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/samsung_smdk2410/samsung_smdk2410_family_id.h"
+#include "../../core/board_parts.h"
+#include "cirrus_pd6710_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/peripherals/peripheral_base.h>
@@ -27,7 +27,7 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::SamsungSmdk2410;
+        return emu_.Get<BoardParts>().Has(PartId::CirrusPd6710);
     }
     void OnReady() override {
         emu_.Get<PeripheralDispatcher>().Register(this);

@@ -3,8 +3,14 @@
   "soc_id": "sa1110",
   "device_year": 2000,
   "board_config": {
-    "ram": { "default": "32mb", "values": ["16mb", "32mb", "64mb"] },
-    "lcd_panel": { "default": "color_tft", "values": ["color_tft", "monochrome_stn"] }
+    "ram_v2": {
+      "default": "samsung_k4s281632b",
+      "values": ["compaq_ipaq_h3000_ram_16mb", "samsung_k4s281632b", "compaq_ipaq_h3000_ram_64mb"]
+    },
+    "lcd_panel_v2": {
+      "default": "compaq_ipaq_h3000_color_tft",
+      "values": ["compaq_ipaq_h3000_color_tft", "compaq_ipaq_h3000_monochrome_stn"]
+    }
   },
   "notes": [],
   "ga_color_depth": 24,

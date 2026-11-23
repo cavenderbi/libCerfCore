@@ -1,0 +1,12 @@
+{
+  "name": "Rockwell RCVDL56DPFL",
+  "supported": true,
+  "connections": [
+    {
+      "board_ids": [
+        "ibm_workpad_z50", "ibm_workpad_z50_canada", "ibm_workpad_z50_japan", "nec_mobilegear2_r450",
+        "nec_mobilegear2_r530", "nec_mobilegear2_r550", "nec_mobilepro_780", "nec_mobilepro_790"
+      ]
+    }
+  ]
+}

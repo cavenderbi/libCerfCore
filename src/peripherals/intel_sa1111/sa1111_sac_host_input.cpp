@@ -2,8 +2,8 @@
 
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/instance_threads.h>
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/hp_jornada_700/hp_jornada_700_family_id.h"
+#include "../../core/board_parts.h"
+#include "intel_sa1111_part_id.h"
 #include "../../host/audio_activity.h"
 #include "../../execution/guest_cycle_clock.h"
 
@@ -21,8 +21,7 @@ constexpr size_t   kMicFifoBytes  = 65536u;
 }
 
 bool Sa1111SacHostInput::ShouldRegister() {
-    auto* bd = emu_.TryGet<BoardContext>();
-    return bd && bd->GetBoardFamilyId() == BoardFamilyId::HpJornada700;
+    return emu_.Get<BoardParts>().Has(PartId::IntelSa1111);
 }
 
 void Sa1111SacHostInput::OnReady() {

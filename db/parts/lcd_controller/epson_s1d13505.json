@@ -1,0 +1,5 @@
+{
+  "name": "Epson S1D13505",
+  "supported": true,
+  "connections": [{ "board_ids": ["jornada_545", "jornada_547", "jornada_548"] }]
+}

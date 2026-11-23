@@ -1,0 +1,7 @@
+{
+  "name": "12\"",
+  "supported": true,
+  "width": 800,
+  "height": 600,
+  "connections": [{ "board_ids": ["siemens_mp377", "siemens_mp377_12_key"] }]
+}

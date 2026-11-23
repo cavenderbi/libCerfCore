@@ -1,0 +1,7 @@
+{
+  "name": "15\"",
+  "supported": true,
+  "width": 1024,
+  "height": 768,
+  "connections": [{ "board_ids": ["siemens_mp377_15_daylight", "siemens_mp377_15_inox", "siemens_mp377_15_touch"] }]
+}

@@ -42,6 +42,7 @@ private:
     const IbmWorkpadZ50MemberStraps* straps_  = nullptr;
     const IbmWorkpadZ50Battery*      battery_ = nullptr;
     uint8_t                          extension_ram_strap_ = 0;
+    uint8_t                          modem_strap_         = 0;
     std::atomic<uint8_t> cs0_out_{0};
     std::atomic<uint8_t> cs1_out_{0};
     CallbackList<> output_listeners_;

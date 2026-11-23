@@ -49,14 +49,27 @@ constexpr char kLedColor[]                 = "led_color";
 constexpr char kNotes[]                    = "notes";
 constexpr char kGenericPartId[]            = "generic_part_id";
 constexpr char kSupported[]                = "supported";
-constexpr char kDisplayedName[]            = "displayed_name";
-constexpr char kDisplayWidth[]             = "display_width";
-constexpr char kDisplayHeight[]            = "display_height";
-constexpr char kDisplayPart[]              = "display";
+constexpr char kParts[]                    = "parts";
+constexpr char kUnknownName[]              = "unknown_name";
+constexpr char kConnections[]              = "connections";
+constexpr char kBoardIds[]                 = "board_ids";
+constexpr char kBoardFamilyIds[]           = "board_family_ids";
+constexpr char kWidth[]                    = "width";
+constexpr char kHeight[]                   = "height";
+constexpr char kSizeMb[]                   = "size_mb";
+constexpr char kChipCount[]                = "chip_count";
+constexpr char kClampViewport[]            = "clamp_viewport";
+constexpr char kRowBits[]                  = "row_bits";
+constexpr char kColumnBits[]               = "column_bits";
+constexpr char kBankBits[]                 = "bank_bits";
+constexpr char kTechnology[]               = "technology";
+constexpr char kChemistry[]                = "chemistry";
 constexpr char kBoardConfigParams[]        = "board_config_params";
 constexpr char kBoardConfig[]              = "board_config";
 constexpr char kDefault[]                  = "default";
 constexpr char kEnumValues[]               = "enum_values";
+constexpr char kPartPicker[]               = "part_picker";
+constexpr char kPartId[]                   = "part_id";
 
 constexpr std::pair<std::string_view, SupportLevel> kSupportLevels[] = {
     {CERF_SUPPORT_BOOTABLE_FULL, SupportLevel::BootableFull},
@@ -103,23 +116,61 @@ struct BoardValues {
     }
 };
 
-std::optional<uint32_t> OptionalSize(const json& item, const char* key) {
+std::optional<uint32_t> OptionalNumber(const json& item, const char* key) {
     if (!item.contains(key)) return std::nullopt;
     return item.at(key).get<uint32_t>();
 }
 
-void AppendSpecs(const json& row, std::vector<DbDeviceSpec>& out) {
+void AppendFeatures(const json& row, std::vector<DbFeature>& out) {
     const json list = row.value(kDeviceSpecs, json::array());
     for (const auto& s : list)
-        out.push_back(DbDeviceSpec{s.at(kGenericPartId).get<std::string>(), s.at(kSupported).get<bool>(),
-                                   s.value(kDisplayedName, std::string()), OptionalSize(s, kDisplayWidth),
-                                   OptionalSize(s, kDisplayHeight)});
+        out.push_back(DbFeature{s.at(kGenericPartId).get<std::string>(), s.at(kSupported).get<bool>()});
 }
 
-std::optional<DbLcdPanelSize> PanelSize(std::span<const DbDeviceSpec> specs) {
-    for (const DbDeviceSpec& s : specs)
-        if (s.generic_part_id == kDisplayPart && s.display_width && s.display_height)
-            return DbLcdPanelSize{*s.display_width, *s.display_height};
+DbPart ParsePart(const json& p) {
+    DbPart part;
+    part.id              = p.at(kId).get<std::string>();
+    part.name            = p.value(kName, std::string());
+    part.generic_part_id = p.at(kGenericPartId).get<std::string>();
+    part.unknown_name    = p.value(kUnknownName, false);
+    part.supported       = p.at(kSupported).get<bool>();
+    part.width           = OptionalNumber(p, kWidth);
+    part.height          = OptionalNumber(p, kHeight);
+    part.size_mb         = OptionalNumber(p, kSizeMb);
+    part.chip_count      = OptionalNumber(p, kChipCount);
+    part.row_bits        = OptionalNumber(p, kRowBits);
+    part.column_bits     = OptionalNumber(p, kColumnBits);
+    part.bank_bits       = OptionalNumber(p, kBankBits);
+    part.technology      = p.value(kTechnology, std::string());
+    part.clamp_viewport  = p.value(kClampViewport, false);
+    part.chemistry       = p.value(kChemistry, std::string());
+    return part;
+}
+
+bool Contains(const json& row, const char* key, const std::string& id) {
+    for (const auto& v : row.value(key, json::array()))
+        if (v.get<std::string>() == id) return true;
+    return false;
+}
+
+bool ConnectsTo(const json& part, const DbBoard& board) {
+    for (const auto& c : part.value(kConnections, json::array()))
+        if (Contains(c, kBoardIds, board.id) || Contains(c, kBoardFamilyIds, board.family_id)) return true;
+    return false;
+}
+
+std::vector<ConfigEnumValue> ParseParamValues(const json& list) {
+    std::vector<ConfigEnumValue> out;
+    for (const auto& v : list) {
+        if (v.contains(kPartId)) out.push_back(ConfigEnumValue{v.at(kPartId).get<std::string>(), std::string()});
+        else                     out.push_back(ConfigEnumValue{v.at(kId).get<std::string>(), v.at(kName).get<std::string>()});
+    }
+    return out;
+}
+
+std::optional<DbLcdPanelSize> PanelSize(std::span<const DbPart* const> parts) {
+    for (const DbPart* p : parts)
+        if (p->width && p->height) return DbLcdPanelSize{*p->width, *p->height};
     return std::nullopt;
 }
 
@@ -167,10 +218,16 @@ void BoardDatabase::OnReady() {
         generic_parts_.push_back(DbGenericPart{p.at(kId).get<std::string>(), p.at(kName).get<std::string>(),
                                                p.at(kIcon).get<std::string>()});
 
-    for (const auto& p : root.at(kBoardConfigParams))
-        board_config_params_.push_back(DbBoardConfigParam{p.at(kId).get<std::string>(), p.at(kName).get<std::string>(),
-                                                          p.value(kGenericPartId, std::string()),
-                                                          ParseConfigEnumValues(p.at(kEnumValues))});
+    const json& parts = root.at(kParts);
+    for (const auto& p : parts) parts_.push_back(ParsePart(p));
+
+    for (const auto& p : root.at(kBoardConfigParams)) {
+        const bool        picker  = p.value(kPartPicker, false);
+        const std::string generic = p.value(kGenericPartId, std::string());
+        board_config_params_.push_back(DbBoardConfigParam{
+            p.at(kId).get<std::string>(), picker ? GenericPart(generic).name : p.at(kName).get<std::string>(), generic,
+            picker, ParseParamValues(p.at(kEnumValues))});
+    }
 
     const json& families = root.at(kBoardFamilies);
     for (const auto& f : families)
@@ -189,9 +246,8 @@ void BoardDatabase::OnReady() {
         row.support_level = ValueByName(kSupportLevels, support);
         row.runs          = InWordList(CERF_RUNNING_SUPPORT_LEVELS, support);
         row.soc_id        = v.Value<std::string>(kSocId);
-        AppendSpecs(family, row.specs);
-        AppendSpecs(b, row.specs);
-        row.lcd_panel_size      = PanelSize(row.specs);
+        AppendFeatures(family, row.features);
+        AppendFeatures(b, row.features);
         row.ga_color_depth      = v.ValueOr(kGaColorDepth, kDefaultGaColorDepth);
         row.ga_window_size      = v.ValueOr(kGaWindowSize, kDefaultGaWindowSize);
         row.dynamic_scale_factor = v.ValueOr(kDynamicScaleFactor, 0);
@@ -204,8 +260,23 @@ void BoardDatabase::OnReady() {
         MergeBoardConfig(family, row.config);
         MergeBoardConfig(b, row.config);
         std::ranges::sort(row.config, {}, [this](const DbBoardConfigSetting& s) { return FindBoardConfigParam(s.param_id); });
+        for (size_t i = 0; i < parts.size(); ++i)
+            if (ConnectsTo(parts[i], row)) row.connected_parts.push_back(&parts_[i]);
+        row.parts = ComposeParts(row, [this](const DbBoardConfigSetting& s) { return FindPart(s.default_value); });
+        std::ranges::sort(row.parts, {}, [this](const DbPart* p) {
+            return std::pair(&GenericPart(p->generic_part_id), p);
+        });
+        row.lcd_panel_size = PanelSize(row.parts);
         boards_.push_back(std::move(row));
     }
+}
+
+const DbGenericPart& BoardDatabase::GenericPart(std::string_view id) const { return RowById(generic_parts_, id); }
+
+const DbPart* BoardDatabase::FindPart(std::string_view id) const {
+    for (const DbPart& p : parts_)
+        if (p.id == id) return &p;
+    return nullptr;
 }
 
 const DbBoardConfigParam* BoardDatabase::FindBoardConfigParam(std::string_view id) const {

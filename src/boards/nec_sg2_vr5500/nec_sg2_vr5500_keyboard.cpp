@@ -4,6 +4,8 @@
 #include <cerfcore/host/keyboard_router.h>
 #include "../../peripherals/intel_i8042/i8042_controller.h"
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "../../peripherals/ali_m1535/ali_m1535_part_id.h"
 #include "nec_sg2_vr5500_family_id.h"
 
 #include <cstddef>
@@ -22,7 +24,8 @@ public:
 
     bool ShouldRegister() override {
         auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::NecSg2Vr5500;
+        return bd && bd->GetBoardFamilyId() == BoardFamilyId::NecSg2Vr5500 &&
+               emu_.Get<BoardParts>().Has(PartId::AliM1535);
     }
 
     void OnReady() override { emu_.Get<KeyboardRouter>().Register(this); }

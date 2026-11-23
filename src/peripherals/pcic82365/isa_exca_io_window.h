@@ -1,9 +1,9 @@
 #pragma once
 
-#include <cerfcore/boards/board_context.h>
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 #include <cerfcore/peripherals/peripheral_base.h>
+#include "../../core/board_parts.h"
 #include "../peripheral_dispatcher.h"
 #include "isa_host_bus_rule.h"
 
@@ -17,7 +17,7 @@ public:
     using Peripheral::Peripheral;
 
     bool ShouldRegister() override {
-        return Controller::FittedOnFamily(emu_.Get<BoardContext>().GetBoardFamilyId());
+        return emu_.Get<BoardParts>().Has(Controller::kPartId);
     }
 
     void OnReady() override {

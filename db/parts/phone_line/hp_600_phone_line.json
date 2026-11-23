@@ -1,0 +1,14 @@
+{
+  "unknown_name": true,
+  "supported": false,
+  "connections": [
+    {
+      "board_ids": [
+        "jornada_680", "jornada_680_europe", "jornada_680_france", "jornada_680_germany", "jornada_680_japan",
+        "jornada_680_scandinavia", "jornada_680_spain", "jornada_688", "jornada_690", "jornada_690_europe",
+        "jornada_690_france", "jornada_690_germany", "jornada_690_japan", "jornada_690_scandinavia",
+        "jornada_690_spain"
+      ]
+    }
+  ]
+}

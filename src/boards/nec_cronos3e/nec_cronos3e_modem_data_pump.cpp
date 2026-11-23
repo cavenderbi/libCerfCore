@@ -5,8 +5,9 @@
 #include "../../peripherals/peripheral_dispatcher.h"
 #include "../../peripherals/rockwell_rcvdl56dpfl/rcvdl56dpfl_data_pump_peripheral.h"
 #include "../../socs/vr41xx/vr41xx_hsp.h"
+#include "../../core/board_parts.h"
+#include "../../peripherals/rockwell_rcvdl56dpfl/rockwell_rcvdl56dpfl_part_id.h"
 #include "nec_cronos3e_family_id.h"
-#include "nec_mobilegear2_r430_id.h"
 
 #include <cstdint>
 
@@ -24,9 +25,8 @@ public:
     using Vrc4172ChipSelected<Rcvdl56dpflDataPumpPeripheral>::Vrc4172ChipSelected;
 
     bool ShouldRegister() override {
-        const auto& bd = emu_.Get<BoardContext>();
-        return bd.GetBoardFamilyId() == BoardFamilyId::NecCronos3e &&
-               bd.GetBoardId() != BoardId::NecMobilegear2R430;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecCronos3e &&
+               emu_.Get<BoardParts>().Has(PartId::RockwellRcvdl56dpfl);
     }
 
     uint32_t MmioBase() const override { return kWindowBase; }

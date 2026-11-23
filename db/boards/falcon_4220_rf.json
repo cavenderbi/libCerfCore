@@ -1,0 +1,6 @@
+{
+  "name": "PSC/Datalogic Falcon 4220 RF",
+  "short_name": "Falcon 4220 RF",
+  "board_family_id": "askey_pc3xx",
+  "support_level": "unknown_partial"
+}

@@ -1,6 +1,8 @@
 #include "ibm_workpad_z50_board_eeprom.h"
 
 #include <cerfcore/boards/board_context.h>
+#include "../../core/board_parts.h"
+#include "ibm_workpad_z50_eeprom_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include "ibm_workpad_z50_family_id.h"
 
@@ -17,7 +19,8 @@ constexpr uint8_t  kBlankCell     = 0xFFu;
 REGISTER_SERVICE(IbmWorkpadZ50BoardEeprom);
 
 bool IbmWorkpadZ50BoardEeprom::ShouldRegister() {
-    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::IbmWorkpadZ50;
+    return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::IbmWorkpadZ50 &&
+           emu_.Get<BoardParts>().Has(PartId::IbmWorkpadZ50Eeprom);
 }
 
 void IbmWorkpadZ50BoardEeprom::FillCells() {

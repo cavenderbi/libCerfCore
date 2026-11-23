@@ -101,7 +101,10 @@ void ConfigLoader::LoadBoardConfig(const json& board, DeviceConfig& config, cons
     for (const auto& [id, value] : c.items()) {
         const std::string         key   = CfgKeyPath({ctx, id});
         const DbBoardConfigParam* param = db.FindBoardConfigParam(id);
-        if (!param) Reader().Fail(path, "'" + key + "' is not a board configuration parameter");
+        if (!param) {
+            LOG(Cfg, "%s is not a board configuration parameter\n", key.c_str());
+            continue;
+        }
         if (value.is_null()) {
             config.board_config.erase(id);
             continue;

@@ -1,7 +1,7 @@
 #include "ucb1x00_codec.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/philips_velo_1/philips_velo_1_family_id.h"
+#include "../../core/board_parts.h"
+#include "philips_ucb1100_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 
 #include <cstdint>
@@ -22,8 +22,7 @@ public:
     using Ucb1x00Codec::Ucb1x00Codec;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        return bd && bd->GetBoardFamilyId() == BoardFamilyId::PhilipsVelo1;
+        return emu_.Get<BoardParts>().Has(PartId::PhilipsUcb1100);
     }
 
 protected:

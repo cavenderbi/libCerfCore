@@ -2,6 +2,8 @@
 
 #include <cerfcore/boards/board_context.h>
 #include "../../boards/hp_jornada_700/hp_jornada_700_family_id.h"
+#include "../../core/board_parts.h"
+#include "epson_sed1356_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 
 namespace cerfcore {
@@ -13,7 +15,8 @@ public:
     using Sed1356PowerSequence::Sed1356PowerSequence;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::HpJornada700;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::HpJornada700 &&
+               emu_.Get<BoardParts>().Has(PartId::EpsonSed1356);
     }
 
     /* SED1356 X25B-A-001-12 Table 7-20 p.78: t1 and t3 give maxima only. */

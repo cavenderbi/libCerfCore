@@ -1,8 +1,7 @@
 #include "ucb1x00_codec.h"
 
-#include <cerfcore/boards/board_context.h>
-#include "../../boards/hp_jornada_820/hp_jornada_820_family_id.h"
-#include "../../boards/philips_nino/philips_nino_family_id.h"
+#include "../../core/board_parts.h"
+#include "philips_ucb1200_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 
 #include <cstdint>
@@ -23,10 +22,7 @@ public:
     using Ucb1x00Codec::Ucb1x00Codec;
 
     bool ShouldRegister() override {
-        auto* bd = emu_.TryGet<BoardContext>();
-        if (!bd) return false;
-        const std::string_view b = bd->GetBoardFamilyId();
-        return b == BoardFamilyId::HpJornada820 || b == BoardFamilyId::PhilipsNino;
+        return emu_.Get<BoardParts>().Has(PartId::PhilipsUcb1200);
     }
 
 protected:

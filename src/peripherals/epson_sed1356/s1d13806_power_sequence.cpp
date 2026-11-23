@@ -2,6 +2,8 @@
 
 #include <cerfcore/boards/board_context.h>
 #include "../../boards/nec_mobilepro_900_series/nec_mobilepro_900_series_family_id.h"
+#include "../../core/board_parts.h"
+#include "epson_s1d13806_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
 #include <cerfcore/core/fatal.h>
 
@@ -14,7 +16,8 @@ public:
     using Sed1356PowerSequence::Sed1356PowerSequence;
 
     bool ShouldRegister() override {
-        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecMobilepro900Series;
+        return emu_.Get<BoardContext>().GetBoardFamilyId() == BoardFamilyId::NecMobilepro900Series &&
+               emu_.Get<BoardParts>().Has(PartId::EpsonS1d13806);
     }
 
     /* S1D13806 X28B-A-001-13 Table 6-15 p.62 t2: LCD Enable high to panel active,

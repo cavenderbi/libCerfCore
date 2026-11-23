@@ -1,0 +1,5 @@
+{
+  "name": "Everspin MR2A16A",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["siemens_simatic_mp377"] }]
+}

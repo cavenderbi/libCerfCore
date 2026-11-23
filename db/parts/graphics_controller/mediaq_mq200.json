@@ -1,0 +1,5 @@
+{
+  "name": "MediaQ MQ200",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["nec_cronos3e", "pangolin", "siemens_simpad"] }]
+}

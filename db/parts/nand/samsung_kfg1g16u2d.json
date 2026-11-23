@@ -1,0 +1,5 @@
+{
+  "name": "Samsung KFG1G16U2D",
+  "supported": true,
+  "connections": [{ "board_family_ids": ["siemens_simatic_mp377"] }]
+}

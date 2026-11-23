@@ -2,7 +2,9 @@
 
 #include <cerfcore/boards/board_context.h>
 #include "siemens_simpad_family_id.h"
+#include "siemens_simpad_pcmcia_part_id.h"
 #include <cerfcore/core/cerf_emulator.h>
+#include "../../core/board_parts.h"
 #include <cerfcore/host/machine_object_tree.h>
 #include <cerfcore/socs/guest_cpu_reset.h>
 #include "../../peripherals/pcmcia/pcmcia_auto_insert.h"
@@ -32,13 +34,17 @@ public:
     }
 
     void OnReady() override {
-        emu_.Get<PcmciaSpaceRouter>().ProvideSockets(&slot_, nullptr);
-        emu_.Get<MachineObjectTree>().Add(&slot_);
+        const bool fitted = emu_.Get<BoardParts>().Has(PartId::SiemensSimpadPcmcia);
+        if (fitted) {
+            emu_.Get<PcmciaSpaceRouter>().ProvideSockets(&slot_, nullptr);
+            emu_.Get<MachineObjectTree>().Add(&slot_);
+        }
 
         auto& gpio = emu_.Get<Sa11xxGpio>();
         gpio.DriveInputPin(kGpioCd, true);    /* empty: CF_CD idles high     */
         gpio.DriveInputPin(kGpioIrq, true);   /* READY/nIREQ deasserted high */
 
+        if (!fitted) return;
         emu_.Get<PcmciaAutoInsert>().InsertDefaultNetworkCard(slot_);
         emu_.Get<GuestCpuReset>().RegisterResetListener([this](ResetLineKind kind) {
             if (kind == ResetLineKind::Rtc) slot_.PowerCycleCard();

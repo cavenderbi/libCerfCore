@@ -1,0 +1,8 @@
+{
+  "name": "256-colour DSTN panel",
+  "supported": true,
+  "technology": "color_dstn",
+  "width": 240,
+  "height": 320,
+  "connections": [{ "board_ids": ["philips_nino_500"] }]
+}
