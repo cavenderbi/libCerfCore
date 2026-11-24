@@ -1,5 +1,6 @@
 #include "imx51_gpu3d_raster.h"
 #include "imx51_gpu3d_memory.h"
+#include "imx51_gpu3d_color.h"
 #include "imx51_gpu3d_tiling.h"
 #include <cerfcore/core/byte_order.h>
 #include <cerfcore/core/cerf_emulator.h>
@@ -44,7 +45,7 @@ void Imx51Gpu3dRaster::RestoreState(StateReader& reader) {
     reader.ReadBytes("gmem", gmem_.data(),gmem_.size());
     if (gmem_binding_ != 0xFFFFFFFFu &&
         ((gmem_binding_ & 0xFF0u) != 0u || (gmem_binding_ & 0xFFFFF000u) >= gmem_.size() || gmem_pitch_ == 0 || gmem_pitch_ > 16383u ||
-         ((gmem_binding_ & 15u) != 0u && (gmem_binding_ & 15u) != 2u && (gmem_binding_ & 15u) != 5u)))
+         !Imx51Gpu3dSupportedColorFormat(gmem_binding_ & 15u)))
         reader.Reject("GPU raster GMEM binding 0x%08X pitch %u", gmem_binding_, gmem_pitch_);
 }
 
@@ -163,7 +164,7 @@ void Imx51Gpu3dRaster::RasterizeTriangle(const std::array<Imx51Gpu3dShaderState,
     if (vte == 0xB00u && !resolve && clip != 0x10000u) fail("window-space clipping",clip);
     const uint32_t info = reg(0x2001), surface = reg(0x2000), format = info & 15u;
     if ((surface & ~0x3FFFu) != 0 || (surface & 0x3FFFu) == 0) fail("surface/MSAA",surface);
-    if (format != 0u && format != 2u && format != 5u) fail("color format",format);
+    if (!Imx51Gpu3dSupportedColorFormat(format)) fail("color format",format);
     if (blend && (resolve || format != 2u)) fail("blend target/resolve",info);
     const uint32_t swap = (info >> 9) & 3u;
     /* Ford SYNC 2 librenderboy.dll: 0x41CDB4B0-0x41CDB500 (format/swap),
@@ -181,8 +182,10 @@ void Imx51Gpu3dRaster::RasterizeTriangle(const std::array<Imx51Gpu3dShaderState,
                                                          "accesses its graphics memory");
         if (swap == 3u) fail("GMEM swap",info);
         if ((mmu_config & 1u) && mmu_config != 1u) fail("GMEM MMU mode",mmu_config);
-        if (gmem_binding_ != 0xFFFFFFFFu && (gmem_binding_ != binding || gmem_pitch_ != (surface & 0x3FFFu)))
-            fail("GMEM format/pitch/base reinterpretation",info);
+        if (gmem_binding_ != 0xFFFFFFFFu && (gmem_binding_ != binding || gmem_pitch_ != (surface & 0x3FFFu)) &&
+            !Imx51Gpu3dRg88UpperBankResolve(gmem_binding_,gmem_pitch_,binding,surface & 0x3FFFu,resolve))
+            emu_.Get<Fatal>().Die("GPU raster unsupported GMEM format/pitch/base reinterpretation value=%08X previous=%08X previous_pitch=%u pitch=%u resolve=%u color_mask=%08X control=%08X",
+                info,gmem_binding_,gmem_pitch_,surface & 0x3FFFu,resolve ? 1u : 0u,reg(0x2104),control);
     }
     if (resolve && (!gmem || gmem_binding_ == 0xFFFFFFFFu)) fail("uninitialized resolve source",info);
     const uint32_t pitch = surface & 0x3FFFu, bytes = format == 5u ? 4u : 2u;
@@ -320,7 +323,8 @@ void Imx51Gpu3dRaster::RasterizeTriangle(const std::array<Imx51Gpu3dShaderState,
             if (bytes == 4u) for (unsigned i=0;i<4;++i) color[i]=float(p[i])/255.0f;
             else {
                 const uint32_t packed=cerf::le::U16(p);
-                if (format == 0u) for (unsigned i=0;i<4;++i) color[i]=float((packed>>(i*4u))&15u)/15.0f;
+                if (format == 4u) color=Imx51Gpu3dUnpackRg88(static_cast<uint16_t>(packed));
+                else if (format == 0u) for (unsigned i=0;i<4;++i) color[i]=float((packed>>(i*4u))&15u)/15.0f;
                 else color={float(packed&31u)/31.0f,float((packed>>5)&63u)/63.0f,float((packed>>11)&31u)/31.0f,1.0f};
             }
             /* Mesa e97ad748 a2xx.xml: RB_COLOR_INFO.SWAP; Navigation20260906_235040 source_info=202. */
@@ -406,7 +410,15 @@ void Imx51Gpu3dRaster::RasterizeTriangle(const std::array<Imx51Gpu3dShaderState,
             pixel.data[i] = (mask & (1u << i)) ? static_cast<uint8_t>(truncate_8888 ? color[i] * 255u :
                 ApproximateDitherQuantize(color[i],255u,i,uint32_t(x)+offset_x,uint32_t(y)+offset_y,
                     !resolve && dither_mode != 0u)) : destination[i];
-        else {
+        else if (format == 4u) {
+            const auto quantize = [&](unsigned component) {
+                return static_cast<uint8_t>(truncate_8888 ? color[component] * 255u :
+                    ApproximateDitherQuantize(color[component],255u,component,
+                        uint32_t(x)+offset_x,uint32_t(y)+offset_y,!resolve && dither_mode != 0u));
+            };
+            cerf::le::Put16(pixel.data.data(), Imx51Gpu3dPackRg88(quantize(0),quantize(1),
+                cerf::le::U16(destination),mask));
+        } else {
             uint32_t packed = cerf::le::U16(destination);
             const std::array<uint32_t,4> shifts = format == 0u ?
                 (((target_info >> 9) & 3u) == 3u ? std::array<uint32_t,4>{12,8,4,0} : std::array<uint32_t,4>{0,4,8,12}) :
