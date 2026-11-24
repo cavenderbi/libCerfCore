@@ -10,3 +10,5 @@ function(cerfcore_test name)
 endfunction()
 
 cerfcore_test(utf16_test)
+
+cerfcore_test(imx51_gpu3d_blit_test)

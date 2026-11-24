@@ -7,6 +7,7 @@
 #include <cerfcore/boards/board_context.h>
 #include "imx51_id.h"
 #include <cstring>
+#include <cmath>
 
 namespace cerfcore {
 
@@ -89,30 +90,38 @@ void Imx51Gpu3dBlit::Draw(uint32_t ctrl, uint64_t pa,
         HaltUnsupportedAccess("blit not opaque/full-mask/direct-coord", static_cast<uint32_t>(pa), ci);
 
     const uint32_t vhw = BlitReg(registers, 0x4048u, pa), vhh = BlitReg(registers, 0x4049u, pa);
-    if (AsFloat(vhw) * 2.0f != static_cast<float>(srcW) ||
-        AsFloat(vhh) * 2.0f != static_cast<float>(srcH) ||
+    const float width = AsFloat(vhw) * 2.0f, height = AsFloat(vhh) * 2.0f;
+    if (!std::isfinite(width) || !std::isfinite(height) || width < 1.0f || height < 1.0f ||
+        width > static_cast<float>(srcW) || height > static_cast<float>(srcH) ||
+        std::floor(width) != width || std::floor(height) != height ||
         BlitReg(registers, 0x404Au, pa) != vhw || BlitReg(registers, 0x404Bu, pa) != vhh)
-        HaltUnsupportedAccess("blit geometry not 1:1 full-screen", static_cast<uint32_t>(pa), srcW);
-    for (uint32_t k = 0u; k < 4u; ++k)
-        if (BlitReg(registers, 0x4098u + k, pa) != 0x3F000000u)
-            HaltUnsupportedAccess("blit tex not full [0,1]", static_cast<uint32_t>(pa), 0x4098u + k);
+        HaltUnsupportedAccess("blit geometry not 1:1 origin-aligned", static_cast<uint32_t>(pa), srcW);
+    const uint32_t copyW = static_cast<uint32_t>(width), copyH = static_cast<uint32_t>(height);
+    const float texX = AsFloat(BlitReg(registers, 0x4098u, pa));
+    const float texY = AsFloat(BlitReg(registers, 0x4099u, pa));
+    if (!std::isfinite(texX) || !std::isfinite(texY) ||
+        std::abs(texX * 2.0f - width / static_cast<float>(srcW)) > 0.000001f ||
+        std::abs(texY * 2.0f - height / static_cast<float>(srcH)) > 0.000001f ||
+        BlitReg(registers, 0x409Au, pa) != BlitReg(registers, 0x4098u, pa) ||
+        BlitReg(registers, 0x409Bu, pa) != BlitReg(registers, 0x4099u, pa))
+        HaltUnsupportedAccess("blit tex not 1:1 origin-aligned", static_cast<uint32_t>(pa), 0x4098u);
     const uint32_t tl = BlitReg(registers, 0x2081u, pa), br = BlitReg(registers, 0x2082u, pa);
     if ((tl & 0x7FFFu) != 0u || ((tl >> 16) & 0x7FFFu) != 0u ||
-        (br & 0x7FFFu) < srcW || ((br >> 16) & 0x7FFFu) < srcH)
+        (br & 0x7FFFu) < copyW || ((br >> 16) & 0x7FFFu) < copyH)
         HaltUnsupportedAccess("blit scissor origin/clip", static_cast<uint32_t>(pa), br);
 
-    const uint64_t sSpan = uint64_t(srcH - 1u) * srcPitch * srcBpp + uint64_t(srcW) * srcBpp;
-    const uint64_t dSpan = uint64_t(srcH - 1u) * dstPitch * dstBpp + uint64_t(srcW) * dstBpp;
+    const uint64_t sSpan = uint64_t(copyH - 1u) * srcPitch * srcBpp + uint64_t(copyW) * srcBpp;
+    const uint64_t dSpan = uint64_t(copyH - 1u) * dstPitch * dstBpp + uint64_t(copyW) * dstBpp;
     const uint8_t* s0 = emu_.Get<Imx51Gpu3dMemory>().ReadSpan(srcBase, sSpan, mmu_config);
     uint8_t* d0 = emu_.Get<Imx51Gpu3dMemory>().WriteSpan(dstBase, dSpan, mmu_config);
     if (srcBpp == dstBpp) {
-        for (uint32_t y = 0u; y < srcH; ++y)
-            std::memmove(d0 + uint64_t(y) * dstPitch * dstBpp, s0 + uint64_t(y) * srcPitch * srcBpp, srcW * srcBpp);
+        for (uint32_t y = 0u; y < copyH; ++y)
+            std::memmove(d0 + uint64_t(y) * dstPitch * dstBpp, s0 + uint64_t(y) * srcPitch * srcBpp, copyW * srcBpp);
     } else if (srcBpp == 4u) {
-        for (uint32_t y = 0u; y < srcH; ++y) {
+        for (uint32_t y = 0u; y < copyH; ++y) {
             const uint8_t* srow = s0 + uint64_t(y) * srcPitch * 4u;
             uint8_t* drow = d0 + uint64_t(y) * dstPitch * 2u;
-            for (uint32_t x = 0u; x < srcW; ++x)
+            for (uint32_t x = 0u; x < copyW; ++x)
                 cerf::le::Put16(drow + x * 2u,
                                 lcd_pixel::PackRgb565(cerf::le::U32(srow, x * 4u)));
         }
