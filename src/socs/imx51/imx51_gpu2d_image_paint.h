@@ -16,14 +16,14 @@ public:
     bool ShouldRegister() override;
 
     /* One tile under G2D_INPUT 0x09 + GRADIENT.ENABLE2 + BLENDERCFG.ENABLE. */
-    void Composite(const uint32_t (&regs)[0x100]);
+    void Composite(const uint32_t (&regs)[0x100], const uint32_t* paint_regs = nullptr);
 
 private:
     void CheckGates(const uint32_t (&regs)[0x100]) const;
+    void CheckNormalGates(const uint32_t (&regs)[0x100]) const;
     /* Run PASSES+1 color + ALPHAPASSES+1 alpha micro-op passes over TEMP0-2 with
-       operands SOURCE (the texel), IMAGE (identity; SRC1=0 disables the second
-       texture) and DEST; returns TEMP0. */
-    uint32_t BlendMultiPass(const uint32_t (&regs)[0x100], uint32_t src, uint32_t dst) const;
+       operands SOURCE (paint), IMAGE (the sampled texture) and DEST; returns TEMP0. */
+    uint32_t BlendMultiPass(const uint32_t (&regs)[0x100], uint32_t src, uint32_t image, uint32_t dst, uint32_t coverage) const;
     [[noreturn]] void Halt(const uint32_t (&regs)[0x100], const char* why,
                            uint32_t addr, uint32_t data) const;
 };

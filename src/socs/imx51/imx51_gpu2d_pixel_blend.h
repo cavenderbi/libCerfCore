@@ -16,7 +16,7 @@ public:
 
     void        ValidateBlendProg(uint32_t prog) const;
     static bool BlendProgRefsDest(uint32_t prog);
-    uint32_t    BlendPixel(const Gpu2dFillTarget& t, uint32_t src, uint32_t dst, float cov) const;
+    uint32_t    BlendPixel(const Gpu2dFillTarget& t, uint32_t src, uint32_t dst, float cov, uint32_t image = 0xFFFFFFFFu) const;
 
 private:
     [[noreturn]] void HaltBlend(const char* why, uint32_t prog) const;

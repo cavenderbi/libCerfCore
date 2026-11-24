@@ -16,7 +16,7 @@ public:
     bool ShouldRegister() override;
 
     /* VGV2_ACTION=FLUSH: fill/stroke the accumulated path with the register file. */
-    void Flush(const uint32_t (&regs)[0x100], bool bbox_live);
+    void Flush(const uint32_t (&regs)[0x100], bool bbox_live, const uint32_t* paint_regs = nullptr);
 
 private:
     [[noreturn]] void Halt(const uint32_t (&regs)[0x100], const char* why,

@@ -24,6 +24,8 @@ public:
     void SaveState(StateWriter& w) const;
     void RestoreState(StateReader& r);
     void PowerOnReset();
+    void SavePaintState(StateWriter& w) const;
+    void RestorePaintState(StateReader& r);
 
 private:
     [[noreturn]] void Halt(const char* why, uint32_t addr, uint32_t data) const;
@@ -34,6 +36,7 @@ private:
     void     EmitPoint(uint32_t action);
     /* Flatten a quadratic bezier C1(current)->C3(control)->C4(end) to device LineTos. */
     void     EmitQuad(float c3x, float c3y, float c4x, float c4y);
+    void     EmitCubic(float c2x, float c2y, float c3x, float c3y, float c4x, float c4y);
     void     DevicePoint(float px, float py, float& dx, float& dy) const;
     void     StoreReg(uint32_t reg, uint32_t data);
     static bool IsConsumedConfigReg(uint32_t reg);
@@ -45,7 +48,15 @@ private:
     uint32_t vgv3_cursor_    = 0;  /* persistent walk read pointer (survives a pause) */
     float    cur_x_          = 0.0f;  /* C4 current point, raw path coords */
     float    cur_y_          = 0.0f;
+    float    quad_control_x_ = 0.0f;
+    float    quad_control_y_ = 0.0f;
+    bool     quad_control_valid_ = false;
+    float    cubic_control_x_ = 0.0f;
+    float    cubic_control_y_ = 0.0f;
+    bool     cubic_control_valid_ = false;
     bool     bbox_live_      = false;  /* VGV2_BBOX written; FLUSH superset gate applies */
+    bool paint_bank_valid_ = false;
+    uint32_t paint_regs_[0x100] = {};
     uint32_t vg_regs_[0x100] = {};  /* g12 config/geometry register file */
 };
 

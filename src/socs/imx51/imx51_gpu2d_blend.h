@@ -40,15 +40,34 @@ inline uint32_t Operand(uint32_t prog, uint32_t i, uint32_t shift,
     return Inv(prog, i) ? 255u - v : v;
 }
 
-/* ADD programs, validated by the dispatchers. Both pipes read the previous
+constexpr uint32_t CombineProducts(uint32_t operation, uint32_t first, uint32_t second) {
+    switch (operation) {
+        case 0u: return first + second > 255u ? 255u : first + second;
+        case 1u: return first > second ? first - second : 0u;
+        case 2u: return first < second ? first : second;
+        default: return first > second ? first : second;
+    }
+}
+
+inline uint32_t BlendChannel(uint32_t prog, uint32_t shift,
+                             const uint32_t* inputs, const uint32_t* constants) {
+    const uint32_t first = Mul(Operand(prog, 0, shift, inputs, constants),
+                               Operand(prog, 1, shift, inputs, constants));
+    const uint32_t second = Mul(Operand(prog, 2, shift, inputs, constants),
+                                Operand(prog, 3, shift, inputs, constants));
+    return CombineProducts(Operation(prog), first, second);
+}
+
+/* Blend programs, validated by the dispatchers. Both pipes read the previous
    pass's TEMP values: sync_2 libOpenVG.dll 0x41C58230 writes TEMP1 RGBA,
    and 0x41C60610 emits a following color pass that reads TEMP1.a. */
 inline uint32_t AddProgram(const uint32_t* alpha, uint32_t alpha_passes,
                            const uint32_t* color, uint32_t color_passes,
-                           const uint32_t* constants, uint32_t src, uint32_t dst) {
+                           const uint32_t* constants, uint32_t src, uint32_t dst,
+                           uint32_t image = 0xFFFFFFFFu) {
     uint32_t temp[3] = {};
     for (uint32_t p = 0; p < color_passes || p < alpha_passes; ++p) {
-        const uint32_t inputs[] = {0u, src, dst, 0xFFFFFFFFu, temp[0], temp[1], temp[2]};
+        const uint32_t inputs[] = {0u, src, dst, image, temp[0], temp[1], temp[2]};
         auto run = [&](uint32_t prog, uint32_t shift) {
             const uint32_t p1 = Mul(Operand(prog, 0, shift, inputs, constants),
                                      Operand(prog, 1, shift, inputs, constants));
@@ -59,7 +78,7 @@ inline uint32_t AddProgram(const uint32_t* alpha, uint32_t alpha_passes,
                 if (value > 255u) value = 255u;
                 temp[d - 1u] = (temp[d - 1u] & ~(0xFFu << shift)) | (value << shift);
             };
-            put(Dst(prog, 0), p1 + p2);
+            put(Dst(prog, 0), CombineProducts(Operation(prog), p1, p2));
             put(Dst(prog, 1), p1);
             put(Dst(prog, 2), p2);
         };
@@ -95,6 +114,17 @@ constexpr uint32_t PremultArgb(uint32_t argb) {
 /* One un-premultiply channel divide (BLENDERCFG.OOALPHA result -> straight alpha). */
 constexpr uint32_t UnpremultChannel(uint32_t ch, uint32_t a) {
     return (ch * 255u + a / 2u) / a > 255u ? 255u : (ch * 255u + a / 2u) / a;
+}
+
+// Match the existing image-paint and copy paths for transparent pixels;
+// the Z160's zero-alpha RGB result has not been verified on hardware.
+constexpr uint32_t UnpremultArgb(uint32_t argb) {
+    const uint32_t alpha = argb >> 24;
+    if (alpha == 0u) return 0u;
+    if (alpha == 255u) return argb;
+    return (alpha << 24) | (UnpremultChannel((argb >> 16) & 255u, alpha) << 16)
+         | (UnpremultChannel((argb >> 8) & 255u, alpha) << 8)
+         | UnpremultChannel(argb & 255u, alpha);
 }
 
 }  // namespace imx51_g2d_blend

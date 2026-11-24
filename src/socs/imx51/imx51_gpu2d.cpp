@@ -119,6 +119,8 @@ public:
         /* Services, not in the peripheral walk - serialized through this funnel. */
         emu_.Get<Imx51Gpu2dCommandEngine>().SaveState(w);
         emu_.Get<Imx51Gpu2dRasterizer>().SaveState(w);
+        emu_.Get<Imx51Gpu2dCommandEngine>().SavePaintState(w);
+        emu_.Get<Imx51Gpu2dRasterizer>().SaveSmoothState(w);
     }
     void RestoreState(StateReader& r) override {
         RestoreLatch(r, cmd_);
@@ -134,6 +136,8 @@ public:
         r.Read("irq_active_g2d", irq_active_g2d_);
         emu_.Get<Imx51Gpu2dCommandEngine>().RestoreState(r);
         emu_.Get<Imx51Gpu2dRasterizer>().RestoreState(r);
+        emu_.Get<Imx51Gpu2dCommandEngine>().RestorePaintState(r);
+        emu_.Get<Imx51Gpu2dRasterizer>().RestoreSmoothState(r);
         written_ = true;
     }
     void PostRestore() override {  /* re-drive the restored G2D IRQ line (hibernation.md peripheral contract) */

@@ -8,6 +8,7 @@
 #include "imx51_id.h"
 #include <cerfcore/cpu/emulated_memory.h>
 #include "imx51_gpu2d_blend.h"
+#include "imx51_gpu2d_direct2d.h"
 
 #include <algorithm>
 #include <cmath>
@@ -30,6 +31,14 @@ enum { kOpDot = 0, kOpRcp = 1, kOpSqrtMul = 2, kOpSqrtAdd = 3 };
 int32_t WrapRepeat(int32_t v, int32_t n) {
     v %= n;
     return v < 0 ? v + n : v;
+}
+int32_t WrapCoord(int32_t value, int32_t size, Gpu2dWrap wrap) {
+    if (wrap == Gpu2dWrap::Repeat) return WrapRepeat(value, size);
+    if (wrap == Gpu2dWrap::Mirror) {
+        const int32_t mirrored = WrapRepeat(value, size * 2);
+        return mirrored < size ? mirrored : size * 2 - mirrored - 1;
+    }
+    return std::clamp(value, 0, size - 1);
 }
 }  // namespace
 
@@ -67,10 +76,17 @@ void Imx51Gpu2dGradwSampler::EvalProgram(const Gpu2dGradwPaint& p, int32_t px, i
         const uint32_t dst = (w >> 25) & 0xFu, op = (w >> 29) & 0x3u;
         float res;
         if (op == kOpDot)          res = va * vb + vc * vd + ve;
+        else if (op == kOpRcp)     res = vb / va + vc * vd + ve;
         else if (op == kOpSqrtMul) res = std::sqrt(va) * vb + vc * vd + ve;
+        else if (op == kOpSqrtAdd && vb == 0.0f && vd == 0.0f && ve == 0.0f)
+            res = std::sqrt(std::max(va, 0.0f)) + vc;
         else {
             emu_.Get<Fatal>().Die("[GPU2D-GRADW] ISA opcode %u not modeled (INST%u=0x%08X)", op, i, w);
         }
+        // The projective reciprocal program emits both texture coordinates:
+        // OUTX = B/A and OUTY = D/A. The guest uses ZERO for C and E.
+        if (op == kOpRcp && dst == 8u && ((w >> 10) & 31u) == 28u && (w & 31u) == 28u)
+            r[9] = vd / va;
         if (dst > 9u) {  /* writable: X/Y-as-temp, temps 2-7, OUTX(8)/OUTY(9) */
             emu_.Get<Fatal>().Die("[GPU2D-GRADW] ISA writes un-modeled GRADREG %u", dst);
         }
@@ -81,39 +97,80 @@ void Imx51Gpu2dGradwSampler::EvalProgram(const Gpu2dGradwPaint& p, int32_t px, i
 }
 
 uint32_t Imx51Gpu2dGradwSampler::Fetch(const Gpu2dGradwPaint& p, int32_t tx, int32_t ty) const {
-    /* WRAP=0 = clamp to edge (VG_COLOR_RAMP_SPREAD_PAD); WRAP=1 = REPEAT (tile modulo). */
-    tx = p.wrap_u ? WrapRepeat(tx, p.texw) : std::clamp(tx, 0, p.texw - 1);
-    ty = p.wrap_v ? WrapRepeat(ty, p.texh) : std::clamp(ty, 0, p.texh - 1);
-    const uint32_t pa = p.texbase + (static_cast<uint32_t>(ty) * p.tstride
-                                     + static_cast<uint32_t>(tx)) * 4u;
+    if ((p.wrap_u == Gpu2dWrap::Border && (tx < 0 || tx >= p.texw)) ||
+        (p.wrap_v == Gpu2dWrap::Border && (ty < 0 || ty >= p.texh)))
+        return p.srgb ? Imx51Gpu2dSrgbToLinear(p.border_color) : p.border_color;
+    tx = WrapCoord(tx, p.texw, p.wrap_u);
+    ty = WrapCoord(ty, p.texh, p.wrap_v);
+    const bool packed16 = Gpu2dTextureFormat16(p.format);
+    const bool packed8 = Gpu2dTextureFormat8(p.format);
+    const bool packed1 = Gpu2dTextureFormat1(p.format);
+    const bool packed4 = Gpu2dTextureFormat4(p.format);
+    uint32_t bytes_per_pixel = 4u;
+    if (packed8) bytes_per_pixel = 1u;
+    else if (packed16) bytes_per_pixel = 2u;
+    const uint32_t pa = p.texbase + static_cast<uint32_t>(ty) * p.tstride * 4u
+        + (packed1 ? static_cast<uint32_t>(tx) / 8u : packed4 ? static_cast<uint32_t>(tx) / 2u : static_cast<uint32_t>(tx) * bytes_per_pixel);
     const uint8_t* hp = emu_.Get<EmulatedMemory>().TryTranslate(pa);
     if (!hp) {
         emu_.Get<Fatal>().Die("[GPU2D-GRADW] texel unbacked pa=0x%08X (tx=%d ty=%d)", pa, tx, ty);
     }
-    return *reinterpret_cast<const uint32_t*>(hp);  /* fmt7 ARGB8888 */
+    if (packed1) {
+        const bool set = (*hp & (1u << (static_cast<uint32_t>(tx) % 8u))) != 0u;
+        uint32_t pixel = set ? p.foreground_color : p.background_color;
+        if (p.format == 1u) pixel = set ? 0xFFFFFFFFu : 0xFF000000u;
+        if (p.swap_rb) pixel = (pixel & 0xFF00FF00u) |
+            ((pixel & 0x00FF0000u) >> 16) | ((pixel & 0x000000FFu) << 16);
+        return p.srgb ? Imx51Gpu2dSrgbToLinear(pixel) : pixel;
+    }
+    uint32_t pixel;
+    if (packed4) {
+        const uint32_t alpha = ((*hp >> ((static_cast<uint32_t>(tx) % 2u) * 4u)) & 15u) * 17u;
+        pixel = (alpha << 24) | 0xFFFFFFu;
+    } else if (packed8) {
+        const uint32_t channel = *hp;
+        pixel = p.format == 3u
+            ? 0xFF000000u | (channel * 0x010101u) : (channel << 24) | 0xFFFFFFu;
+    } else if (packed16) {
+        pixel = Gpu2dDecodeTexture16(*reinterpret_cast<const uint16_t*>(hp), p.format);
+    } else {
+        pixel = *reinterpret_cast<const uint32_t*>(hp);
+        if (p.format == 13u) pixel = (pixel >> 8) | (pixel << 24);
+    }
+    if (p.swap_rb) pixel = (pixel & 0xFF00FF00u) |
+        ((pixel & 0x00FF0000u) >> 16) | ((pixel & 0x000000FFu) << 16);
+    return p.srgb ? Imx51Gpu2dSrgbToLinear(pixel) : pixel;
 }
 
 uint32_t Imx51Gpu2dGradwSampler::Sample(const Gpu2dGradwPaint& p,
                                         int32_t px, int32_t py) const {
+    const uint32_t texel = SampleTexel(p, px, py);
+    return p.premultiply ? texel : imx51_g2d_blend::PremultArgb(texel);
+}
+
+uint32_t Imx51Gpu2dGradwSampler::SampleTexel(const Gpu2dGradwPaint& p,
+                                                int32_t px, int32_t py) const {
     float s, t;
     EvalProgram(p, px, py, s, t);
     uint32_t texel;
     if (p.bilinear) {
         /* Half-texel centres (GPU texel-centre convention), clamp at edges. */
-        const float su = s * p.texw - 0.5f, tv = t * p.texh - 0.5f;
+        // One-row textures address horizontal texel centers at integers.
+        const float center_offset = p.texh == 1 ? 0.0f : 0.5f;
+        const float su = s * p.texw - center_offset, tv = t * p.texh - 0.5f;
         const int32_t x0 = static_cast<int32_t>(std::floor(su));
         const int32_t y0 = static_cast<int32_t>(std::floor(tv));
         const float fxr = su - static_cast<float>(x0), fyr = tv - static_cast<float>(y0);
         texel = Lerp(Lerp(Fetch(p, x0, y0), Fetch(p, x0 + 1, y0), fxr),
                      Lerp(Fetch(p, x0, y0 + 1), Fetch(p, x0 + 1, y0 + 1), fxr), fyr);
     } else {
-        texel = Fetch(p, static_cast<int32_t>(std::floor(s * p.texw)),
-                      static_cast<int32_t>(std::floor(t * p.texh)));
+        // Approximate point-sampler subtexel precision before selecting the texel.
+        const float sx = std::round(s * p.texw * 256.0f) / 256.0f;
+        const float ty = std::round(t * p.texh * 256.0f) / 256.0f;
+        texel = Fetch(p, static_cast<int32_t>(std::floor(sx)),
+                      static_cast<int32_t>(std::floor(ty)));
     }
-    /* openvg_spec.pdf 9.3.3: a premultiplied ramp is interpolated in premult form
-       (texel already premult); a non-premult ramp is interpolated independently,
-       then premultiplied here for the g12's premultiplied blend ALU. */
-    return p.premultiply ? texel : imx51_g2d_blend::PremultArgb(texel);
+    return texel;
 }
 
 }

@@ -16,12 +16,24 @@ class Imx51Gpu2dPixelBlend;
 /* One FLUSH's fill target, decoded by the peripheral from the g12 register file
    (G2D_BASE0/CFG0/SCISSORX/Y + VGV1_SCISSORX/Y + VGV1_CFG1 + G2D_COLOR). */
 struct Gpu2dFillTarget {
+    uint32_t mask_pa = 0;
+    int32_t mask_stride_dw = 0;
     uint32_t dest_pa;    /* G2D_BASE0 (tile-corner physical; gpuaddr==physical) */
     int32_t  stride_dw;
+    bool     dest_a8 = false;
+    bool     dest_5551 = false;
+    bool     dest_4444 = false;
+    bool     dest_argb4444 = false;
+    bool     dest_argb1555 = false;
     bool     dest_565 = false;  /* G2D_CFG0.FORMAT: false=G2D_8888(7), true=G2D_0565(6) */
     int32_t  clip_l, clip_t, clip_r, clip_b;  /* inclusive px, scissors pre-intersected */
     uint32_t argb;       /* G2D_COLOR, PREMULTIPLIED ARGB8888 (paint setup premultiplies
                             via libOpenVG sub_41C69F40: ch = ch*A/255) */
+    bool     antialias = true;
+    bool     multisample = false;
+    int32_t  sample_index = -1;
+    int32_t  sample_scissor_top = 0;
+    int32_t  sample_scissor_bottom = 0x7fffffff;
     bool     even_odd;   /* VGV1_CFG1.WINDRULE: 1=even-odd, 0=nonzero */
     bool     blend;      /* G2D_BLENDERCFG.ENABLE */
     bool     oo_alpha;   /* G2D_BLENDERCFG.OOALPHA: un-premultiply the blend result */
@@ -30,23 +42,36 @@ struct Gpu2dFillTarget {
                              surfaces, fmt==12427) */
     uint32_t prog_a;     /* G2D_BLEND_A0 alpha-pipe micro-op */
     uint32_t prog_c;     /* G2D_BLEND_C0 color-pipe micro-op */
+    bool     image_paint = false;
+    bool     generic_blend = false;
+    uint32_t alpha_passes = 0, color_passes = 0;
+    uint32_t alpha_program[4] = {}, color_program[8] = {};
     bool     color_transform = false;  /* CONST0/1 transform followed by SRC_OVER */
     uint32_t prog_a1 = 0, prog_c1 = 0;
     uint32_t blend_const[8] = {};      /* G2D_CONST0-7, selected by CONST/SRC */
     /* When set, the per-pixel SOURCE is the GRADW texel sample at (x,y) instead
        of the solid argb (VG-fill gradient paint); null = solid/copy fill. */
     const Gpu2dGradwPaint* paint = nullptr;
+    const Gpu2dGradwPaint* second_paint = nullptr;
 };
 
-/* One direct-2D SCOORD1 source->dest copy, decoded by the command engine from the
-   g12 register file (BASE0/CFG0 dest + BASE1/CFG1 src + G2D_XY/SXY/WIDTHHEIGHT +
-   G2D_SCISSORX/Y). Both surfaces are G2D_8888 linear with all CFG swap fields 0
-   (emitter sub_41C6C448 writes CFG=STRIDE|0x7000), so the copy is byte-identical. */
+/* One direct-2D SCOORD1 source->dest copy, decoded from the g12 register file. */
 struct Gpu2dCopySpec {
+    uint32_t dst_format;
     uint32_t dst_pa;         /* G2D_BASE0 (tile-corner physical; gpuaddr==physical) */
     int32_t  dst_stride_dw;
     uint32_t src_pa;         /* G2D_BASE1 */
     int32_t  src_stride_dw;
+    uint32_t src_format;
+    uint32_t foreground_color, background_color;
+    bool src_srgb;
+    bool src_swap_rb;
+    bool dst_srgb;
+    bool dst_swap_rb;
+    bool dither;
+    bool premultiply_source;
+    bool opaque_source;
+    bool unpremultiply_source;
     int32_t  clip_l, clip_t, clip_r, clip_b;  /* inclusive dest G2D scissor */
     int32_t  dst_x, dst_y;   /* G2D_XY dest origin (signed 12-bit) */
     int32_t  src_x, src_y;   /* G2D_SXY source origin (unsigned 11-bit) */
@@ -64,7 +89,7 @@ public:
     void OnReady() override;
 
     void MoveTo(float x, float y, bool closed);
-    void LineTo(float x, float y);
+    void LineTo(float x, float y, bool smooth = false);
     bool HasGeometry() const { return !pts_.empty(); }
     void Flush(const Gpu2dFillTarget& t);  /* fill + clear the accumulated path */
     /* Direct-2D engine rect fill (G2D_XY/WIDTHHEIGHT/COLOR, blend-disabled). */
@@ -72,6 +97,8 @@ public:
 
     void SaveState(StateWriter& w) const;
     void RestoreState(StateReader& r);
+    void SaveSmoothState(StateWriter& w) const;
+    void RestoreSmoothState(StateReader& r);
 
     [[noreturn]] void HaltFill(const char* why, float a, float b) const;
     /* Coverage-fill closed contours (arbitrary edges) under t.even_odd/nonzero
@@ -84,7 +111,8 @@ public:
     const std::vector<float>&    PathPoints() const { return pts_; }
     const std::vector<uint32_t>& PathStarts() const { return starts_; }
     const std::vector<uint8_t>&  PathClosed() const { return closed_; }
-    void ClearPath() { pts_.clear(); starts_.clear(); closed_.clear(); }
+    const std::vector<uint8_t>& PathSmooth() const { return smooth_; }
+    void ClearPath() { pts_.clear(); starts_.clear(); closed_.clear(); smooth_.clear(); }
 
 private:
     /* Byte address of dest pixel (x,y) per t.dest_565 (row stride = stride_dw
@@ -95,8 +123,13 @@ private:
     /* src = t.paint ? samp->Sample at (x,y) : t.argb (samp resolved once per fill). */
     uint32_t PaintSrc(const Gpu2dFillTarget& t, const Imx51Gpu2dGradwSampler* samp,
                       int32_t x, int32_t y) const;
+    uint32_t BlendAt(const Gpu2dFillTarget& t, const Imx51Gpu2dGradwSampler* samp,
+                     int32_t x, int32_t y, float coverage);
     void FillRow(const Gpu2dFillTarget& t, int32_t y, int32_t x0, int32_t x1,
                  uint32_t const_px, bool per_pixel, const Imx51Gpu2dGradwSampler* samp);
+    void FillSampledContours(const Gpu2dFillTarget& t,
+                                 const std::vector<std::vector<float>>& contours,
+                                 uint32_t const_px, bool per_pixel);
     /* Exact box-filter coverage fill for fractional RECTILINEAR paths; partial
        pixels are modeled only under the blender (coverage scales the paint). */
     void FlushCoverage(const Gpu2dFillTarget& t, uint32_t const_px, bool per_pixel,
@@ -109,6 +142,7 @@ private:
     std::vector<float>    pts_;
     std::vector<uint32_t> starts_;
     std::vector<uint8_t>  closed_;
+    std::vector<uint8_t> smooth_;
 
     const Imx51Gpu2dPixelBlend* blend_ = nullptr;
 };

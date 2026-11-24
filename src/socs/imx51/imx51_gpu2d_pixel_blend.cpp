@@ -31,8 +31,6 @@ bool Imx51Gpu2dPixelBlend::BlendProgRefsDest(uint32_t prog) {
 }
 
 void Imx51Gpu2dPixelBlend::ValidateBlendProg(uint32_t prog) const {
-    if (Operation(prog) != 0u)  /* G2D_BLENDOP_ADD (vgenums_z160.h:181-186) */
-        HaltBlend("blend OPERATION SUB/MIN/MAX", prog);
     if (Dst(prog, 0) != 1u || Dst(prog, 1) != 0u || Dst(prog, 2) != 0u)
         HaltBlend("blend multi-TEMP routing", prog);
     for (uint32_t i = 0; i < 4u; ++i) {
@@ -42,26 +40,21 @@ void Imx51Gpu2dPixelBlend::ValidateBlendProg(uint32_t prog) const {
 }
 
 uint32_t Imx51Gpu2dPixelBlend::BlendPixel(const Gpu2dFillTarget& t, uint32_t src, uint32_t dst,
-                                          float cov) const {
-    if (cov < 1.0f) {
-        auto cv = [cov](uint32_t ch) {
-            return static_cast<uint32_t>(static_cast<float>(ch) * cov + 0.5f);
-        };
-        src = (cv(src >> 24) << 24) | (cv((src >> 16) & 0xFFu) << 16)
-            | (cv((src >> 8) & 0xFFu) << 8) | cv(src & 0xFFu);
-    }
+                                          float cov, uint32_t image) const {
     if (t.premult_dst)
         dst = PremultArgb(dst);
     const uint32_t inputs[] = {0u, src, dst};
-    auto chan = [&](uint32_t prog, uint32_t shift) -> uint32_t {
-        auto operand = [&](uint32_t i) -> uint32_t {
-            return Operand(prog, i, shift, inputs, t.blend_const);
-        };
-        const uint32_t sum = Mul(operand(0), operand(1)) + Mul(operand(2), operand(3));
-        return std::min(sum, 255u);
-    };
     uint32_t a, r, g, b;
-    if (t.color_transform) {
+    if (t.generic_blend) {
+        const uint32_t out = AddProgram(t.alpha_program, t.alpha_passes,
+                                        t.color_program, t.color_passes, t.blend_const,
+                                        t.image_paint ? t.argb : src, dst,
+                                        t.image_paint ? src : image);
+        a = out >> 24;
+        r = (out >> 16) & 0xFFu;
+        g = (out >> 8) & 0xFFu;
+        b = out & 0xFFu;
+    } else if (t.color_transform) {
         const uint32_t alpha[] = {t.prog_a, t.prog_a1}, color[] = {t.prog_c, t.prog_c1};
         const uint32_t out = AddProgram(alpha, 2u, color, 2u, t.blend_const, src, dst);
         a = out >> 24;
@@ -69,22 +62,25 @@ uint32_t Imx51Gpu2dPixelBlend::BlendPixel(const Gpu2dFillTarget& t, uint32_t src
         g = (out >> 8) & 0xFFu;
         b = out & 0xFFu;
     } else {
-        a = chan(t.prog_a, 24u);
-        r = chan(t.prog_c, 16u);
-        g = chan(t.prog_c, 8u);
-        b = chan(t.prog_c, 0u);
+        a = BlendChannel(t.prog_a, 24u, inputs, t.blend_const);
+        r = BlendChannel(t.prog_c, 16u, inputs, t.blend_const);
+        g = BlendChannel(t.prog_c, 8u, inputs, t.blend_const);
+        b = BlendChannel(t.prog_c, 0u, inputs, t.blend_const);
     }
-    if (t.oo_alpha && a != 255u) {
-        if (a == 0u) {
-            if (r | g | b)
-                HaltBlend("OOALPHA divide on zero-alpha nonzero color", t.prog_c);
-        } else {
-            r = UnpremultChannel(r, a);
-            g = UnpremultChannel(g, a);
-            b = UnpremultChannel(b, a);
+    uint32_t argb = (a << 24) | (r << 16) | (g << 8) | b;
+    if (cov < 1.0f) {
+        const uint32_t coverage_dst = t.oo_alpha && !t.premult_dst ? PremultArgb(dst) : dst;
+        uint32_t covered = 0;
+        for (uint32_t shift = 0; shift < 32u; shift += 8u) {
+            const float result_channel = static_cast<float>((argb >> shift) & 255u);
+            const float dest_channel = static_cast<float>((coverage_dst >> shift) & 255u);
+            const float mixed = result_channel * cov + dest_channel * (1.0f - cov);
+            const uint32_t value = static_cast<uint32_t>(mixed + 0.5f);
+            covered |= value << shift;
         }
+        argb = covered;
     }
-    return (a << 24) | (r << 16) | (g << 8) | b;
+    return t.oo_alpha ? UnpremultArgb(argb) : argb;
 }
 
 }

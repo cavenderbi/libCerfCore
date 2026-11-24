@@ -10,3 +10,7 @@ function(cerfcore_test name)
 endfunction()
 
 cerfcore_test(utf16_test)
+cerfcore_test(imx51_gpu2d_unpremult_test)
+cerfcore_test(imx51_gpu2d_blend_ops_test)
+cerfcore_test(imx51_gpu2d_image_operand_test)
+cerfcore_test(imx51_gpu2d_fill_color_test)

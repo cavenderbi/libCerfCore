@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 
 namespace cerfcore {
 
@@ -53,7 +54,11 @@ constexpr uint32_t kFmtF32 = 3u;
 constexpr uint32_t kActMoveToOpen   = 1u;
 constexpr uint32_t kActMoveToClosed = 2u;
 constexpr uint32_t kActLineTo       = 3u;
+constexpr uint32_t kActCubicTo      = 4u;
+constexpr uint32_t kActSmoothCubicTo = 6u;
+constexpr uint32_t kActSmoothQuadTo = 7u;
 constexpr uint32_t kActQuadTo       = 5u;  /* VGV2_ACTION_QUADTO: quadratic C1,C3,C4 */
+constexpr uint32_t kAddrC2X         = 0x42u;
 constexpr uint32_t kAddrC3X         = 0x44u;  /* ADDR_VGV2_C3X (control pt; C4 follows at 0x46) */
 /* VGV2 geometry/transform registers (vgregs_z160.h:178-211). */
 constexpr uint32_t kAddrC4X      = 0x46u;  /* ADDR_VGV2_C4X */
@@ -149,7 +154,16 @@ bool Imx51Gpu2dCommandEngine::IsConsumedConfigReg(uint32_t reg) {
 }
 
 void Imx51Gpu2dCommandEngine::StoreReg(uint32_t reg, uint32_t data) {
+    if (reg == 0xD0u && data == 0u) paint_bank_valid_ = false;
+    if (reg == 0xD0u && (vg_regs_[0xD0] & ~7u) == 0x40u && (data & 0x1C0u) == 0x1C0u) {
+        std::copy_n(vg_regs_, 0x100, paint_regs_);
+        paint_bank_valid_ = true;
+    }
     switch (reg) {
+        case kAddrVgv3Control:
+            /* The command stream can flush the blit cache; writes are synchronous here. */
+            if (data == (1u << 19)) return;
+            Halt("in-stream VGV3_CONTROL mode (not modeled)", reg, data);
         case kAddrVgv3NextAddr: vgv3_nextaddr_ = data; return;  /* CALLADDR, consumed by the walk */
         case kAddrVgv3NextCmd:  vgv3_nextcmd_ = data; return;   /* NEXTCMD, consumed by the walk */
         case kAddrVgv3Mode:
@@ -165,9 +179,7 @@ void Imx51Gpu2dCommandEngine::StoreReg(uint32_t reg, uint32_t data) {
             vg_regs_[reg] = data;
             return;
         case 0x04u: case 0x05u: case 0x06u: case 0x07u:
-            /* G2D_BASE2/CFG2/BASE3/CFG3 = SRC2/SRC3 source surfaces
-               (vgregs_z160.h:64-65,81-82); every render dispatch FATALs
-               G2D_CONFIG.SRC2/SRC3, so their fetch is unreachable - proven-inert. */
+            /* G2D_BASE2/CFG2 provide the mask surface for vector fills. */
             vg_regs_[reg] = data;
             return;
         case 0x16u: case 0x17u: case 0x1Au: case 0x1Bu:
@@ -179,9 +191,7 @@ void Imx51Gpu2dCommandEngine::StoreReg(uint32_t reg, uint32_t data) {
             vg_regs_[reg] = data;
             return;
         case 0x0Au: case 0x0Bu:
-            /* G2D_FOREGROUND/BACKGROUND (vgregs_z160.h:93,61) = mono-expand/colorkey
-               source colors; CERF sources fills from COLOR/GRADW/BASE only, and those
-               modes FATAL at the format/CONFIG/INPUT gates, so FG/BG are never read. */
+            /* G2D_FOREGROUND/BACKGROUND provide colors for one-bit textures. */
             vg_regs_[reg] = data;
             return;
         case 0x60u: case 0x62u: case 0x63u: case 0x64u:
@@ -220,10 +230,7 @@ void Imx51Gpu2dCommandEngine::StoreReg(uint32_t reg, uint32_t data) {
             vg_regs_[reg] = data;
             return;
         case 0xD4u:
-            /* GRADW_BORDERCOLOR (vgregs_z160.h:106) = the out-of-bounds texel for a
-               non-clamp wrap/tile mode; the GRADW sampler clamps texcoords to edge and
-               never reads it, and any non-zero TEXCFG WRAP/TILED FATALs at the texture-
-               config gate before the sampler - proven-inert. */
+            /* GRADW_BORDERCOLOR is consumed by the border wrap mode. */
             vg_regs_[reg] = data;
             return;
         case 0x23u:
@@ -286,7 +293,13 @@ void Imx51Gpu2dCommandEngine::StoreReg(uint32_t reg, uint32_t data) {
             }
             Halt("G2D_COLOR write under unmodeled G2D_INPUT", reg, vg_regs_[kAddrG2dInput]);
     }
-    if (IsConsumedConfigReg(reg)) { vg_regs_[reg] = data; return; }
+    if (IsConsumedConfigReg(reg)) {
+        vg_regs_[reg] = data;
+        if (reg == kAddrG2dWh && vg_regs_[kAddrG2dInput] == 0x08u &&
+            ((vg_regs_[0xD0] & ~7u) == 0x40u || (vg_regs_[0xD0] & 0x1C0u) == 0x1C0u))
+            emu_.Get<Imx51Gpu2dImagePaint>().Composite(vg_regs_, paint_bank_valid_ ? paint_regs_ : nullptr);
+        return;
+    }
     Halt("g12 register write has no modeled consumer", reg, data);
 }
 
@@ -356,21 +369,30 @@ void Imx51Gpu2dCommandEngine::ExecPacket(uint32_t base, uint32_t count) {
 uint32_t Imx51Gpu2dCommandEngine::ExecGeometry(uint32_t action, uint32_t addr, uint32_t fmt,
                                                uint32_t cnt, uint32_t loop, uint32_t data_pa) {
     const bool quad = (action == kActQuadTo);
-    if (action != kActMoveToOpen && action != kActMoveToClosed && action != kActLineTo && !quad) {
+    const bool cubic = (action == kActCubicTo);
+    const bool smooth_cubic = (action == kActSmoothCubicTo);
+    const bool smooth_quad = (action == kActSmoothQuadTo);
+    if (action != kActMoveToOpen && action != kActMoveToClosed && action != kActLineTo && !quad && !smooth_quad && !cubic && !smooth_cubic) {
         Halt("VGV2 curve/vertex action (not modeled)", data_pa, action);
     }
     const bool rel = (addr == kAddrC4XRel);
-    if (quad) {
+    const bool cubic_rel = addr == kAddrC2X + 8u;
+    const bool quad_rel = addr == kAddrC3X + 8u;
+    if (cubic) {
+        if (loop != 6u || cnt == 0u || cnt % 6u != 0u || (addr != kAddrC2X && !cubic_rel))
+            Halt("VGV2 CUBICTO target/loop/count", data_pa, (loop << 16) | cnt);
+    } else if (quad || smooth_cubic) {
         /* QUADTO writes C3(control 0x44/0x45) then C4(end 0x46/0x47): LOOP=4, count a
            multiple of 4, absolute C3X target (captured shape, encoder sub_41C7772C). */
         if (loop != 4u || cnt == 0u || (cnt & 3u) != 0u)
             Halt("VGV2 QUADTO loop/count shape", data_pa, (loop << 16) | cnt);
-        if (addr != kAddrC3X)
+        if (addr != kAddrC3X && !quad_rel)
             Halt("VGV2 QUADTO target register", data_pa, addr);
     } else {
         if (loop != 2u || cnt == 0u || (cnt & 1u) != 0u)
             Halt("VGV2 geometry loop/count shape", data_pa, (loop << 16) | cnt);
-        if (addr != kAddrC4X && !(rel && action == kActLineTo))
+        if (addr != kAddrC4X && !(addr == kAddrC2X && action == kActLineTo) &&
+            !(rel && (action == kActLineTo || smooth_quad)))
             Halt("VGV2 geometry target register", data_pa, addr);
     }
     uint32_t lanes = 1u, word = 0;
@@ -378,7 +400,7 @@ uint32_t Imx51Gpu2dCommandEngine::ExecGeometry(uint32_t action, uint32_t addr, u
     else if (fmt == kFmtS16) lanes = 2u;
     else if (fmt != kFmtS32 && fmt != kFmtF32)
         Halt("VGV2 geometry RAW format", data_pa, fmt);
-    float pt[4];
+    float pt[6];
     for (uint32_t k = 0; k < cnt; ++k) {
         const uint32_t lane = k % lanes;
         if (lane == 0u) word = ReadPa(data_pa + (k / lanes) * 4u);
@@ -389,16 +411,39 @@ uint32_t Imx51Gpu2dCommandEngine::ExecGeometry(uint32_t action, uint32_t addr, u
             case kFmtS32: v = static_cast<float>(static_cast<int32_t>(word)); break;
             default:      std::memcpy(&v, &word, sizeof(v)); break;  /* F32 */
         }
-        if (quad) {
+        if (cubic) {
+            pt[k % 6u] = v;
+            if (k % 6u != 5u) continue;
+            const float ox = cubic_rel ? cur_x_ : 0.0f, oy = cubic_rel ? cur_y_ : 0.0f;
+            EmitCubic(pt[0] + ox, pt[1] + oy, pt[2] + ox, pt[3] + oy, pt[4] + ox, pt[5] + oy);
+        } else if (quad || smooth_cubic) {
             pt[k & 3u] = v;                       /* C3x,C3y,C4x,C4y (absolute) */
             if ((k & 3u) != 3u) continue;
-            EmitQuad(pt[0], pt[1], pt[2], pt[3]);
+            if (quad_rel) {
+                pt[0] += cur_x_; pt[1] += cur_y_; pt[2] += cur_x_; pt[3] += cur_y_;
+            }
+            if (smooth_cubic) {
+                const float c2x = cubic_control_valid_ ? 2.0f * cur_x_ - cubic_control_x_ : cur_x_;
+                const float c2y = cubic_control_valid_ ? 2.0f * cur_y_ - cubic_control_y_ : cur_y_;
+                EmitCubic(c2x, c2y, pt[0], pt[1], pt[2], pt[3]);
+            } else EmitQuad(pt[0], pt[1], pt[2], pt[3]);
         } else {
             pt[k & 1u] = v;
             if ((k & 1u) == 0u) continue;
-            if (rel) { cur_x_ += pt[0]; cur_y_ += pt[1]; }
-            else     { cur_x_ = pt[0];  cur_y_ = pt[1]; }
-            EmitPoint(action);
+            if (smooth_quad) {
+                const float control_x = quad_control_valid_ ? 2.0f * cur_x_ - quad_control_x_ : cur_x_;
+                const float control_y = quad_control_valid_ ? 2.0f * cur_y_ - quad_control_y_ : cur_y_;
+                EmitQuad(control_x, control_y, rel ? cur_x_ + pt[0] : pt[0],
+                         rel ? cur_y_ + pt[1] : pt[1]);
+            } else {
+                if (addr == kAddrC2X && (pt[0] != cur_x_ || pt[1] != cur_y_))
+                    Halt("VGV2 LINETO C2 differs from current point", data_pa, addr);
+                if (rel) { cur_x_ += pt[0]; cur_y_ += pt[1]; }
+                else     { cur_x_ = pt[0];  cur_y_ = pt[1]; }
+                quad_control_valid_ = false;
+                cubic_control_valid_ = false;
+                EmitPoint(action);
+            }
         }
     }
     return (cnt + lanes - 1u) / lanes;
@@ -441,20 +486,111 @@ void Imx51Gpu2dCommandEngine::EmitQuad(float c3x, float c3y, float c4x, float c4
     auto& rast = emu_.Get<Imx51Gpu2dRasterizer>();
     for (int i = 1; i <= n; ++i) {
         const float t = static_cast<float>(i) / static_cast<float>(n), u = 1.0f - t;
-        const float px = u * u * c1x + 2.0f * u * t * c3x + t * t * c4x;
-        const float py = u * u * c1y + 2.0f * u * t * c3y + t * t * c4y;
+        const float px = c1x + 2.0f * u * t * (c3x - c1x) + t * t * (c4x - c1x);
+        const float py = c1y + 2.0f * u * t * (c3y - c1y) + t * t * (c4y - c1y);
         float dx, dy;
         DevicePoint(px, py, dx, dy);
-        rast.LineTo(dx, dy);
+        rast.LineTo(dx, dy, i != n);
     }
     cur_x_ = c4x;
     cur_y_ = c4y;
+    quad_control_x_ = c3x;
+    quad_control_y_ = c3y;
+    quad_control_valid_ = true;
+    // VGV2 smooth actions reflect the last control point across curve types.
+    cubic_control_x_ = c3x;
+    cubic_control_y_ = c3y;
+    cubic_control_valid_ = true;
+}
+
+void Imx51Gpu2dCommandEngine::EmitCubic(float c2x, float c2y, float c3x, float c3y,
+                                       float c4x, float c4y) {
+    const float c1x = cur_x_, c1y = cur_y_;
+    float dx[4], dy[4];
+    DevicePoint(c1x, c1y, dx[0], dy[0]); DevicePoint(c2x, c2y, dx[1], dy[1]);
+    DevicePoint(c3x, c3y, dx[2], dy[2]); DevicePoint(c4x, c4y, dx[3], dy[3]);
+    const float a = std::hypot(dx[0] - 2.0f * dx[1] + dx[2], dy[0] - 2.0f * dy[1] + dy[2]);
+    const float b = std::hypot(dx[1] - 2.0f * dx[2] + dx[3], dy[1] - 2.0f * dy[2] + dy[3]);
+    // A tiny centerline can still have a wide stroke: retain its changing tangent.
+    constexpr int kMinCubicSegments = 32;
+    const int count = std::clamp(static_cast<int>(std::ceil(std::sqrt(192.0f * std::max(a, b)))),
+                                 kMinCubicSegments, 256);
+    auto& rast = emu_.Get<Imx51Gpu2dRasterizer>();
+    // The offset pen can turn sharply even when the centerline barely moves.
+    // Subdivide the original intervals where the cubic tangent changes rapidly.
+    auto tangent = [&](float t) {
+        const float u = 1.0f - t;
+        return std::pair<float, float>{u*u*(c2x-c1x) + 2*u*t*(c3x-c2x) + t*t*(c4x-c3x),
+                                       u*u*(c2y-c1y) + 2*u*t*(c3y-c2y) + t*t*(c4y-c3y)};
+    };
+    // Very small curves are sensitive to rounding when their offset pen turns.
+    constexpr float kSubpixelExtent = 1.0f / 16.0f;
+    const float curve_extent = std::max({std::hypot(dx[1] - dx[0], dy[1] - dy[0]),
+                                         std::hypot(dx[2] - dx[0], dy[2] - dy[0]),
+                                         std::hypot(dx[3] - dx[0], dy[3] - dy[0])});
+    const float max_turn_cosine = curve_extent <= kSubpixelExtent ? 0.999f : 0.9995f;
+    auto turns_sharply = [&](float left, float right) {
+        const auto a = tangent(left), b = tangent(right);
+        const float a_len = std::hypot(a.first, a.second), b_len = std::hypot(b.first, b.second);
+        constexpr float kMinTangentLength = 1e-9f;
+        return a_len > kMinTangentLength && b_len > kMinTangentLength &&
+            a.first*b.first + a.second*b.second < max_turn_cosine*a_len*b_len;
+    };
+    // Preserve endpoint tangent directions when float precision permits it.
+    const float endpoint_t = 0.25f / (count * count);
+    auto endpoint_has_precision = [&](int endpoint, int control) {
+        float magnitude = std::max({1.0f, std::fabs(dx[endpoint]), std::fabs(dy[endpoint])});
+        const float xx = RegF(vg_regs_, kAddrXfXX), xy = RegF(vg_regs_, kAddrXfXX + 2u);
+        const float yx = RegF(vg_regs_, kAddrXfXX + 1u), yy = RegF(vg_regs_, kAddrXfXX + 3u);
+        const float determinant = std::fabs(xx * yy - xy * yx);
+        const float condition = determinant > 1e-12f
+            ? std::max(std::fabs(xx) + std::fabs(xy), std::fabs(yx) + std::fabs(yy)) *
+              std::max(std::fabs(yy) + std::fabs(xy), std::fabs(yx) + std::fabs(xx)) / determinant
+            : 1e20f;
+        magnitude *= condition;
+        const float displacement = 3.0f * endpoint_t *
+            std::hypot(dx[control] - dx[endpoint], dy[control] - dy[endpoint]);
+        return displacement > 32.0f * std::numeric_limits<float>::epsilon() * magnitude;
+    };
+    auto emit_endpoint_sample = [&](float t) {
+        const float u = 1.0f - t;
+        const float px = c1x + 3*u*u*t*(c2x-c1x) + 3*u*t*t*(c3x-c1x) + t*t*t*(c4x-c1x);
+        const float py = c1y + 3*u*u*t*(c2y-c1y) + 3*u*t*t*(c3y-c1y) + t*t*t*(c4y-c1y);
+        float x, y;
+        DevicePoint(px, py, x, y);
+        rast.LineTo(x, y, true);
+    };
+    if (endpoint_has_precision(0, 1)) emit_endpoint_sample(endpoint_t);
+    auto emit_interval = [&](auto&& self, float left, float right, int depth) -> void {
+        const float mid = (left + right) * 0.5f;
+        constexpr int kMaxTurnSubdivision = 7;
+        if (depth < kMaxTurnSubdivision && (turns_sharply(left, mid) || turns_sharply(mid, right))) {
+            self(self, left, mid, depth + 1);
+            self(self, mid, right, depth + 1);
+            return;
+        }
+        if (right == 1.0f && left < 1.0f - endpoint_t && endpoint_has_precision(3, 2))
+            emit_endpoint_sample(1.0f - endpoint_t);
+        const float t = right, u = 1.0f - t;
+        const float px = c1x + 3*u*u*t*(c2x-c1x) + 3*u*t*t*(c3x-c1x) + t*t*t*(c4x-c1x);
+        const float py = c1y + 3*u*u*t*(c2y-c1y) + 3*u*t*t*(c3y-c1y) + t*t*t*(c4y-c1y);
+        float x, y;
+        DevicePoint(px, py, x, y);
+        rast.LineTo(x, y, right < 1.0f);
+    };
+    for (int i = 1; i <= count; ++i)
+        emit_interval(emit_interval, static_cast<float>(i - 1) / count, static_cast<float>(i) / count, 0);
+    cur_x_ = c4x; cur_y_ = c4y;
+    quad_control_x_ = c3x;
+    quad_control_y_ = c3y;
+    quad_control_valid_ = true;
+    cubic_control_x_ = c3x; cubic_control_y_ = c3y; cubic_control_valid_ = true;
 }
 
 /* FLUSH (VGV2_ACTION=15): fill/stroke the accumulated path. The gate + target
    build + rasterizer/stroker dispatch live in the VG-fill service. */
 void Imx51Gpu2dCommandEngine::FlushPath() {
-    emu_.Get<Imx51Gpu2dVgFill>().Flush(vg_regs_, bbox_live_);
+    emu_.Get<Imx51Gpu2dVgFill>().Flush(vg_regs_, bbox_live_, paint_bank_valid_ ? paint_regs_ : nullptr);
 }
 
 void Imx51Gpu2dCommandEngine::SaveState(StateWriter& w) const {
@@ -477,10 +613,51 @@ void Imx51Gpu2dCommandEngine::RestoreState(StateReader& r) {
     r.ReadBytes("vg_regs", vg_regs_, sizeof(vg_regs_));
 }
 
+void Imx51Gpu2dCommandEngine::SavePaintState(StateWriter& w) const {
+    w.Write("paint_bank_valid", paint_bank_valid_);
+    w.WriteBytes("paint_regs", paint_regs_, sizeof(paint_regs_));
+    w.Write("quad_control_valid", quad_control_valid_);
+    w.Write("quad_control_x", quad_control_x_);
+    w.Write("quad_control_y", quad_control_y_);
+    w.Write("cubic_control_valid", cubic_control_valid_);
+    w.Write("cubic_control_x", cubic_control_x_);
+    w.Write("cubic_control_y", cubic_control_y_);
+}
+
+void Imx51Gpu2dCommandEngine::RestorePaintState(StateReader& r) {
+    quad_control_valid_ = false;
+    quad_control_x_ = quad_control_y_ = 0.0f;
+    cubic_control_valid_ = false;
+    cubic_control_x_ = cubic_control_y_ = 0.0f;
+    if (r.Remaining() == 0) {
+        paint_bank_valid_ = false;
+        std::fill(std::begin(paint_regs_), std::end(paint_regs_), 0u);
+        return;
+    }
+    r.Read("paint_bank_valid", paint_bank_valid_);
+    r.ReadBytes("paint_regs", paint_regs_, sizeof(paint_regs_));
+    if (r.Remaining() != 0) {
+        r.Read("quad_control_valid", quad_control_valid_);
+        r.Read("quad_control_x", quad_control_x_);
+        r.Read("quad_control_y", quad_control_y_);
+    }
+    if (r.Remaining() != 0) {
+        r.Read("cubic_control_valid", cubic_control_valid_);
+        r.Read("cubic_control_x", cubic_control_x_);
+        r.Read("cubic_control_y", cubic_control_y_);
+    }
+}
+
 void Imx51Gpu2dCommandEngine::PowerOnReset() {
     vgv3_nextaddr_ = vgv3_nextcmd_ = vgv3_cursor_ = 0;
     cur_x_ = cur_y_ = 0.0f;
+    quad_control_valid_ = false;
+    quad_control_x_ = quad_control_y_ = 0.0f;
+    cubic_control_valid_ = false;
+    cubic_control_x_ = cubic_control_y_ = 0.0f;
     bbox_live_ = false;
+    paint_bank_valid_ = false;
+    std::fill(std::begin(paint_regs_), std::end(paint_regs_), 0u);
     std::fill(std::begin(vg_regs_), std::end(vg_regs_), 0u);
 }
 
